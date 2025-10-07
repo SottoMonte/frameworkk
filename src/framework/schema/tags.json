@@ -1,0 +1,327 @@
+{
+    "Card": {
+        "type": "dict",
+        "schema": {
+            "id": {"type": "string"},
+            "title": {"type": "string"},
+            "subtitle": {"type": "string"},
+            "image": {"type": "string"},
+            "content": {"type": "string"},
+            "class": {"type": "string"},
+            "width": {"type": "string"},
+            "height": {"type": "string"},
+            "padding": {"type": "string"},
+            "margin": {"type": "string"},
+            "alignment-content": {
+                "type": "string",
+                "allowed": ["horizontal", "center", "end", "between", "around"]
+            },
+            "expand": {
+                "type": "string"
+            }
+        },
+        "_return": {"function": "render_widget", "args": ["card"]}
+    },
+    "Data": {
+        "type": "dict", 
+        "schema": {
+            "id": {"type": "string"},
+            "class": {"type": "string"},
+            "width": {"type": "string"},
+            "height": {"type": "string"},
+            "value": {"type": "string"},
+            "type": {
+                "type": "string",
+                "allowed": ["text", "table", "table.row", "table.cell", "table.header", "table.body", "progress", "placeholder"],
+                "default": "text"
+            }
+        },
+        "_return": {"function": "render_widget", "args": ["data"]}
+    },
+    "Media": {
+        "type": "dict", 
+        "schema": {
+            "allow": {"type": "string"},
+            "class": {"type": "string"},
+            "controls": {"type": "string"},
+            "autoplay": {"type": "string" },
+            "width":{"type": "string"},
+            "height":{"type": "string"},
+            "expand":{"type": "string"},
+            "type": {
+                "type": "string",
+                "allowed": ["image", "video", "audio", "embed", "carousel", "map","icon"]
+            },
+            "src": {
+                "type": "string"
+            }
+        },
+        "_type": {"icon":"icon","image": "image", "video": "video", "audio": "video", "embed": "embed", "carousel": "carousel", "map": "map"}
+    },
+    "Navigation": {
+        "type": "dict",
+        "schema": {
+            "id": {"type": "string"},
+            "class": {"type": "string"},
+            "width": {"type": "string"},
+            "height": {"type": "string"},
+            "expand": {"type": "string"},
+            "padding": {"type": "string"},
+            "margin": {"type": "string"},
+            "alignment-content": {
+                "type": "string",
+                "allowed": ["horizontal", "vertical", "center", "end", "between", "around"]
+            },
+            "orientation": {
+                "type": "string",
+                "allowed": ["horizontal", "vertical"],
+                "default": "horizontal"
+            },
+            "type": {
+                "type": "string",
+                "allowed": ["bar", "breadcrumb", "pagination", "accordion", "tab","accordion-item"],
+                "default": "bar"
+            }
+        },
+        "_type": {
+            "bar": "bar",
+            "breadcrumb": "breadcrumb",
+            "pagination": "pagination",
+            "accordion": "accordion",
+            "accordion-item": "accordion",
+            "tab": "bar"
+        }
+    },
+    "View": {
+        "type": "dict", 
+        "schema": {
+            "route": {"type": "string"},
+            "view": {"type": "string"},
+            "index": {"type": "string"}
+        },
+        "_return": {"function": "mount_view", "args": ["route"]}
+    },
+    "Messenger": {
+        "type": "dict", 
+        "schema": {
+            "view": {"type": "string"},
+            "domain": {"type": "string"}
+        },
+        "_return": {"function": "render_widget", "args": ["Messenger"]}
+    },
+    "Message": {
+        "type": "dict",
+        "schema": {
+            "title": {"type": "string"},
+            "subtitle": {"type": "string"},
+            "type": {
+                "type": "string",
+                "allowed": ["info", "success", "warning", "error"],
+                "default": "info"
+            },
+            "mode": {
+                "type": "string",
+                "allowed": ["toast", "alert", "inline","banner"],
+                "default": "alert"
+            }
+        },
+        "_return": {"function": "render_widget", "args": ["message"]}
+    },
+    "Defender": {"type": "dict", "schema": {}},
+    "Column": {
+        "type": "dict",
+        "schema": {
+            "id": {"type": "string"},
+            "padding": {"type": "string"},
+            "margin": {"type": "string"},
+            "width": {"type": "string"},
+            "height": {"type": "string"},
+            "class": {"type": "string"},
+            "expand": {
+                "type": "string"
+            }
+
+        },
+        "_return": {"function": "render_widget", "args": ["Column"]}
+    },
+    "Row": {
+        "type": "dict", 
+        "schema": {
+            "id": {"type": "string"},
+            "expand": {"type": "string"},
+            "class": {"type": "string"},
+            "width": {"type": "string"},
+            "height": {"type": "string"},
+            "padding": {"type": "string"},
+            "margin": {"type": "string"},
+            "spacing":{"type": "string"},
+            "alignment-vertical":{"type": "string"},
+            "alignment-horizontal":{"type": "string"},
+            "alignment-content":{"type": "string"}
+        },
+        "_return": {"function": "render_widget", "args": ["Row"]}
+    },
+    "Container": {
+        "type": "dict",
+        "schema": {
+            "type": {
+                "type": "string",
+                "allowed": ["fluid", "fixed"],
+                "default": "fluid"
+            },
+            "id": {"type": "string"},
+            "class": {"type": "string"},
+            "width": {"type": "string"},
+            "height": {"type": "string"},
+            "padding": {"type": "string"},
+            "spacing": {"type": "string"},
+            "margin": {"type": "string"},
+            "expand": {"type": "string"},
+            "alignment-content": {
+                "type": "string",
+                "allowed": ["horizontal", "center", "end", "between", "around"]
+            }
+        },
+        "_return": {"function": "render_widget", "args": ["Container"]}
+    },
+    "Storekeeper": {
+        "type": "dict", 
+        "schema": {
+            "method": {
+                "type": "string",
+                "allowed": ["get", "post", "put", "delete"],
+                "default": "get"
+            },
+            "repository": {
+                "type": "string"
+            },
+            "id": { "type":"string" },
+            "filter": { "type":"string" },
+            "sort": { "type":"string" },
+            "limit": { "type":"string" },
+            "offset": { "type":"string" }
+        },
+        "_return": {"function": "render_widget_storekeeper", "args": ["Storekeeper"]}
+    },
+    "Input": {
+        "type": "dict",
+        "schema": {
+            "id": {"type": "string"},
+            "class": {"type": "string"},
+            "width": {"type": "string"},
+            "height": {"type": "string"},
+            "required": {"type": "string"},
+            "disabled": {"type": "string"},
+            "readonly": {"type": "string"},
+            "autofocus": {"type": "string"},
+            "selected": {"type": "string"},
+            "event-click": {"type": "string"},
+            "event-change": {"type": "string"},
+            "type": {
+                "type": "string",
+                "allowed": ["email","combobox","text", "select", "checkbox", "textarea", "radio", "switch", "color", "range","password","listbox","search","number"],
+                "default": "text"
+            },
+            "alignment-content": {
+                "type": "string",
+                "allowed": ["horizontal", "center", "end", "between", "around"]
+            },
+            "name": {"type": "string"},
+            "placeholder": {"type": "string"},
+            "value": {"type": "string"}
+        },
+        "_return": {"function": "render_widget", "args": ["Input"]}
+    },
+    "Action": {
+        "type": "dict",
+        "schema": {
+            "id": {"type": "string"},
+            "tooltip": {"type": "string"},
+            "spacing": {"type": "string"},
+            "expand": {"type": "string"},
+            "alignment-content": {
+                "type": "string",
+                "allowed": ["horizontal", "center", "end", "between", "around"]
+            },
+            "width": {"type": "string"},
+            "height": {"type": "string"},
+            "class": {"type": "string"},
+            "type": {
+                "type": "string",
+                "allowed": ["button", "submit", "form","dropdown", "link"],
+                "default": "button"
+            },
+            "action": { "type": "string"},
+            "active": { "type": "string"},
+            "route": {"type": "string"},
+            "event-change": {"type": "string"},
+            "event-click": {"type": "string"}
+        },
+        "_type": {"button": "action","submit": "action", "form": "action", "dropdown": "action", "link": "action"}
+    },
+    "Window": {
+        "type": "dict", 
+        "schema": {
+            "allow": {"type": "string"},
+            "title": {"type": "string"},
+            "layout": {"type": "string"},
+            "class": {"type": "string"},
+            "id": {"type": "string"},
+            "width": {"type": "string"},
+            "height": {"type": "string"},
+            "expand": {"type": "string"},
+            "action": {"type": "string"},
+            "size": {"type": "string"},
+            "type": {
+                "type": "string",
+                "allowed": ["still","embed","dialog","root","inner"],
+                "default": "embed"
+            },
+            "src": {"type": "string"}
+        },
+        "_type": {"dialog": "modal", "still": "offcanvas", "embed": "embed","root": "window", "inner": "window"}
+    },
+    "Text": {
+        "type": "dict",
+        "schema": {
+            "class": {"type": "string"},
+            "width": {"type": "string"},
+            "height": {"type": "string"},
+            "value": {"type": "string"},
+            "disabled": {"type": "string"},
+            "type": {
+                "type": "string",
+                "allowed": ["code", "text"],
+                "default": "text"
+            }
+        },
+        "_input":"text",
+        "_return": {"function": "render_widget", "args": ["Text"]}
+    },
+    "Group": {
+        "type": "dict", 
+        "schema": {
+            "width": {"type": "string"},
+            "height": {"type": "string"},
+            "expand": {"type": "string"},
+            "class": {"type": "string"},
+            "padding": {"type": "string"},
+            "spacing": {"type": "string"},
+            "margin": {"type": "string"},
+            "alignment-content": {
+                "type": "string",
+                "allowed": ["horizontal", "center", "end", "between", "around"]
+            },
+            "alignment-vertical": {
+                "type": "string",
+                "allowed": ["top", "center", "bottom"]
+            },
+            "type": {
+                "type": "string",
+                "allowed": ["input", "list", "card", "tab", "action"],
+                "default": "input"
+            }
+        },
+        "_return": {"function": "render_widget", "args": ["Group"]}
+    }
+}

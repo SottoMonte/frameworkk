@@ -1,0 +1,47 @@
+{
+    "identifier": {
+        "type": "string",
+        "default": "",
+        "_builder_options": {
+            "function": "generate_identifier"
+        }
+    },
+    "state": {
+        "type": "boolean",
+        "default": false
+    },
+    "action": {
+        "type": "string",
+        "default": "unknown"
+    },
+    "time": {
+        "type": "string",
+        "default": "",
+        "_builder_options": {
+            "function": "time_now_utc"
+        }
+    },
+    "remark": {
+        "type": "string",
+        "default": ""
+    },
+    "worker": {
+        "type": "string",
+        "default": "unknown"
+    },
+    "parameters": {
+        "type": "dict",
+        "default": {}
+    },
+    "result": {
+        "type": "list",
+        "default": [], 
+        "schema": { 
+            "type": "dict"
+        },
+        "_builder_options": {
+            "force_type": "dict",
+            "iterable": true 
+        }
+    }
+}

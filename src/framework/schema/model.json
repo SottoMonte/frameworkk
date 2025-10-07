@@ -1,0 +1,52 @@
+{
+    "Data": {"type": "dict", "schema": {}},
+    "Resource": {
+        "type": "dict",
+        "schema": {
+            "types": {
+                "type": "list",
+                "allowed": ["image", "video", "audio"]
+            }
+        }
+    },
+    "Media": {
+        "type": "dict",
+        "schema": {
+            "types": {
+                "type": "list",
+                "allowed": ["image", "video", "audio", "embed"]
+            }
+        }
+    },
+    "Navigation": {"type": "dict", "schema": {}},
+    "View": {"type": "dict", "schema": {}},
+    "Messenger": {"type": "dict", "schema": {}},
+    "Defender": {"type": "dict", "schema": {}},
+    "Column": {"type": "dict", "schema": {}},
+    "Row": {"type": "dict", "schema": {}},
+    "Storekeeper": {"type": "dict", "schema": {}},
+    "Input": {
+        "type": "dict",
+        "schema": {
+            "types": {
+                "type": "list",
+                "allowed": ["text", "select", "checkbox", "textarea", "radio", "switch", "color", "range"]
+            }
+        }
+    },
+    "Action": {
+        "type": "dict",
+        "schema": {
+            "default_type": {"type": "string", "allowed": ["button", "submit", "form"]},
+            "types": {
+                "type": "list",
+                "allowed": ["button", "submit", "form"]
+            },
+            "map": {"type": "dict", "schema": {}}
+        }
+    },
+    "Window": {"type": "dict", "schema": {}},
+    "Text": {"type": "dict", "schema": {}},
+    "Group": {"type": "dict", "schema": {}},
+    "Layout": {"type": "dict", "schema": {}}
+}

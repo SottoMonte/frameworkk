@@ -1,0 +1,107 @@
+{
+    "id": {"type": "dict", "schema": {}},
+    "name": {"type": "dict", "schema": {}},
+    "tooltip": {"type": "dict", "schema": {}},
+    "placeholder": {"type": "dict", "schema": {}},
+    "value": {"type": "dict", "schema": {}},
+    "state": {
+        "type": "dict",
+        "schema": {
+            "options": {
+                "type": "list",
+                "allowed": ["readonly", "disabled", "selected", "enabled"]
+            }
+        }
+    },
+    "click": {"type": "dict", "schema": {}},
+    "change": {"type": "dict", "schema": {}},
+    "route": {"type": "dict", "schema": {}},
+    "init": {"type": "dict", "schema": {}},
+    "action": {"type": "dict", "schema": {}},
+    "width": {"type": "dict", "schema": {}},
+    "height": {"type": "dict", "schema": {}},
+    "space": {"type": "dict", "schema": {}},
+    "expand": {
+        "type": "dict",
+        "schema": {
+            "options": {
+                "type": "list",
+                "allowed": ["fill", "vertical", "horizontal", "auto"]
+            }
+        }
+    },
+    "collapse": {"type": "dict", "schema": {}},
+    "border": {"type": "dict", "schema": {}},
+    "border-top": {"type": "dict", "schema": {}},
+    "border-bottom": {"type": "dict", "schema": {}},
+    "border-left": {"type": "dict", "schema": {}},
+    "border-right": {"type": "dict", "schema": {}},
+    "margin": {
+        "type": "dict",
+        "schema": {
+            "unit": {
+                "type": "list",
+                "allowed": ["px", "enum"]
+            }
+        }
+    },
+    "margin-top": {"type": "dict", "schema": {}},
+    "margin-bottom": {"type": "dict", "schema": {}},
+    "margin-left": {"type": "dict", "schema": {}},
+    "margin-right": {"type": "dict", "schema": {}},
+    "padding": {"type": "dict", "schema": {}},
+    "padding-top": {"type": "dict", "schema": {}},
+    "padding-bottom": {"type": "dict", "schema": {}},
+    "padding-left": {"type": "dict", "schema": {}},
+    "padding-right": {"type": "dict", "schema": {}},
+    "size": {
+        "type": "dict",
+        "schema": {
+            "unit": {
+                "type": "list",
+                "allowed": ["px", "enum", "rem", "%"]
+            }
+        }
+    },
+    "alignment-horizontal": {
+        "type": "dict",
+        "schema": {
+            "options": {
+                "type": "list",
+                "allowed": ["start", "end", "center", "between", "around", "evenly"]
+            }
+        }
+    },
+    "alignment-vertical": {
+        "type": "dict",
+        "schema": {
+            "options": {
+                "type": "list",
+                "allowed": ["start", "end", "center", "baseline", "stretch"]
+            }
+        }
+    },
+    "alignment-content": {
+        "type": "dict",
+        "schema": {
+            "options": {
+                "type": "list",
+                "allowed": ["vertical", "horizontal", "center", "between", "around", "evenly"]
+            }
+        }
+    },
+    "position": {
+        "type": "dict",
+        "schema": {
+            "options": {
+                "type": "list",
+                "allowed": ["sticky", "static", "relative", "absolute", "fixed"]
+            }
+        }
+    },
+    "style": {"type": "dict", "schema": {}},
+    "shadow": {"type": "dict", "schema": {}},
+    "opacity": {"type": "dict", "schema": {}},
+    "background-color": {"type": "dict", "schema": {}},
+    "class": {"type": "dict", "schema": {}}
+}

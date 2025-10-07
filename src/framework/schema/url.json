@@ -1,0 +1,42 @@
+{
+  "url": {
+    "type": "string",
+    "required": true,
+    "regex": "^(https?|ftp)://[^\\s/$.?#].[^\\s]*$",
+    "minlength": 10
+  },
+  "protocol": {
+    "type": "string",
+    "regex": "^(https?|ftp)$"
+  },
+  "host": {
+    "type": "string"
+  },
+  "port": {
+    "type": "integer",
+    "min": 1,
+    "max": 65535
+  },
+  "path": {
+    "type": "list",
+    "schema": {
+      "type": "string"
+    }
+  },
+  "query": {
+    "type": "dict",
+    "keysrules": {"type": "string"},
+    "valuesrules": {
+        "type": "list",
+        "schema": {"type": "string"}
+    }
+  },
+  "fragment": {
+    "type": "dict",
+    "keysrules": {"type": "string"},
+    "valuesrules": {
+        "type": "list",
+        "schema": {"type": "string"}
+    }
+  }
+}

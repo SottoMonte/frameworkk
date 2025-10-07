@@ -1,0 +1,132 @@
+[project]
+name = "my-app"                          # Nome del progetto
+version = "0.1.0"                        # Versione dell'app
+description = "Un'app di esempio"        # Descrizione del progetto
+readme = "README.md"                     # File di documentazione
+requires-python = ">=3.9"                # Versione minima di Python richiesta
+key = "my-secret-key"                    # Chiave segreta dell'app
+
+# Configurazione della messaggistica
+[amessage.log]
+adapter = "console"
+file = ""
+level = "debug"
+format = "%(asctime)s | %(levelname)-8s | %(process)d | %(message)s"
+
+[amessage.client]
+adapter = "websocket"
+url = "ws://localhost:8000/messenger"
+
+[amessage.server]
+adapter = "websocket"
+url = "wss://app.colosso.cloud/messenger"
+
+[amessage.chatbot]
+adapter = "api"
+domain = "assistant,chat"
+url = "https://openrouter.ai/api/v1/chat/completions"
+authorization = "Bearer"
+accept = "application/json"
+token = "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"
+
+[amessage.producer]
+adapter = "api"
+domain = "backlog.producer,test"
+url = "https://openrouter.ai/api/v1/chat/completions"
+authorization = "Bearer"
+accept = "application/json"
+token = "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"
+
+[amessage.programmer]
+adapter = "api"
+domain = "assistant,bom"
+url = "https://openrouter.ai/api/v1/chat/completions"
+authorization = "Bearer"
+accept = "application/json"
+token = "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"
+
+[amessage.backend]
+adapter = "redis"
+host = "redis-18721.c339.eu-west-3-1.ec2.redns.redis-cloud.com"
+port = "18721"
+database = "Projects-free-db"
+username = "default"
+password = ""
+
+# Configurazione della presentazione
+[presentation.web]
+adapter = "starlette"
+host = "0.0.0.0"
+port = "5000"
+route = "web.xml"
+#ssl_keyfile = "key.pem"
+#ssl_certfile = "cert.pem"
+
+[apresentation.native]
+adapter = "flutter"
+route = "route.xml"
+
+# Configurazione dell'autenticazione
+[authentication.supabase]
+adapter = "supabase"
+url = "https://ljeowpqmovaavxghpsne.supabase.co"
+key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxqZW93cHFtb3ZhYXZ4Z2hwc25lIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDEzNDI3NDEsImV4cCI6MjA1NjkxODc0MX0.IAIJo8-x2WIa9tk7HQwLxgmAX1JTX0aK3kLTb7FQTG8"
+
+[aauthentication.github]
+adapter = "oauth"
+url = "https://github.com/login/oauth/access_token?client_id={{ GITHUB_OAUTH_ID }}&client_secret={{ GITHUB_OAUTH_SECRET }}"
+link = "https://github.com/login/oauth/authorize?client_id=Ov23lidpWleO0KCHQVm0&scope=repo,user&state=xyz987"
+id = "{{ GITHUB_OAUTH_ID }}"
+secret = "{{ GITHUB_OAUTH_SECRET }}"
+
+# Configurazione della persistenza
+[apersistence.bot]
+adapter = "jwt"
+url = "https://api.github.com"
+app_id = "{{ GITHUB_COLOSSO_ID }}"
+installation_id = "{{ GITHUB_COLOSSO_APP }}"
+key = "public/colosso-cloud.2024-11-24.private-key.pem"
+autologin = "true"
+
+[apersistence.backend]
+adapter = "redis"
+host = "redis-18721.c339.eu-west-3-1.ec2.redns.redis-cloud.com"
+port = "18721"
+database = "Projects-free-db"
+username = "default"
+password = ""
+
+[persistence.supabase]
+adapter = "supabase"
+url = "https://ljeowpqmovaavxghpsne.supabase.co"
+key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxqZW93cHFtb3ZhYXZ4Z2hwc25lIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDEzNDI3NDEsImV4cCI6MjA1NjkxODc0MX0.IAIJo8-x2WIa9tk7HQwLxgmAX1JTX0aK3kLTb7FQTG8"
+token = "{{ session_token_supabase or 'none' }}"
+refresh_token = "{{ session_token_supabase or 'none' }}"
+
+[apersistence.github]
+adapter = "api"
+url = "https://api.github.com"
+authorization = "Bearer "
+accept = "application/vnd.github+json"
+token = "{% if session.github and session.github.access_token %}{{ session.github.access_token }}{% else %}none{% endif %}"
+
+[apersistence.workspace]
+adapter = "fs"
+
+# Configurazione dell'automazione
+[aactuator.devops]
+adapter = "ansible"
+playbook_path = ""
+extra_vars = ""
+inventory_file = ""
+timeout = ""
+
+[aactuator.functions]
+adapter = "flow"
+url = "https://ljeowpqmovaavxghpsne.supabase.co/functions/v1/scrum-release"
+token = "{{ SUPABASE_SECRET }}"
+
+[aactuator.github]
+adapter = "flow"
+url = "https://ljeowpqmovaavxghpsne.supabase.co/functions/v1/scrum-release"
+token = "{{  session|get('github.access_token') }}"

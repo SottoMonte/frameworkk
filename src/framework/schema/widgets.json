@@ -1,0 +1,45 @@
+{
+    "Text": {
+        "type": "dict",
+        "schema": {
+            "attributes": {
+                "type": "list",
+                "allowed": ["expand"]
+            }
+        }
+    },
+    "Video": {
+        "type": "dict",
+        "schema": {
+            "attributes": {
+                "type": "list",
+                "allowed": ["expand"]
+            }
+        }
+    },
+    "Image": {"type": "dict", "schema": {}},
+    "Row": {"type": "dict", "schema": {}},
+    "Column": {"type": "dict", "schema": {}},
+    "Container": {"type": "dict", "schema": {}},
+    "Input": {"type": "dict", "schema": {}},
+    "Button": {"type": "dict", "schema": {}},
+    "List": {"type": "dict", "schema": {}},
+    "Tree": {"type": "dict", "schema": {}},
+    "Table": {"type": "dict", "schema": {}},
+    "Modal": {"type": "dict", "schema": {}},
+    "Drawer": {"type": "dict", "schema": {}},
+    "Map": {"type": "dict", "schema": {}},
+    "Chart": {"type": "dict", "schema": {}},
+    "Editor": {"type": "dict", "schema": {}},
+    "Form": {"type": "dict", "schema": {}},
+    "Tab": {"type": "dict", "schema": {}},
+    "Scroll": {"type": "dict", "schema": {}},
+    "Toast": {"type": "dict", "schema": {}},
+    "Alert": {"type": "dict", "schema": {}},
+    "Card": {"type": "dict", "schema": {}},
+    "Window": {"type": "dict", "schema": {}},
+    "Breadcrumb": {"type": "dict", "schema": {}},
+    "Pagination": {"type": "dict", "schema": {}},
+    "Carousel": {"type": "dict", "schema": {}},
+    "Navigation": {"type": "dict", "schema": {}}
+}
