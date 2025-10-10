@@ -141,7 +141,8 @@ async def bootstrap() -> None:
         # Correzione del nome della funzione (get_confi -> get_config)
         
         print(dir(language))  # Debug: Verifica le funzioni disponibili in language
-        config = language.get_config(**config_params) 
+        text = await language.backend(path="pyproject.toml")
+        config = language.format(text,**config_params) 
         logger.info(f"Configurazione caricata con successo (Ambiente: {platform_type}).")
         
         # LOGGING MIGLIORATO (Stato DI)

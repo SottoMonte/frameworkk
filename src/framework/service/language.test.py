@@ -1,6 +1,6 @@
 import asyncio
 
-resources = {
+imports = {
     'flow': 'framework/service/flow.py',
     'model': 'framework/schema/model.json',
 }
