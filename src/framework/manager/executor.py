@@ -3,7 +3,7 @@ from typing import List, Dict, Any, Callable
 import re
 
 
-resources = {
+imports = {
     'flow': 'framework/service/flow.py',
 }
 

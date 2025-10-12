@@ -98,8 +98,6 @@ APP_CONTEXT = {
     #custom_filename=__file__,
     app_context=APP_CONTEXT)
 def application(tester=None,**constants):
-    print("Starting application...", constants)
-        
     if '--update' in constants.get('args',[]):
         sync_github_repo("src", "colosso-cloud", "framework", "main")
     if '--test' in constants.get('args',[]):
@@ -107,7 +105,5 @@ def application(tester=None,**constants):
     else:
         event_loop = asyncio.new_event_loop()
         asyncio.set_event_loop(event_loop)
-        print(dir(language))
-        #print(dir())
         event_loop.create_task(loader.bootstrap())
         event_loop.run_forever()
