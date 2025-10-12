@@ -1,5 +1,6 @@
 import sys
 import logging
+import time
 imports = {'flow': 'framework.service.flow'}
 # Controllo se il codice sta girando in Pyodide
 
@@ -44,6 +45,7 @@ class adapter:
     def __init__(self, **constants):
         #self.config = constants['config']
         self.history = dict()
+        self.start_time = time.time()
         # Creazione del logger
         self.logger = logging.getLogger("self.config['project']['identifier']")
         self.logger.propagate = False 
@@ -58,12 +60,26 @@ class adapter:
 
         # 2. Modifica il Formatter per includere il campo 'domain'
         formatter = self.ColoredFormatter(
-            constants.get('format', "%(asctime)s | %(levelname)-8s | %(filename)s:%(lineno)d | %(funcName)-25s | %(process)d | %(message)s"),
+            constants.get('format', "%(asctime)s.%(msecs)03d | [T+%(delta_ms)s] | %(levelname)-8s | %(filename)s:%(lineno)d | %(funcName)-25s | %(process)d | %(message)s"),
             datefmt="%Y-%m-%d %H:%M:%S"
         )
 
         ch.setFormatter(formatter)
+        self.logger.addFilter(self._TimerFilter(self.start_time)) 
         self.logger.addHandler(ch)
+
+    class _TimerFilter(logging.Filter):
+        """Calcola e aggiunge il tempo trascorso (delta) dall'avvio del sistema."""
+        def __init__(self, start_time):
+            super().__init__()
+            self.start_time = start_time
+
+        def filter(self, record):
+            # Calcola il delta time in secondi
+            delta_seconds = record.created - self.start_time
+            # Lo formatta in millisecondi con 3 decimali (es. 000000123.456)
+            record.delta_ms = f"{delta_seconds * 1000:012.3f}"
+            return True
 
     class ColoredFormatter(logging.Formatter):
         """Classe per aggiungere colori ANSI ai livelli di log in console."""
