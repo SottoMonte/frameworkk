@@ -144,7 +144,7 @@ async def validate_and_filter_module(main_module: types.ModuleType, path: str) -
     Simula la validazione (hashing, test) e restituisce un modulo filtrato.
     Per l'esempio, includiamo solo le funzioni e classi che iniziano con 'format_' o 'Application'.
     """
-    validated_members = {'format_user', 'application', 'messenger','executor'} # Membri che hanno 'superato' la validazione
+    validated_members = {'format_user', 'application', 'messenger','executor','storekeeper','defender','presenter','adapter'} # Membri che hanno 'superato' la validazione
     
     # Crea un nuovo modulo con solo i membri approvati
     filtered_module = types.ModuleType(f"filtered:{main_module.__name__}")
@@ -283,43 +283,23 @@ async def load_di_entry(
             
             dependencies: Dict[str, Any] = {}
             for dep_key in dependency_keys:
-                dep_service_name = constants.get(dep_key)
-                if dep_service_name:
-                    # Assicura che la dipendenza esista come placeholder
-                    if dep_service_name not in di:
-                        di[dep_service_name] = lambda _di: []
+                if dep_key not in di:
+                    di[dep_key] = lambda _di: []
                     
-                    # Salva il resolver della dipendenza
-                    dependencies[dep_key] = di[dep_service_name]
-            
-            def resolver(_di: Dict[str, Any] = di) -> Any:
-                """Funzione che risolve le dipendenze e istanzia il Manager."""
-                resolved_dependencies = {
-                    key: dep_resolver(_di)
-                    for key, dep_resolver in dependencies.items()
-                }
-                
-                final_args = {**init_args, **resolved_dependencies}
-                return resource_class(**final_args)
-            
-            # Registrazione: Sostituisce la lambda iniziale con il resolver del Manager
-            di[service_name] = resolver
+                # Salva il resolver della dipendenza
+                dependencies[dep_key] = di[dep_key]
+            #print(f"⏳ Caricamento Manager: '{service_name}' ({log_info}) con dipendenze {dependencies}",dependency_keys)
+            di[service_name] = lambda _di: resource_class(**init_args|{'providers': dependencies})
             print(f"✅ Registrato Factory: '{service_name}' ({log_info})")
 
         else:
             # --- CASO: PROVIDER/SINGLETON (Istanziamento eager in una lista) ---
-            
-            # Istanzia la risorsa immediatamente con gli argomenti di configurazione
-            provider_instance = resource_class(**init_args)
+            if service_name not in di:
+                di[service_name] = lambda di: list([])
 
-            # Ottiene la lista dei provider (risolvendo la lambda iniziale)
-            provider_list: List[Any] = di[service_name]({})
+            #provider = getattr(module, 'adapter')
+            di[service_name].append(resource_class(config=init_args))
             
-            # Aggiunge il nuovo provider
-            provider_list.append(provider_instance)
-            
-            # Registrazione: Aggiorna la lambda per restituire la lista aggiornata
-            di[service_name] = lambda _di: provider_list
             print(f"✅ Aggiunto Provider a lista: '{service_name}' ({log_info})")
 
 # =====================================================================

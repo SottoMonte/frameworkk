@@ -8,11 +8,13 @@ imports = {
 class messenger():
 
     def __init__(self,**constants):
-        self.providers = constants['providers']
+        #print('MES-',constants)
+        self.providers = constants['providers']['message']
+        pass
 
     @flow.asynchronous(inputs='messenger',outputs='transaction')
     async def post(self,**constants):
-        operations = []
+        '''operations = []
         map_tasks = dict()
         # email -> email | log,fs -> messaggio | app -> evento
         #sender, receiver 
@@ -31,7 +33,13 @@ class messenger():
                 map_tasks[len(operations)-1] = profile
 
         # Commit all operations at the same time   
-        transactions = await asyncio.gather(*operations)
+        transactions = await asyncio.gather(*operations)'''
+        for provider in self.providers:
+            #profile = provider.config['profile'].upper()
+            #domain_provider = provider.config.get('domain','*').split(',')
+            #domain_message = constants.get('domain',[])
+            await provider.post(**constants)
+        print(constants)
 
     #@flow.asynchronous(inputs='messenger',outputs='transaction')
     async def read(self,**constants):

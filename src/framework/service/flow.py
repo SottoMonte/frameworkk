@@ -5,7 +5,7 @@ import inspect
 import traceback
 import functools
 
-def asynchronous(**constants):
+def asynchronous(custom_filename: str = __file__, app_context = None,**constants):
     inject = [di[manager] for manager in constants.get('managers', [])]
     output = constants.get('outputs', [])
     input = constants.get('inputs', [])
@@ -27,23 +27,17 @@ def asynchronous(**constants):
                     return outcome
 
             except Exception as e:
-                exc_type, exc_obj, tb = sys.exc_info()
-                last_tb = traceback.extract_tb(tb)[-1]
+                source_code = None
+                fff = "src/"+custom_filename
+                source_code = await language.backend(path=fff)
 
-                error_info = {
-                    "module": function.__module__,
-                    "function": function.__name__,
-                    "file": last_tb.filename,
-                    "line": last_tb.lineno,
-                    "error": str(e),
-                    "args": args,
-                    "kwargs": kwargs,
-                }
-
-                print(f"Errore generico: {error_info}")
-
-                # Rilancia l'errore se vuoi interrompere il flusso
-
+                # Genera il rapporto usando l'eccezione attiva
+                report = language.analyze_exception(source_code=source_code,custom_filename=fff,app_context=app_context)
+                dependency_messenger = di['messenger']()
+                
+                ok = await language.convert(report, str, 'json')
+                await dependency_messenger.post(domain='debug', message=ok)
+                print(ok)
         return wrapper
     return decorator
 

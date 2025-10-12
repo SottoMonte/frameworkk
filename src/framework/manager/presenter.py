@@ -1,4 +1,3 @@
-
 class presenter():
     def __init__(self,**constants):
         self.providers = constants['providers']

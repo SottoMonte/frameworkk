@@ -131,30 +131,40 @@ async def bootstrap() -> None:
         }
     ]
 
+    await language.load_di_entry(language, **{
+        'path': 'infrastructure/message/console.py', # Percorso per resource
+        'service': 'message', # Chiave nel DI per la lista dei provider
+        'adapter': 'adapter', # Nome della classe da estrarre dal modulo
+        'payload': { # Argomenti del costruttore (__init__)
+            'host': 'smtp.corp.com', 
+            'port': 587, 
+            'secure': True
+        }
+    })
+
     # 1. Caricamento sequenziale dei manager essenziali e controllo del risultato
     for mgr in manager_loader_path:
         # Assumiamo che language.load_manager sollevi ResourceLoadError in caso di fallimento
         await language.load_di_entry(language, **mgr)
-        
-    logger.info("Manager di base (Messenger, Executor) caricati e pronti.")
 
-
-    logger.info("Avvio del processo di inizializzazione del Framework. Controllo ambiente...")
     
-    # LOGGING MIGLIORATO (Informazioni sull'Ambiente)
-    logger.info(f"Sistema: Python {sys.version.split()[0]} su {sys.platform}")
+    
+    dependency_executor = di['executor']
+    dependency_messenger = di['messenger']
+    #print('EXEC-',dependency_messenger)
+    await dependency_messenger.post(domain='debug', message="✅ Manager di base (Messenger, Executor) caricati e pronti.")
+
+    await dependency_messenger.post(domain='debug', message="Avvio del processo di inizializzazione del Framework. Controllo ambiente...")
+    await dependency_messenger.post(domain='debug', message=f"Sistema: Python {sys.version.split()[0]} su {sys.platform}")
     
     env_config: Dict[str, Any] = dict(os.environ)
     session_data: Dict[str, Any] = {}
     identifier_val: str = 'None'
     
-    await installa_dipendenze_browser()
-    logger.info("Dipendenze Pyodide/Browser verificate e installate (se necessario).")
-    
     # Gestione Condizionale della Configurazione Browser/Server (omessa per brevità, è invariata)
     if sys.platform == "emscripten":
         import js # Accesso al DOM
-        
+        await installa_dipendenze_browser()
         cookies: Dict[str, str] = parse_browser_cookies(str(js.document.cookie))
         session_str = cookies.get('session', 'None')
         identifier_val = cookies.get('session_identifier', 'None')
@@ -162,19 +172,20 @@ async def bootstrap() -> None:
         
         config_params = {**env_config, "session": session_data, "identifier": identifier_val}
         platform_type = "Browser (Pyodide)"
+        dependency_messenger.post(domain='debug', message=f"Dipendenze Pyodide/Browser verificate e installate (se necessario).")
     else:
         # Assumiamo che language.get_config sia la funzione corretta
         config_params = env_config | {"session": session_data}
         platform_type = "Server (Standard)"
-    logger.info(f"Configurazione ambiente preparata per: {platform_type}.")
+    await dependency_messenger.post(domain='debug', message=f"Configurazione ambiente preparata per: {platform_type}.")
     # Correzione del nome della funzione (get_confi -> get_config)
     
     text = await language.backend(path="pyproject.toml")
-    config = await language.format(text,**config_params) 
-    logger.info(f"Configurazione caricata con successo (Ambiente: {platform_type}).")
+    config = await language.format(text,**config_params)
+    await dependency_messenger.post(domain='debug', message=f"Configurazione caricata con successo (Ambiente: {platform_type}).")
     
     # LOGGING MIGLIORATO (Stato DI)
-    logger.info(f"Container DI 'kink' inizializzato. Tentativo di caricamento manager essenziali...")
+    await dependency_messenger.post(domain='debug', message=f"Container DI 'kink' inizializzato. Tentativo di caricamento manager essenziali...")
     
     # Manager principali (Caricamento Parallelo)
 
@@ -187,23 +198,66 @@ async def bootstrap() -> None:
         'secure': True
     }"""
 
-    manager_tasks: List[asyncio.Task] = [
-        asyncio.create_task(language.load_manager(language, provider="presentation", name="presenter", path="framework/manager/presenter.py"), name="load_presenter"),
-        asyncio.create_task(language.load_manager(language, provider="authentication", name="defender", path="framework/manager/defender.py"), name="load_defender"),
-        asyncio.create_task(language.load_manager(language, provider="persistence", name="storekeeper", path="framework/manager/storekeeper.py"), name="load_storekeeper"),
-        asyncio.create_task(language.load_manager(language, provider="authentication", name="tester", path="framework/manager/tester.py"), name="load_tester"),
+    manager_loader_path = [
+        {
+            'path': 'framework/manager/presenter.py',
+            'name': 'presenter',
+            'config': {
+                'cache_enabled': True, 
+                'log_level': 'INFO'
+            },
+            'dependency_keys': ['messenger'], # Dipendenze da risolvere dal DI
+            'messenger': 'presenter' # Nome della chiave nel DI per la dipendenza
+        },
+        {
+            'path': 'framework/manager/defender.py',
+            'name': 'defender',
+            'config': {
+                'cache_enabled': True, 
+                'log_level': 'INFO'
+            },
+            'dependency_keys': ['messenger','persistence'], # Dipendenze da risolvere dal DI
+            'messenger': 'defender' # Nome della chiave nel DI per la dipendenza
+        },
+        {
+            'path': 'framework/manager/storekeeper.py',
+            'name': 'storekeeper',
+            'config': {
+                'cache_enabled': True, 
+                'log_level': 'INFO'
+            },
+            'dependency_keys': ['messenger'], # Dipendenze da risolvere dal DI
+            'messenger': 'storekeeper' # Nome della chiave nel DI per la dipendenza
+        },
+        {
+            'path': 'framework/manager/tester.py',
+            'name': 'tester',
+            'config': {
+                'cache_enabled': True, 
+                'log_level': 'INFO'
+            },
+            'dependency_keys': ['messenger','persistence'], # Dipendenze da risolvere dal DI
+            'messenger': 'tester' # Nome della chiave nel DI per la dipendenza
+        }
     ]
     
-    logger.info(f"Avvio del caricamento parallelo di {len(manager_tasks)} Manager...")
+    manager_tasks = [ asyncio.create_task(language.load_di_entry(language, **mgr), name=f"load_{mgr['name']}") for mgr in manager_loader_path]
+    
+    await dependency_messenger.post(domain='debug', message=f"Avvio del caricamento parallelo di {len(manager_tasks)} Manager...")
     await dependency_executor.all_completed(tasks=manager_tasks) 
-    logger.info("Caricamento Manager completato. System-DI pronto.")
+    await dependency_messenger.post(domain='debug', message="Caricamento Manager completato. System-DI pronto.")
 
-    # ... (il resto della logica rimane identico) ...
+    '''dependency_storekeeper = di['storekeeper'](di)
+    dependency_defender = di['defender'](di)
+    dependency_presenter = di['presenter'](di)
+    print('STORE-',dependency_storekeeper)
+    print('DEFEN-',dependency_defender)
+    print('PRESEN-',dependency_presenter)'''
 
-    # --- FASE DI CARICAMENTO PROVIDER ---
+    '''# --- FASE DI CARICAMENTO PROVIDER ---
     provider_tasks: List[asyncio.Task] = []
     MODULI_PRINCIPALI = ["presentation", "persistence", "message", "authentication", "actuator"]
-    logger.info("Preparazione al caricamento dei Provider d'Infrastruttura...")
+    await dependency_messenger.post(domain='debug', message="Preparazione al caricamento dei Provider d'Infrastruttura...")
     
     for module_name in MODULI_PRINCIPALI:
         if module_name in config and isinstance(config.get(module_name), dict):
@@ -245,4 +299,4 @@ async def bootstrap() -> None:
         else:
             logger.debug(f"L'elemento {item_name} non ha un metodo 'loader'. Saltato.")
 
-    logger.info("Framework avviato con successo. Sistema pronto e operativo.")
+    logger.info("Framework avviato con successo. Sistema pronto e operativo.")'''

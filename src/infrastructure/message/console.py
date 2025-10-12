@@ -1,6 +1,6 @@
 import sys
 import logging
-modules = {'flow': 'framework.service.flow'}
+imports = {'flow': 'framework.service.flow'}
 # Controllo se il codice sta girando in Pyodide
 
 if sys.platform == 'emscripten':
@@ -40,10 +40,10 @@ class adapter:
     RESET_COLOR = "\033[0m"  # Reset colori ANSI
 
     def __init__(self, **constants):
-        self.config = constants['config']
+        #self.config = constants['config']
         self.history = dict()
         # Creazione del logger
-        self.logger = logging.getLogger(self.config['project']['identifier'])
+        self.logger = logging.getLogger("self.config['project']['identifier']")
         self.logger.setLevel(logging.DEBUG)
         self.processable = ['log']
         
