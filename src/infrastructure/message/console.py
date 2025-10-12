@@ -60,7 +60,7 @@ class adapter:
 
         # 2. Modifica il Formatter per includere il campo 'domain'
         formatter = self.ColoredFormatter(
-            constants.get('format', "%(asctime)s.%(msecs)03d | [T+%(delta_ms)s] | %(levelname)-8s | %(filename)s:%(lineno)d | %(funcName)-25s | %(process)d | %(message)s"),
+            constants.get('format', "%(asctime)s.%(msecs)03d | [T+%(delta_ms)s]ms | [ΔT%(delta_inter_ms)s]ms | %(levelname)-8s | %(filename)s:%(lineno)d | %(funcName)-25s | %(process)d | %(message)s"),
             datefmt="%Y-%m-%d %H:%M:%S"
         )
 
@@ -68,7 +68,7 @@ class adapter:
         self.logger.addFilter(self._TimerFilter(self.start_time)) 
         self.logger.addHandler(ch)
 
-    class _TimerFilter(logging.Filter):
+    '''class _TimerFilter(logging.Filter):
         """Calcola e aggiunge il tempo trascorso (delta) dall'avvio del sistema."""
         def __init__(self, start_time):
             super().__init__()
@@ -79,6 +79,33 @@ class adapter:
             delta_seconds = record.created - self.start_time
             # Lo formatta in millisecondi con 3 decimali (es. 000000123.456)
             record.delta_ms = f"{delta_seconds * 1000:012.3f}"
+            return True'''
+    
+    class _TimerFilter(logging.Filter):
+        """Aggiunge il Delta Time Assoluto (T+) e il Delta Inter-Messaggio (T^)."""
+        def __init__(self, start_time):
+            super().__init__()
+            self.start_time = start_time
+            self.last_record_time = None # <--- Variabile per tracciare il tempo precedente
+
+        def filter(self, record):
+            
+            # --- 1. Delta Assoluto (T+) ---
+            delta_seconds_abs = record.created - self.start_time
+            record.delta_ms = f"{delta_seconds_abs * 1000:012.3f}" 
+            
+            # --- 2. Delta Inter-Messaggio (T^) ---
+            if self.last_record_time is None:
+                # Primo record: il delta è zero o lo stesso del delta assoluto
+                record.delta_inter_ms = f"{0.0:09.3f}"
+            else:
+                # Calcola il tempo trascorso dall'ultimo record
+                delta_inter_seconds = record.created - self.last_record_time
+                record.delta_inter_ms = f"{delta_inter_seconds * 1000:09.3f}" # Formato: 000.000
+                
+            # Aggiorna il tempo dell'ultimo record per la prossima iterazione
+            self.last_record_time = record.created 
+            
             return True
 
     class ColoredFormatter(logging.Formatter):
