@@ -17,8 +17,12 @@ import traceback
 import types # Importato per la gestione dinamica dei moduli
 import inspect
 from cerberus import Validator, TypeDefinition, errors
-from typing import Dict, Callable, Any
 import hashlib
+import functools
+import platform
+from typing import Dict, Any, Optional, List, Callable
+import psutil
+import socket
 
 # Cache e stack per prevenire loop e ricaricamenti ripetuti
 # Ora registrati in DI per poterli sovrascrivere / mockare facilmente.
@@ -56,12 +60,35 @@ def _get_module_cache() -> Dict[str, types.ModuleType]:
 
 def _get_loading_stack():
     return di['loading_stack']
-
-
+    
+class LogReportEncoder(json.JSONEncoder):
+    """
+    JSONEncoder personalizzato per la serializzazione di oggetti complessi 
+    trovati nei log di debug e nelle tracce di errore.
+    Converte qualsiasi tipo di dato non serializzabile in una stringa.
+    """
+    def default(self, obj):
+        try:
+            # 1. Tenta di usare l'implementazione predefinita della superclasse
+            # Questo gestisce tutti i tipi standard (dict, list, str, int, float, bool, None)
+            return super().default(obj)
+        except TypeError:
+            # 2. Se la serializzazione standard fallisce (TypeError: ... is not JSON serializable)
+            # converti l'oggetto nella sua rappresentazione in stringa.
+            # Questo è il fallback universale.
+            
+            # Per oggetti che hanno un metodo to_dict/to_json, potresti aggiungerlo qui:
+            # if hasattr(obj, 'to_dict'):
+            #     return obj.to_dict()
+                
+            # Fallback per tutti gli altri: usa la rappresentazione in stringa
+            # Esempi: loop eventi, oggetti complessi, istanze di classi personalizzate.
+            return str(obj)
+    
 mappa = {
     (str,dict,''): lambda v: v if isinstance(v, dict) else {},
     (str,dict,'json'): lambda v: json.loads(v) if isinstance(v, str) else {},
-    (dict,str,'json'): lambda v: json.dumps(v) if isinstance(v, dict) else '',
+    (dict,str,'json'): lambda v: json.dumps(v,indent=4,cls=LogReportEncoder) if isinstance(v, dict) else '',
 
 }
 
@@ -69,7 +96,7 @@ async def convert(target, output,input=''):
     try:
         return mappa[(type(target),output,input)](target)
     except KeyError:
-        raise ValueError(f"Conversione non supportata: {type(target)} -> {output} da {input}")
+        raise ValueError(f"Conversione non supportata: {type(target)} -> {type(output)} da {input}")
     except Exception as e:
         raise ValueError(f"Errore conversione: {e}")
 
@@ -82,353 +109,368 @@ async def format(target ,**constants):
     except Exception as e:
         raise ValueError(f"Errore formattazione: {e}")
 
-async def resource(lang, **constants) -> Any:
-    path: str = constants.get("path", "")
+# =====================================================================
+# --- Funzioni di Caricamento ---
+# =====================================================================
 
-    # Normalizza la path ricevuta:
-    # - rimuove leading slash
-    # - garantisce il prefisso 'src/' solo una volta
-    path = (path or "").lstrip('/')
-    if not path:
-        path = 'src'
-    elif not path.startswith('src/'):
-        path = os.path.normpath(os.path.join('src', path))
-    else:
-        path = os.path.normpath(path)
+async def validate_and_filter_module(main_module: types.ModuleType, path: str) -> types.ModuleType:
+    """
+    Simula la validazione (hashing, test) e restituisce un modulo filtrato.
+    Per l'esempio, includiamo solo le funzioni e classi che iniziano con 'format_' o 'Application'.
+    """
+    validated_members = {'format_user', 'application'} # Membri che hanno 'superato' la validazione
+    
+    # Crea un nuovo modulo con solo i membri approvati
+    filtered_module = types.ModuleType(f"filtered:{main_module.__name__}")
+    filtered_module.__file__ = main_module.__file__
+    
+    for name in validated_members:
+        if hasattr(main_module, name):
+            setattr(filtered_module, name, getattr(main_module, name))
+            
+    # Assegna anche la dipendenza risolta, se presente
+    if hasattr(main_module, 'schema'):
+        setattr(filtered_module, 'schema', getattr(main_module, 'schema'))
+        
+    print(f"✅ Validazione e filtro riusciti per {path}. Membri esposti: {list(validated_members)}")
+    return filtered_module
 
-    content = await backend(path=path)
+def resolve_path(resource_path: str | None) -> str:
+    """Normalizza e aggiunge il prefisso 'src/' al percorso della risorsa."""
+    resource_path = (resource_path or "").lstrip('/')
+    if not resource_path:
+        return 'src'
+    if not resource_path.startswith('src/'):
+        return os.path.normpath(os.path.join('src', resource_path))
+    return os.path.normpath(resource_path)
 
-
-    if path.endswith(".json"):
-        return await convert(content, 'dict', 'json')
-
-    # Funzioni di supporto incapsulate dentro 'resource', come richiesto
-    async def _execute_python_module(adapter_name: str, path: str, module_code: str, dependency_loader=None) -> types.ModuleType:
-        """
-        Crea un module object dinamico, esegue il codice in un suo namespace e ritorna il module.
-        Allega __source__ con il codice originale per successiva ispezione/hash.
-        Inietta alcuni global utili (language, loader, types, asyncio).
-        """
-        module_name = f"dynamic_{uuid.uuid4().hex}"
-        module = types.ModuleType(module_name)
-        # usa la path già normalizzata (evita 'src/src/...' se path contiene già 'src/')
-        module.__file__ = path
-        ns = module.__dict__
-
-        # variabili utili disponibili al codice eseguito
-        ns['language'] = lang
-        ns['loader'] = lang         # alias semplice: il loader può essere l'oggetto language
-        ns['types'] = types
-        ns['asyncio'] = asyncio
-
-        # salva sorgente per hashing/diagnostica
-        module.__source__ = module_code
+async def _load_dependencies(module: types.ModuleType) -> None:
+    """Risolve le dipendenze 'imports' definite in un modulo."""
+    imports_map = getattr(module, "imports", {})
+    print(f"🔄 Risoluzione dipendenze per {module.__file__}: {imports_map}")
+    
+    for key, import_path in imports_map.items():
+        print(f"⏳ Caricamento dipendenza '{key}' da {import_path}...")
         try:
-            exec(module_code, ns)
-        except Exception as e:
-            raise ImportError(f"Esecuzione modulo fallita: {e}") from e
-        return module
-
-    def _compute_top_level_hashes(source: str) -> Dict[str, str]:
-        """
-        Restituisce mapping name -> sha256 della porzione di sorgente per
-        funzioni e classi di livello superiore.
-        """
-        out: Dict[str, str] = {}
-        try:
-            tree = ast.parse(source)
-        except Exception:
-            return out
-        lines = source.splitlines()
-        for node in tree.body:
-            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
-                start = getattr(node, "lineno", 1) - 1
-                end = getattr(node, "end_lineno", start + 1)
-                seg = "\n".join(lines[start:end])
-                out[node.name] = hashlib.sha256(seg.encode("utf-8")).hexdigest()
-        return out
-
-    def _compute_test_method_hashes(source: str) -> Dict[str, str]:
-        """
-        Restituisce mapping "TestClass.test_method" -> sha256 della porzione
-        di sorgente del metodo di test.
-        """
-        out: Dict[str, str] = {}
-        try:
-            tree = ast.parse(source)
-        except Exception:
-            return out
-        lines = source.splitlines()
-        for node in tree.body:
-            if isinstance(node, ast.ClassDef) and (node.name == "TestModule" or node.name.startswith("Test")):
-                for item in node.body:
-                    if isinstance(item, (ast.FunctionDef, ast.AsyncFunctionDef)) and item.name.startswith("test_"):
-                        start = getattr(item, "lineno", 1) - 1
-                        end = getattr(item, "end_lineno", start + 1)
-                        seg = "\n".join(lines[start:end])
-                        out[f"{node.name}.{item.name}"] = hashlib.sha256(seg.encode("utf-8")).hexdigest()
-        return out
-
-    def _load_hash_db():
-        """
-        Restituisce tuple (db, db_path). Se il file non esiste lo crea vuoto.
-        """
-        db_path = "src/framework/service/test_hashes.json"
-        try:
-            os.makedirs(os.path.dirname(db_path), exist_ok=True)
-            if not os.path.exists(db_path):
-                # crea file vuoto
-                with open(db_path, "w") as f:
-                    json.dump({}, f)
-                return {}, db_path
-            with open(db_path, "r") as f:
-                try:
-                    return json.load(f), db_path
-                except Exception:
-                    # se non è valid JSON, sovrascriviamo con vuoto per non bloccare il sistema
-                    with open(db_path, "w") as fw:
-                        json.dump({}, fw)
-                    return {}, db_path
-        except Exception:
-            # fallback: DB in-memory se anche la creazione fallisce
-            return {}, db_path
-
-    async def _validate_module_contract(module: types.ModuleType, path: str, run_tests: bool = False):
-        """
-        Verifica che il modulo abbia entry nel JSON degli hash e che gli hash
-        di top-level e dei test coincidano. Se manca l'entry esegue i test:
-        - se i test falliscono -> ImportError
-        - se i test passano -> salva gli hash nel JSON e procede con la validazione
-        """
-        if path.endswith(".py"):
-            test_path = path[:-3] + ".test.py"
-        else:
-            test_path = path + ".test.py"
-
-        try:
-            test_content = await backend(path=test_path)
+            imported_content = await backend(path='src/'+import_path)
         except FileNotFoundError:
-            raise ImportError(f"Nessun file di test trovato per {path}: atteso {test_path}")
-
-        test_module = await _execute_python_module("test_adapter", test_path, test_content, dependency_loader=None)
-
-        # se il file di test definisce una mappa 'imports', risolviamola e popoliamo le variabili
-        # es.: "imports = { 'model': 'framework/schema/model.json' }"
-        try:
-            imports_map = getattr(test_module, "imports", None)
-            if isinstance(imports_map, dict):
-                for key, import_path in imports_map.items():
-                    try:
-                        imported_content = await backend(path=import_path)
-                    except FileNotFoundError:
-                        continue
-                    if isinstance(imported_content, str) and import_path.endswith(".json"):
-                        try:
-                            value = await convert(imported_content, 'dict', 'json')
-                        except Exception:
-                            # fallback a json.loads diretto
-                            value = json.loads(imported_content)
-                    elif import_path.endswith(".py"):
-                        # esegui il modulo dipendenza e assegna il module
-                        value = await _execute_python_module(f"dep_{key}", import_path, imported_content, dependency_loader=None)
-                    else:
-                        value = imported_content
-                    setattr(test_module, key, value)
-        except Exception:
-            # non blocchiamo l'esecuzione dei test in caso di problemi secondari con gli imports
-            pass
-
-        db, db_path = _load_hash_db()
-        # usiamo una key canonica per il DB (la path già normalizzata passata a resource)
-        canonical_key = os.path.normpath(path)
-        # cerchiamo anche eventuali varianti salvate precedentemente per compatibilità
-        found_key = None
-        for k in db.keys():
+            continue
+        value: Any
+        if isinstance(imported_content, str) and import_path.endswith(".json"):
             try:
-                if os.path.normpath(k) == canonical_key or k.endswith(path) or canonical_key.endswith(os.path.normpath(k)):
-                    found_key = k
-                    break
+                value = await convert(imported_content, 'dict', 'json')
             except Exception:
-                continue
-        # se troviamo una vecchia chiave, usiamola come punto di partenza ma poi riscriviamo sotto la canonical_key
-        entry = db.get(found_key) if found_key else db.get(canonical_key)
+                value = json.loads(imported_content)
+        elif import_path.endswith(".py"):
+            value = await _load_python_module(key, import_path, imported_content, lang=getattr(module, 'language'))
+        else:
+            value = imported_content
+        setattr(module, key, value)
+        print(f"📦 Dipendenza '{key}' caricata da {import_path}")
 
-        main_source = getattr(module, "__source__", None)
-        test_source = getattr(test_module, "__source__", None)
-        if main_source is None or test_source is None:
-            raise ImportError("Sorgente non disponibile per hashing")
-
-        main_hashes = _compute_top_level_hashes(main_source)
-        test_hashes = _compute_test_method_hashes(test_source)
-
-        # se manca l'entry: esegui i test; se passano, salva gli hash e continua
-        if not entry:
-            try:
-                # semplice runner dei test definiti nel file di test
-                for name, obj in list(vars(test_module).items()):
-                    if not isinstance(obj, type):
-                        continue
-                    if not (name == "TestModule" or name.startswith("Test")):
-                        continue
-                    test_instance = obj()
-                    setattr(test_instance, "main_module", module)
-                    for attr in dir(test_instance):
-                        if not attr.startswith("test_"):
-                            continue
-                        method = getattr(test_instance, attr)
-                        if asyncio.iscoroutinefunction(method):
-                            await method()
-                        else:
-                            method()
-            except Exception as e:
-                raise ImportError(f"Test fallito durante validazione iniziale per {path}: {e}")
-
-            # se i test passano, persistiamo gli hash calcolati
-            db[canonical_key] = {
-                 "functions": main_hashes,
-                 "tests": test_hashes
-             }
-            try:
-                os.makedirs(os.path.dirname(db_path), exist_ok=True)
-                with open(db_path, "w") as f:
-                    json.dump(db, f, indent=2)
-            except Exception:
-                # non blocchiamo l'importazione se il salvataggio fallisce
-                pass
-            # se esisteva una vecchia chiave, rimuoviamola per evitare duplicati
-            if found_key and found_key != canonical_key and found_key in db:
-                try:
-                    del db[found_key]
-                except Exception:
-                    pass
-            entry = db.get(canonical_key)
-
-        expected_funcs = entry.get("functions", {})
-        expected_tests = entry.get("tests", {})
-
-        validated = set()
-        auto_accept = os.environ.get("FWK_AUTO_ACCEPT_HASH", "") == "1"
-        updated = False
-
-        for test_key, registered_test_hash in expected_tests.items():
-            actual_test_hash = test_hashes.get(test_key)
-            if actual_test_hash is None:
-                raise ImportError(f"Test registrato '{test_key}' non trovato nel file di test -> importazione bloccata")
-
-            if actual_test_hash != registered_test_hash:
-                if auto_accept:
-                    expected_tests[test_key] = actual_test_hash
-                    db.setdefault(canonical_key, {})["tests"] = expected_tests
-                    updated = True
-                else:
-                    raise ImportError(f"Hash test mismatch per '{test_key}' -> importazione bloccata")
-
-            if "." not in test_key:
-                raise ImportError(f"Formato test key non valido: {test_key}")
-            cls, method = test_key.split(".", 1)
-            if cls == "TestModule":
-                member = method[5:] if method.startswith("test_") else method
-                registered_member_hash = expected_funcs.get(member)
-                actual_member_hash = main_hashes.get(member)
-                if registered_member_hash is None or actual_member_hash is None:
-                    raise ImportError(f"Hash non registrato o membro non trovato per '{member}' richiesto da '{test_key}'")
-                if registered_member_hash != actual_member_hash:
-                    if auto_accept:
-                        expected_funcs[member] = actual_member_hash
-                        db.setdefault(canonical_key, {})["functions"] = expected_funcs
-                        updated = True
-                    else:
-                        raise ImportError(f"Hash mismatch per membro '{member}' richiesto da '{test_key}'")
-                validated.add(member)
-            else:
-                if not cls.startswith("Test"):
-                    raise ImportError(f"Nome classe test non riconosciuto: {cls}")
-                target_class = cls[4:] or None
-                registered_member_hash = expected_funcs.get(target_class)
-                actual_member_hash = main_hashes.get(target_class)
-                if registered_member_hash is None or actual_member_hash is None:
-                    raise ImportError(f"Hash non registrato o classe non trovata per '{target_class}' richiesta da '{test_key}'")
-                if registered_member_hash != actual_member_hash:
-                    if auto_accept:
-                        expected_funcs[target_class] = actual_member_hash
-                        db.setdefault(canonical_key, {})["functions"] = expected_funcs
-                        updated = True
-                    else:
-                        raise ImportError(f"Hash mismatch per classe '{target_class}' richiesta da '{test_key}'")
-                validated.add(target_class)
-
-        if updated:
-            try:
-                with open(db_path, "w") as f:
-                    json.dump(db, f, indent=2)
-            except Exception:
-                pass
-
-        # opzionale: eseguire i test una seconda volta se richiesto
-        if run_tests:
-            for name, obj in list(vars(test_module).items()):
-                if not isinstance(obj, type):
-                    continue
-                if not (name == "TestModule" or name.startswith("Test")):
-                    continue
-                test_instance = obj()
-                setattr(test_instance, "main_module", module)
-                for attr in dir(test_instance):
-                    if not attr.startswith("test_"):
-                        continue
-                    method = getattr(test_instance, attr)
-                    try:
-                        if asyncio.iscoroutinefunction(method):
-                            await method()
-                        else:
-                            method()
-                    except Exception as e:
-                        raise ImportError(f"Test fallito {name}.{attr}: {e}")
-
-        return validated
-
-    def _create_filtered_module(main_module: types.ModuleType, validated):
-        """
-        Restituisce un oggetto module con i soli membri validati (consente .application).
-        """
-        module_name = getattr(main_module, "__name__", f"filtered_{uuid.uuid4().hex}")
-        out_module = types.ModuleType(module_name)
-        out_module.__file__ = getattr(main_module, "__file__", None)
-        for name in validated:
-            if hasattr(main_module, name):
-                setattr(out_module, name, getattr(main_module, name))
-        return out_module
-
-    # Fine funzioni di supporto ------------------------------
-
-    # esegui il modulo principale
-    main_module = await _execute_python_module(path, path, content, dependency_loader=None)
-
-    # se il modulo principale definisce una mappa 'imports', risolviamola e popoliamo le variabili
+async def _load_python_module(name: str, path: str, code: str, lang: str) -> types.ModuleType:
+    """Crea ed esegue dinamicamente un modulo Python con le variabili globali necessarie."""
+    module_name = f"{path}"
+    module = types.ModuleType(module_name)
+    module.__file__ = path
+    module.__source__ = code
+    module.__dict__['language'] = lang
+    #print(code)
     try:
-        imports_map = getattr(main_module, "imports", None)
-        if isinstance(imports_map, dict):
-            for key, import_path in imports_map.items():
+        exec(code, module.__dict__)
+        await _load_dependencies(module)
+    except Exception as e:
+        raise ImportError(f"Esecuzione modulo Python fallita per {path}: {e}") from e
+    return module
+
+async def resource(lang: str, path: str | None = None, **kwargs) -> Any:
+    """
+    Carica una risorsa (JSON o modulo Python) e ne valida il contratto.
+    
+    Argomenti:
+        lang (str): La lingua da iniettare nei moduli Python.
+        path (str | None): Il percorso della risorsa.
+    """
+    resource_path = resolve_path(path)
+    content = await backend(path=resource_path)
+    
+    if resource_path.endswith(".json"):
+        return await convert(content, str, 'json')
+    
+    if resource_path.endswith(".py"):
+        # Notare che `lang` viene passato qui
+        main_module = await _load_python_module("main_module", resource_path, content, lang)
+        # La funzione di validazione è astratta/esterna
+        filtered_module = await validate_and_filter_module(main_module, resource_path)
+        return filtered_module
+        
+    return content
+
+# =====================================================================
+# --- Funzioni Principali di Analisi ---
+# =====================================================================
+
+def _get_system_info() -> Dict[str, Any]:
+    """Raccoglie le informazioni chiave su CPU, RAM e Processo."""
+    mem = psutil.virtual_memory()
+    
+    return {
+        "hostname": socket.gethostname(),
+        "process_id": os.getpid(),
+        "cpu_cores_logical": psutil.cpu_count(),
+        "cpu_cores_physical": psutil.cpu_count(logical=False),
+        "ram_total_gb": round(mem.total / (1024**3), 2),
+        "ram_available_gb": round(mem.available / (1024**3), 2),
+        "os_name": platform.platform(),
+    }
+
+def _get_line_from_source(source_lines: List[str], lineno: int) -> str:
+    """Recupera una specifica riga dal sorgente diviso."""
+    index = lineno - 1
+    if 0 <= index < len(source_lines):
+        return source_lines[index].strip()
+    return "RIGA SORGENTE NON TROVATA O FUORI LIMITE"
+
+def asynchronous(custom_filename: str = __file__, app_context: Optional[Dict[str, Any]] = None):
+    """
+    Decoratore per catturare eccezioni, generare un rapporto di debug dettagliato e loggarlo usando il logger configurato.
+    """
+    def decorator(func):
+        @functools.wraps(func)
+        async def wrapper(*args, **kwargs):
+            try:
+                return await func(*args, **kwargs)
+            except Exception:
+                # Recupera il codice sorgente del modulo della funzione
+                source_code = None
                 try:
-                    imported_content = await backend(path=import_path)
-                except FileNotFoundError:
-                    continue
-                if isinstance(imported_content, str) and import_path.endswith(".json"):
-                    try:
-                        value = await convert(imported_content, 'dict', 'json')
-                    except Exception:
-                        value = json.loads(imported_content)
-                elif import_path.endswith(".py"):
-                    value = await _execute_python_module(f"dep_{key}", import_path, imported_content, dependency_loader=None)
-                else:
-                    value = imported_content
-                setattr(main_module, key, value)
-    except Exception:
-        # non blocchiamo il caricamento del modulo principale se qualche import fallisce
-        pass
+                    source_code = inspect.getsource(func)
+                except KeyboardInterrupt:
+                    print("Interruzione da tastiera (Ctrl + C).")
+                except (OSError, TypeError):
+                    source_code = ""
 
-    # valida contratto tramite JSON degli hash + test file
-    validated = await _validate_module_contract(main_module, path, run_tests=False)
+                # Genera il rapporto usando l'eccezione attiva
+                report = analyze_exception(
+                    source_code=source_code,
+                    custom_filename=custom_filename,
+                    app_context=app_context
+                )
+                
+                ok = await convert(report, str, 'json')
 
-    filtered = _create_filtered_module(main_module, validated)
-    return filtered
+                print(ok)
+
+                # Rilancia l'eccezione
+                #raise
+
+        return wrapper
+    return decorator
+
+def synchronous(custom_filename: str = __file__, app_context: Optional[Dict[str, Any]] = None):
+    """
+    Decoratore per catturare eccezioni, generare un rapporto di debug dettagliato e loggarlo usando il logger configurato.
+    """
+    def decorator(func):
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs):
+            try:
+                return func(*args, **kwargs)
+            except Exception:
+                # Recupera il codice sorgente del modulo della funzione
+                source_code = None
+                try:
+                    source_code = inspect.getsource(func)
+                except KeyboardInterrupt:
+                    print("Interruzione da tastiera (Ctrl + C).")
+                except (OSError, TypeError):
+                    source_code = ""
+
+                # Genera il rapporto usando l'eccezione attiva
+                report = analyze_exception(
+                    source_code=source_code,
+                    custom_filename=custom_filename,
+                    app_context=app_context
+                )
+                
+                #exc_type, exc_value, _ = sys.exc_info()
+                #error_message = f"Errore intercettato in '{func.__name__}': {type(exc_value).__name__} - {str(exc_value)}"
+                #ok = await convert(report, 'str', 'json')
+                ok = asyncio.run(convert(report, str, 'json'))
+
+                print(ok)
+
+                # Rilancia l'eccezione
+                #raise
+
+        return wrapper
+    return decorator
+
+def analyze_module(source_code: str, module_name: str) -> Dict[str, Any]:
+    """Analizza il codice sorgente (AST) per ricavare la struttura del modulo."""
+    structure = {"module_name": module_name, "module_docstring": None}
+    
+    try:
+        tree = ast.parse(source_code)
+        if (ast.get_docstring(tree)):
+            structure["module_docstring"] = ast.get_docstring(tree).strip()
+            
+        for node in ast.walk(tree):
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                func_info = {
+                    "type": "function",
+                    "data": {
+                        "lineno": node.lineno,
+                        "source_code_line": _get_line_from_source(source_code.splitlines(), node.lineno),
+                        "docstring": ast.get_docstring(node),
+                        "args": [a.arg for a in node.args.posonlyargs + node.args.args + [node.args.vararg] if a],
+                    }
+                }
+                structure[node.name] = func_info
+
+    except Exception as e:
+        structure["parsing_error"] = f"Errore nell'analisi AST: {type(e).__name__} - {str(e)}"
+
+    return structure
+
+def analyze_traceback(tb: Optional[types.TracebackType]) -> List[Dict[str, Any]]:
+    """
+    Estrae i frame del traceback in un formato strutturato, gestendo in modo robusto
+    il recupero della riga di codice sorgente.
+    """
+    structured_tb = []
+    current_tb = tb
+    
+    # Pre-carica il sorgente del modulo principale se è quello iniettato nello scenario di test
+    #in_memory_source_lines = MODULE_CODE_RESOLVED.splitlines()
+
+    while current_tb is not None:
+        frame = current_tb.tb_frame
+        
+        # Ignora le librerie di sistema
+        filename = frame.f_code.co_filename
+        if "/usr/" in filename or "/local/lib/python" in filename or "python3." in filename:
+            current_tb = current_tb.tb_next
+            continue
+
+        # Estrai e sanifica le variabili locali del frame corrente
+        local_vars_state = {
+            #k: sanitize_variable_value(k, v) 
+            k: v
+            for k, v in frame.f_locals.items() 
+            if not k.startswith('__') and k not in ['frame', 'frame_summary', 'current_tb', 'tb']
+        }
+        
+        # === INIZIO FIX CRITICO PER Index/Source Error ===
+        line_content = None
+        
+        # 1. Tentativo con traceback.FrameSummary (il più robusto per file su disco)
+        try:
+            # lookup_line=True forza la ricerca della riga dal disco/modulo
+            frame_summary = traceback.FrameSummary(filename, frame.f_lineno, frame.f_code.co_name, lookup_line=True)
+            if frame_summary.line:
+                line_content = frame_summary.line.strip()
+        except Exception:
+            pass 
+
+        # 2. Fallback per codice dinamico ('<string>' o nomi di file fittizi come 'api_handler_v1.py')
+        '''if line_content is None and (filename.startswith('<') or filename.endswith('api_handler_v1.py')):
+            try:
+                # Usa il sorgente in memoria fornito dal blocco di test
+                line_content = _get_line_from_source(in_memory_source_lines, frame.f_lineno)
+            except Exception:
+                pass'''
+
+        # 3. Fallback finale
+        if line_content is None:
+            if filename.startswith('<'):
+                line_content = "SORGENTE DINAMICA NON DISPONIBILE (exec/lambda)"
+            else:
+                line_content = "SORGENTE NON RECUPERATA DAL DISCO/MODULO"
+        
+        # === FINE FIX CRITICO ===
+
+        structured_tb.append({
+            "step_filename": filename,
+            "step_lineno": frame.f_lineno,
+            "step_function": frame.f_code.co_name,
+            "step_code_line": line_content, 
+            "local_variables_state": local_vars_state
+        })
+        current_tb = current_tb.tb_next
+    
+    return structured_tb
+
+def analyze_exception(source_code: str, custom_filename: str = "<code_in_memory>", app_context: Dict[str, Any] = None) -> Dict[str, Any]:
+    
+    exc_type, exc_value, exc_traceback = sys.exc_info()
+    
+    if exc_type is None or exc_traceback is None:
+        return {"status": "Nessuna eccezione attiva trovata."}
+        
+    tb_list = traceback.extract_tb(exc_traceback)
+    full_traceback_text = traceback.format_exception(exc_type, exc_value, exc_traceback)
+    
+    last_traceback = exc_traceback
+    while last_traceback.tb_next:
+        last_traceback = last_traceback.tb_next
+    last_frame_object = last_traceback.tb_frame 
+    
+    raw_filename = tb_list[-1].filename
+    raw_lineno = tb_list[-1].lineno
+    
+    source_to_analyze = source_code
+    analysis_filename = custom_filename
+    report_filename = raw_filename
+    
+    
+    '''source_from_disk = await backend(raw_filename)
+    source_to_analyze = source_from_disk
+    analysis_filename = raw_filename
+    report_filename = raw_filename'''
+            
+    # La riga di codice non è più recuperata qui.
+
+    module_structure = analyze_module(source_to_analyze, analysis_filename)
+    structured_tb = analyze_traceback(exc_traceback)
+    
+    # Recupera i dettagli dell'errore finale dal traceback strutturato (più affidabile)
+    final_error_step = structured_tb[-1] if structured_tb else {
+        "step_code_line": "SORGENTE NON RECUPERATA", 
+        "step_lineno": raw_lineno, 
+        "step_function": tb_list[-1].name
+    }
+    
+    final_local_vars = {
+         #k: sanitize_variable_value(k, v)
+         k: v
+         for k, v in last_frame_object.f_locals.items() 
+         if not k.startswith('__') and k not in ['last_traceback', 'last_frame_object', 'raw_lineno', 'tb_list', 'exc_traceback']
+    }
+    
+    exception_details = {
+        "exception_type": type(exc_value).__name__,
+        "exception_message": str(exc_value),
+        "error_location": {
+            "filename": report_filename,
+            "line_number": final_error_step["step_lineno"],
+            "function_name": final_error_step["step_function"],
+            "source_code_line": final_error_step["step_code_line"], # <- Usa il valore da structured_tb
+        },
+        "LOCAL_VARIABLES_STATE_FINAL_FRAME": final_local_vars,
+    }
+    
+    debug_report = {
+        "ENVIRONMENT_CONTEXT": {
+            "timestamp": datetime.now().isoformat(),
+            "python_version": platform.python_version(),
+            **_get_system_info()
+        },
+        "APPLICATION_CONTEXT": app_context or {"VERSION": "N/A", "USER_ID": "anonymous"},
+        "EXCEPTION_DETAILS": exception_details,
+        "MODULE_STRUCTURE_ANALYSIS": module_structure,
+        "STRUCTURED_TRACEBACK": structured_tb, 
+        #"FULL_TRACEBACK_TEXT": full_traceback_text 
+    }
+    
+    return debug_report

@@ -87,38 +87,27 @@ def test():
     runner = unittest.TextTestRunner()
     runner.run(suite)
         
+APP_CONTEXT = {
+    "APP_VERSION": "1.2.5",
+    "USER_ID": "user_1234",
+    "REQUEST_ID": "req_xyz987"
+}
 
 #@flow.asynchronous(managers=('tester',))
+@language.synchronous(
+    #custom_filename=__file__,
+    app_context=APP_CONTEXT)
 def application(tester=None,**constants):
     print("Starting application...", constants)
-    try: 
         
-        if '--update' in constants.get('args',[]):
-            sync_github_repo("src", "colosso-cloud", "framework", "main")
-        if '--test' in constants.get('args',[]):
-            test()
-        else:
-            event_loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(event_loop)
-            #print(dir())
-            event_loop.create_task(loader.bootstrap())
-            event_loop.run_forever()
-    except KeyboardInterrupt:
-        # Interruzione manuale con Ctrl+C
-        #asyncio.create_task(messenger.post(msg="Interruzione da tastiera (Ctrl + C)."))
-        pass
-    except Exception as e:
-        # Gestione di altre eccezioni con nome file, modulo e numero di riga
-        exc_type, exc_value, exc_traceback = sys.exc_info()
-        last_frame = exc_traceback.tb_frame
-        filename = last_frame.f_code.co_filename
-        module = last_frame.f_code.co_name
-        line_number = exc_traceback.tb_lineno
-        print(f"RUN -Errore generico: {e}")
-        print(f"File: {filename}, Modulo: {module}, Linea: {line_number}")
-    finally:
-        # Chiusura del loop
-        '''if event_loop.is_running():
-            event_loop.stop()
-        event_loop.close()'''
-        #logging.info(msg="Event loop chiuso.")
+    if '--update' in constants.get('args',[]):
+        sync_github_repo("src", "colosso-cloud", "framework", "main")
+    if '--test' in constants.get('args',[]):
+        test()
+    else:
+        event_loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(event_loop)
+        print(dir(language))
+        #print(dir())
+        event_loop.create_task(loader.bootstrap())
+        event_loop.run_forever()

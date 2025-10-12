@@ -1,10 +1,10 @@
 import asyncio
 
 imports = {
-    'factory': 'framework/service/factory.py',
+    #'factory': 'framework/service/factory.py',
     'flow': 'framework/service/flow.py',
-    'contract': 'framework/service/contract.py',
-    'model': 'framework/schema/model.json',
+    #'contract': 'framework/service/contract.py',
+    #'model': 'framework/schema/model.json',
 }
 
 class TestModule():
