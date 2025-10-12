@@ -39,7 +39,6 @@ class messenger():
             #domain_provider = provider.config.get('domain','*').split(',')
             #domain_message = constants.get('domain',[])
             await provider.post(**constants)
-        print(constants)
 
     #@flow.asynchronous(inputs='messenger',outputs='transaction')
     async def read(self,**constants):

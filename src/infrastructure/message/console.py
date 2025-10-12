@@ -19,7 +19,9 @@ if sys.platform == 'emscripten':
 else:
     
     async def log_backend(self,level, message):
+        
         """Logging in ambiente Python nativo."""
+
         match level:
             case 'debug': self.logger.debug(message)
             case 'info': self.logger.info(message)
@@ -44,6 +46,7 @@ class adapter:
         self.history = dict()
         # Creazione del logger
         self.logger = logging.getLogger("self.config['project']['identifier']")
+        self.logger.propagate = False 
         self.logger.setLevel(logging.DEBUG)
         self.processable = ['log']
         
@@ -51,9 +54,11 @@ class adapter:
         ch = logging.StreamHandler()
         ch.setLevel(logging.DEBUG)
 
-        # Formatter con formattazione avanzata e colori ANSI
+        
+
+        # 2. Modifica il Formatter per includere il campo 'domain'
         formatter = self.ColoredFormatter(
-            constants.get('format', "%(asctime)s | %(levelname)-8s | %(process)d | %(message)s"),
+            constants.get('format', "%(asctime)s | %(levelname)-8s | %(filename)s:%(lineno)d | %(funcName)-25s | %(process)d | %(message)s"),
             datefmt="%Y-%m-%d %H:%M:%S"
         )
 
