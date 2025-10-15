@@ -144,19 +144,28 @@ async def validate_and_filter_module(main_module: types.ModuleType, path: str) -
     Simula la validazione (hashing, test) e restituisce un modulo filtrato.
     Per l'esempio, includiamo solo le funzioni e classi che iniziano con 'format_' o 'Application'.
     """
-    validated_members = {'format_user', 'application', 'messenger','executor','storekeeper','defender','presenter','adapter'} # Membri che hanno 'superato' la validazione
+    validated_members = [] # Membri che hanno 'superato' la validazione
     
     # Crea un nuovo modulo con solo i membri approvati
     filtered_module = types.ModuleType(f"filtered:{main_module.__name__}")
     filtered_module.__file__ = main_module.__file__
-    
-    for name in validated_members:
-        if hasattr(main_module, name):
-            setattr(filtered_module, name, getattr(main_module, name))
+
+    contract_code = await backend(path=path.replace('.py','.test.py'))
+    contract_module = await _load_python_module("contract_module", path.replace('.py','.test.py'), contract_code)
+    contract_ana = analyze_module(contract_code, path.replace('.py','.test.py'))
+    print(contract_ana)
+    print(f"🔍 Validazione contratto per {path} usando {path.replace('.py','.test.py')}...",contract_module)
+    print(contract_ana.keys(),contract_ana.get('TestModule',{})['data']['methods'].keys())
+    for name in contract_ana.get('TestModule',{})['data']['methods'].keys():
+        filtered_name = name.replace('test_','')
+        if hasattr(main_module, filtered_name):
+            setattr(filtered_module, filtered_name, getattr(main_module, filtered_name))
+            validated_members.append(filtered_name)
+        print(f" - {name} -> {filtered_name}")
             
     # Assegna anche la dipendenza risolta, se presente
-    if hasattr(main_module, 'schema'):
-        setattr(filtered_module, 'schema', getattr(main_module, 'schema'))
+    #if hasattr(main_module, 'schema'):
+    #    setattr(filtered_module, 'schema', getattr(main_module, 'schema'))
         
     print(f"✅ Validazione e filtro riusciti per {path}. Membri esposti: {list(validated_members)}")
     return filtered_module
@@ -400,7 +409,7 @@ def synchronous(custom_filename: str = __file__, app_context: Optional[Dict[str,
         return wrapper
     return decorator
 
-def analyze_module(source_code: str, module_name: str) -> Dict[str, Any]:
+def analyze_module2(source_code: str, module_name: str) -> Dict[str, Any]:
     """Analizza il codice sorgente (AST) per ricavare la struttura del modulo."""
     structure = {"module_name": module_name, "module_docstring": None}
     
@@ -488,6 +497,145 @@ def analyze_module(source_code: str, module_name: str) -> Dict[str, Any]:
                         "value": var_value,
                     }
                     structure[var_name] = info
+            elif isinstance(node, ast.ClassDef):
+                # Un'analisi Classi completa richiederebbe di analizzare anche i
+                # membri interni (metodi, variabili di classe), ma per una 
+                # struttura di base:
+
+                class_info = {
+                    "type": "class",
+                    "data": {
+                        "lineno": node.lineno,
+                        "docstring": ast.get_docstring(node),
+                        # Le classi base (ereditarietà)
+                        "bases": [
+                            ast.get_source_segment(source_code, base)
+                            for base in node.bases
+                            if ast.get_source_segment(source_code, base) is not None
+                        ],
+                        # Analisi incompleta: Questo non include i metodi/variabili,
+                        # ma ne ottiene solo i metadati di base della classe.
+                    }
+                }
+                structure[node.name] = class_info
+    except Exception as e:
+        structure["parsing_error"] = f"Errore nell'analisi AST: {type(e).__name__} - {str(e)}"
+
+    return structure
+
+def analyze_module(source_code: str, module_name: str) -> Dict[str, Any]:
+    """Analizza il codice sorgente (AST) per ricavare la struttura del modulo,
+    annidando i metodi all'interno della loro classe.
+    """
+    structure = {"module_name": module_name, "module_docstring": None}
+    
+    try:
+        tree = ast.parse(source_code)
+        if (docstring := ast.get_docstring(tree)):
+            structure["module_docstring"] = docstring.strip()
+            
+        # Per una corretta gestione dello scope, dobbiamo iterare direttamente su tree.body
+        # e poi usare ast.walk/ast.iter_child_nodes per l'analisi interna se necessario.
+        
+        # Mappa i nodi Function/Assign che sono metodi o variabili di classe 
+        # per evitarli nell'analisi principale delle funzioni/variabili di modulo.
+        ignored_nested_nodes = set()
+
+        # 1. Analisi di Primo Livello (Classi e Funzioni/Variabili di Modulo)
+        for node in tree.body:
+
+            # Analisi Classi
+            if isinstance(node, ast.ClassDef):
+                
+                class_info = {
+                    "type": "class",
+                    "data": {
+                        "lineno": node.lineno,
+                        "docstring": ast.get_docstring(node),
+                        "bases": [
+                            ast.get_source_segment(source_code, base)
+                            for base in node.bases
+                            if ast.get_source_segment(source_code, base) is not None
+                        ],
+                        "methods": {}, # 🚨 NUOVA SEZIONE PER I METODI 🚨
+                        "class_vars": {} # Opzionale: per le variabili di classe
+                    }
+                }
+                
+                # Iteriamo SOLO sul corpo della classe per trovare i membri interni
+                for class_member in node.body:
+                    
+                    # Identificazione Metodi
+                    if isinstance(class_member, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                        # Aggiungiamo questo nodo al set degli ignorati per l'analisi del modulo
+                        ignored_nested_nodes.add(class_member)
+                        
+                        method_info = {
+                            "type": "method",
+                            "lineno": class_member.lineno,
+                            "docstring": ast.get_docstring(class_member),
+                            "args": [
+                                a.arg for a in class_member.args.posonlyargs + class_member.args.args + [class_member.args.vararg] 
+                                if a and a.arg not in ('self', 'cls') # Filtra self/cls dall'elenco argomenti
+                            ],
+                            # Non includiamo 'code' per semplicità, ma puoi aggiungerlo qui:
+                            # "code": ast.get_source_segment(source_code, class_member) 
+                        }
+                        class_info["data"]["methods"][class_member.name] = method_info
+                        
+                    # Opzionale: Identificazione Variabili di Classe
+                    elif isinstance(class_member, ast.Assign) and class_member.targets and isinstance(class_member.targets[0], ast.Name):
+                        # Aggiungiamo questo nodo al set degli ignorati
+                        ignored_nested_nodes.add(class_member)
+                        
+                        var_name = class_member.targets[0].id
+                        class_info["data"]["class_vars"][var_name] = {
+                            "lineno": class_member.lineno,
+                            "type_ast": type(class_member.value).__name__,
+                        }
+
+                structure[node.name] = class_info # Aggiungiamo la classe completa
+
+            # Analisi Funzioni di Modulo
+            elif isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                # Se non è una funzione/metodo di classe (già gestita e aggiunta a ignored_nested_nodes),
+                # allora è una funzione di modulo.
+                if node not in ignored_nested_nodes:
+                    func_info = {
+                        "type": "function",
+                        "data": {
+                            "lineno": node.lineno,
+                            "code": ast.get_source_segment(source_code, node),
+                            "docstring": ast.get_docstring(node),
+                            "args": [a.arg for a in node.args.posonlyargs + node.args.args + [node.args.vararg] if a],
+                        }
+                    }
+                    structure[node.name] = func_info
+            
+            # Analisi Variabili/Dizionari di Modulo (solo top-level Assign)
+            elif isinstance(node, ast.Assign):
+                # Se è un'assegnazione di modulo, e non è una variabile di classe (già ignorata)
+                if node not in ignored_nested_nodes:
+                    
+                    # La logica del tuo codice precedente cercava solo dizionari:
+                    if isinstance(node.value, ast.Dict) and node.targets and isinstance(node.targets[0], ast.Name):
+                        var_name = node.targets[0].id
+                        var_value = None
+                        try:
+                            var_value = ast.literal_eval(node.value)
+                        except (ValueError, TypeError):
+                            var_value = "Evaluation Error"
+                        
+                        info = {
+                            "type": type(node.value).__name__,
+                            "lineno": node.lineno,
+                            "value": var_value,
+                        }
+                        structure[var_name] = info
+                        
+            # Se ci sono blocchi di controllo (if/for/ecc.) che contengono Assegnazioni/Funzioni,
+            # questi devono essere gestiti con una logica ricorsiva a parte, ma per semplicità
+            # e per mantenere la struttura basata su tree.body, li ignoriamo qui.
 
     except Exception as e:
         structure["parsing_error"] = f"Errore nell'analisi AST: {type(e).__name__} - {str(e)}"
