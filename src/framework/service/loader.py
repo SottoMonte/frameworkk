@@ -131,7 +131,7 @@ async def bootstrap() -> None:
         }
     ]
 
-    await language.load_di_entry(language, **{
+    await language.load_di_entry(**{
         'path': 'infrastructure/message/console.py', # Percorso per resource
         'service': 'message', # Chiave nel DI per la lista dei provider
         'adapter': 'adapter', # Nome della classe da estrarre dal modulo
@@ -145,7 +145,7 @@ async def bootstrap() -> None:
     # 1. Caricamento sequenziale dei manager essenziali e controllo del risultato
     for mgr in manager_loader_path:
         # Assumiamo che language.load_manager sollevi ResourceLoadError in caso di fallimento
-        await language.load_di_entry(language, **mgr)
+        await language.load_di_entry(**mgr)
 
     
     
@@ -241,7 +241,7 @@ async def bootstrap() -> None:
         }
     ]
     
-    manager_tasks = [ asyncio.create_task(language.load_di_entry(language, **mgr), name=f"load_{mgr['name']}") for mgr in manager_loader_path]
+    manager_tasks = [ asyncio.create_task(language.load_di_entry(**mgr), name=f"load_{mgr['name']}") for mgr in manager_loader_path]
     
     await dependency_messenger.post(domain='debug', message=f"Avvio del caricamento parallelo di {len(manager_tasks)} Manager...")
     await dependency_executor.all_completed(tasks=manager_tasks) 

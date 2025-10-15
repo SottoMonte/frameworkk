@@ -186,20 +186,19 @@ async def _load_dependencies(module: types.ModuleType,dependencies) -> None:
             except Exception:
                 value = json.loads(imported_content)
         elif import_path.endswith(".py"):
-            value = await _load_python_module(key, import_path, imported_content, lang=getattr(module, 'language'))
+            value = await _load_python_module(key, import_path, imported_content)
         else:
             value = imported_content
         setattr(module, key, value)
         print(f"📦 Dipendenza '{key}' caricata da {import_path}")
 
-async def _load_python_module(name: str, path: str, code: str, lang: str) -> types.ModuleType:
+async def _load_python_module(name: str, path: str, code: str) -> types.ModuleType:
     """Crea ed esegue dinamicamente un modulo Python con le variabili globali necessarie."""
-    
     module_name = f"{path}"
     module = types.ModuleType(module_name)
     module.__file__ = path
     module.__source__ = code
-    module.__dict__['language'] = lang
+    module.__dict__['language'] = di['module_cache'].get('language')
     
     #module.__dict__['imports'] = dependencies
     #print(code)
@@ -215,7 +214,7 @@ async def _load_python_module(name: str, path: str, code: str, lang: str) -> typ
         raise ImportError(f"Esecuzione modulo Python fallita per {path}: {e}") from e
     return module
 
-async def resource(lang: str, path: str | None = None, **kwargs) -> Any:
+async def resource(path: str | None = None, **kwargs) -> Any:
     """
     Carica una risorsa (JSON o modulo Python) e ne valida il contratto.
     
@@ -231,17 +230,14 @@ async def resource(lang: str, path: str | None = None, **kwargs) -> Any:
     
     if resource_path.endswith(".py"):
         # Notare che `lang` viene passato qui
-        main_module = await _load_python_module("main_module", resource_path, content, lang)
+        main_module = await _load_python_module("main_module", resource_path, content)
         # La funzione di validazione è astratta/esterna
         filtered_module = await validate_and_filter_module(main_module, resource_path)
         return filtered_module
         
     return content
 
-async def load_di_entry(
-    lang: str,
-    **constants: Any
-) -> None:
+async def load_di_entry(**constants: Any) -> None:
     """
     Carica una risorsa specificata in 'constants' e la registra nel container DI globale.
 
@@ -273,7 +269,7 @@ async def load_di_entry(
 
     
         # 4. Caricamento del Modulo/Risorsa (Usando il path fornito)
-        module = await resource(lang=lang, **constants)
+        module = await resource(**constants)
         resource_class: Callable = getattr(module, attribute_name)
 
         # 5. Definizione della Factory/Resolver

@@ -13,6 +13,7 @@ else:
     # Use resource method instead of load_main
     import asyncio
     async def get_run_module():
+        await language.resource(language, path="framework/service/language.py", adapter="language")
         return await language.resource(language, path="framework/service/run.py", adapter="run")
     
     run = asyncio.run(get_run_module())
