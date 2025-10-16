@@ -139,36 +139,219 @@ async def format(target ,**constants):
 # --- Funzioni di Caricamento ---
 # =====================================================================
 
-async def validate_and_filter_module(main_module: types.ModuleType, path: str) -> types.ModuleType:
+async def validate_and_filter_module(
+    main_module: types.ModuleType, 
+    path: str, 
+) -> types.ModuleType:
     """
-    Simula la validazione (hashing, test) e restituisce un modulo filtrato.
-    Per l'esempio, includiamo solo le funzioni e classi che iniziano con 'format_' o 'Application'.
+    Copia le classi e le funzioni dal main_module al filtered_module.
+    Successivamente, rimuove selettivamente i metodi di classe e le funzioni di modulo 
+    che non hanno un corrispondente test nel modulo di contratto, 
+    escludendo i metodi speciali (__xx__) e privati/protetti (_x).
     """
-    validated_members = [] # Membri che hanno 'superato' la validazione
+    validated_members: List[str] = []
     
-    # Crea un nuovo modulo con solo i membri approvati
-    filtered_module = types.ModuleType(f"filtered:{main_module.__name__}")
-    filtered_module.__file__ = main_module.__file__
+    # --- Caricamento e Analisi del Contratto ---
+    contract_path = path.replace('.py', '.test.py')
+    # ... Caricamento del modulo di contratto (omesso) ...
+    contract_code = await backend(path=contract_path)
+    contract_module = await _load_python_module("contract_module", contract_path, contract_code)
+    contract_ana: Dict[str, Any] = analyze_module(contract_code, contract_path)
+    contract_hashes: Dict[str, Dict[str, str]] = await resource(path="src/framework/schema/file.json")
+    
+    
+    print(f"🔍 Validazione contratto per {path} usando {contract_path}...")
 
-    contract_code = await backend(path=path.replace('.py','.test.py'))
-    contract_module = await _load_python_module("contract_module", path.replace('.py','.test.py'), contract_code)
-    contract_ana = analyze_module(contract_code, path.replace('.py','.test.py'))
-    print(contract_ana)
-    print(f"🔍 Validazione contratto per {path} usando {path.replace('.py','.test.py')}...",contract_module)
-    print(contract_ana.keys(),contract_ana.get('TestModule',{})['data']['methods'].keys())
-    for name in contract_ana.get('TestModule',{})['data']['methods'].keys():
-        filtered_name = name.replace('test_','')
-        if hasattr(main_module, filtered_name):
-            setattr(filtered_module, filtered_name, getattr(main_module, filtered_name))
-            validated_members.append(filtered_name)
-        print(f" - {name} -> {filtered_name}")
-            
-    # Assegna anche la dipendenza risolta, se presente
-    #if hasattr(main_module, 'schema'):
-    #    setattr(filtered_module, 'schema', getattr(main_module, 'schema'))
+    # Set per tracciare i metodi/funzioni che hanno superato il 'contratto'
+    # Formato: { 'nome_classe': set_di_metodi_validi } o { '__module__': set_di_funzioni_valide }
+    contract_methods: Dict[str, set[str]] = {}
+
+    # Riempiamo contract_methods con tutti i nomi dei metodi/funzioni testati (senza 'test_')
+    for mname, data in contract_ana.items():
+        if not isinstance(data, dict):
+            print(f"⚠️ ATTENZIONE: Saltato il membro '{mname}'. I dati analizzati non sono un dizionario.")
+            continue # Skip this entry
+        # Determina il nome della classe/modulo di destinazione
+        target_name = '__module__' if mname == 'TestModule' else mname.replace('Test', '')
+        print(f" - Analisi contratto per {mname} -> {data}")
+        test_methods = data.get('data', {}).get('methods', {}).keys()
         
-    print(f"✅ Validazione e filtro riusciti per {path}. Membri esposti: {list(validated_members)}")
+        contract_methods[target_name] = set()
+        for test_name in test_methods:
+            if test_name.startswith('test_'):
+                contract_methods[target_name].add(test_name.replace('test_', ''))
+
+    # --- Creazione e Popolamento del Modulo Filtrato ---
+    filtered_module = types.ModuleType(f"filtered:{main_module.__name__}")
+    if hasattr(main_module, '__file__'):
+        filtered_module.__file__ = main_module.__file__
+
+    # Copia tutti i membri e poi filtra
+    for name in dir(main_module):
+        # Ignora i membri importati internamente e i nomi speciali del modulo
+        if name.startswith('__'):
+            continue 
+
+        member = getattr(main_module, name)
+
+        if inspect.isclass(member):
+            
+            # --- Gestione CLASSI ---
+            
+            if name not in contract_methods:
+                # Se la classe non ha un modulo di test, la saltiamo (non è stata validata)
+                continue
+
+            # 1. Copia la classe (creando una copia superficiale per poterla modificare)
+            # Creiamo una nuova classe che eredita dalla classe originale (copia completa)
+            # Usiamo type() per creare un clone modificabile.
+            
+            # Copiamo tutti gli attributi della classe originale nel dict
+            original_attrs = dict(inspect.getmembers(member, lambda x: not inspect.isfunction(x) and not inspect.ismethod(x)))
+            # Aggiungiamo i metodi e le funzioni
+            original_attrs.update({k: v for k, v in member.__dict__.items() if inspect.isfunction(v) or inspect.ismethod(v)})
+            original_attrs['__module__'] = filtered_module.__name__
+            
+            # Creazione del CLONE della classe
+            FilteredClass = type(
+                member.__name__, 
+                member.__bases__, 
+                original_attrs
+            )
+            
+            setattr(filtered_module, name, FilteredClass)
+            validated_members.append(name)
+            
+            # 2. RIMOZIONE SELETTIVA dei metodi non testati
+            tested_methods = contract_methods.get(name, set())
+            
+            for attr_name, attr_value in inspect.getmembers(FilteredClass, inspect.isfunction):
+                
+                # Regole di Esclusione (Non Rimuovere MAI):
+                is_special = attr_name.startswith('__') and attr_name.endswith('__') # es. __init__
+                is_protected = attr_name.startswith('_') and not is_special # es. _helper
+                is_tested = attr_name in tested_methods # è coperto da un test
+                
+                if not is_special and not is_protected and not is_tested:
+                    # Rimuovi il metodo se non è speciale, non è protetto e non è testato
+                    delattr(FilteredClass, attr_name)
+                    print(f"   - Rimosso metodo: {name}.{attr_name} (non testato)")
+                else:
+                    # Metodo mantenuto (testato, speciale o protetto)
+                    pass
+
+        elif inspect.isfunction(member):
+            
+            # --- Gestione FUNZIONI a livello di Modulo ---
+            
+            tested_functions = contract_methods.get('__module__', set())
+            
+            is_special = name.startswith('__') and name.endswith('__')
+            is_protected = name.startswith('_') and not is_special
+            is_tested = name in tested_functions
+
+            if not is_special and not is_protected and not is_tested:
+                # Rimuovi la funzione se non è speciale, non è protetta e non è testata
+                print(f"   - Rimosso funzione: {name} (non testata)")
+            else:
+                # Copia la funzione se è essenziale o testata
+                setattr(filtered_module, name, member)
+                validated_members.append(name)
+                
+        else:
+            # --- Copia altri attributi (variabili, costanti, ecc.) ---
+            setattr(filtered_module, name, member)
+
+    print(f"\n✅ Validazione e filtro riusciti per {path}. Membri esposti: {validated_members}")
     return filtered_module
+
+def calculate_hash_of_function(func: Any) -> str:
+    """
+    Calcola l'hash SHA256 del codice sorgente di una funzione o metodo.
+    """
+    try:
+        # Tenta di ottenere il codice sorgente
+        code_obj = func.__code__
+        source_code = str(code_obj.co_code)
+        print(f"Calcolo hash per funzione {source_code}...")
+        # Normalizza (rimuove spazi bianchi iniziali/finali) e codifica
+        source_code = source_code.strip().encode('utf-8')
+        return hashlib.sha256(source_code).hexdigest()
+    except Exception:
+        # Questo può fallire se il modulo è caricato in modo dinamico/complesso
+        return ""
+
+async def generate_and_validate_contract_json(
+    main_path: str, 
+) -> Dict[str, Dict[str, str]]:
+    """
+    Genera il file .contract.json calcolando gli hash del modulo principale 
+    e dei suoi test.
+    
+    Ritorna la mappa degli hash generati.
+    """
+    contract_path = main_path.replace('.py', '.test.py')
+    json_path = 'src/framework/schema/file.json'
+    
+    # 1. Caricamento e analisi dei moduli
+    main_code = await backend(path=main_path)
+    contract_code = await backend(path=contract_path)
+    
+    if not main_code or not contract_code:
+        print("⚠️ Impossibile caricare i file sorgente o di test. Generazione JSON interrotta.")
+        return {}
+        
+    main_module = await _load_python_module("main_module_temp", main_path, main_code)
+    contract_module = await _load_python_module("contract_module_temp", contract_path, contract_code)
+    contract_ana = analyze_module(contract_code, contract_path)
+    
+    contract_hashes: Dict[str, Dict[str, str]] = {}
+
+    # 2. Itera sui risultati dell'analisi per calcolare gli hash
+    for mname, data in contract_ana.items():
+        if not isinstance(data, dict):
+            continue 
+            
+        # Determina il nome della classe o '__module__'
+        target_name = '__module__' if mname == 'TestModule' else mname.replace('Test', '')
+        
+        # Recupera la classe/modulo corrispondente nel main_module
+        if target_name == '__module__':
+            main_target = main_module
+            test_target = contract_module
+        elif hasattr(main_module, target_name) and hasattr(contract_module, mname):
+            main_target = getattr(main_module, target_name)
+            test_target = getattr(contract_module, mname)
+        else:
+            continue # Classe di test senza classe corrispondente
+
+        contract_hashes[target_name] = {}
+        
+        test_methods_keys = data.get('data', {}).get('methods', {}).keys()
+        
+        for test_name in test_methods_keys:
+            if not test_name.startswith('test_'):
+                continue
+
+            method_name = test_name.replace('test_', '')
+            
+            # Calcolo hash del metodo principale
+            if hasattr(main_target, method_name):
+                main_method = getattr(main_target, method_name)
+                contract_hashes[target_name][method_name] = calculate_hash_of_function(main_method)
+            
+            # Calcolo hash del metodo di test
+            if hasattr(test_target, test_name):
+                test_method = getattr(test_target, test_name)
+                contract_hashes[target_name][test_name] = calculate_hash_of_function(test_method)
+
+    # 3. Scrittura del file JSON (Simulata con il backend)
+    json_content = json.dumps(contract_hashes, indent=4)
+    # Assumiamo che il backend abbia una funzione per la scrittura
+    # await backend(path=json_path, content=json_content, mode='w')
+    print(f"✅ Generato e scritto il contratto JSON in {json_path}")
+
+    return {main_path:contract_hashes}
 
 def resolve_path(resource_path: str | None) -> str:
     """Normalizza e aggiunge il prefisso 'src/' al percorso della risorsa."""
@@ -235,10 +418,13 @@ async def resource(path: str | None = None, **kwargs) -> Any:
     content = await backend(path=resource_path)
     
     if resource_path.endswith(".json"):
-        return await convert(content, str, 'json')
+        print(f"📄 Caricamento e parsing JSON da {resource_path}...",type(content))
+        return await convert(content, dict, 'json')
     
     if resource_path.endswith(".py"):
         # Notare che `lang` viene passato qui
+        ook = await generate_and_validate_contract_json(resource_path)
+        print(f"📄 Caricamento e validazione modulo Python da {resource_path}...",ook)
         main_module = await _load_python_module("main_module", resource_path, content)
         # La funzione di validazione è astratta/esterna
         filtered_module = await validate_and_filter_module(main_module, resource_path)

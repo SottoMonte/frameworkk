@@ -1,10 +1,10 @@
-class TestModule():
+class Testadapter():
 
     def setUp(self):
         
         print("Setting up the test environment...")
 
-    async def test_application(self):
+    async def test_post(self):
         '''"""Verifica che language.get recuperi correttamente i valori da percorsi validi."""
         success = [
             {'args':(language),'kwargs':{'path':"framework/service/run.py"},'type':types.ModuleType},
