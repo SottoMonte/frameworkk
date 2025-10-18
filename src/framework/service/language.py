@@ -423,9 +423,9 @@ async def resource(path: str | None = None, **kwargs) -> Any:
     
     if resource_path.endswith(".py"):
         # Notare che `lang` viene passato qui
-        ook = await generate_and_validate_contract_json(resource_path)
-        print(f"📄 Caricamento e validazione modulo Python da {resource_path}...",ook)
         main_module = await _load_python_module("main_module", resource_path, content)
+        if resource_path.endswith(".test.py"):
+            return main_module
         # La funzione di validazione è astratta/esterna
         filtered_module = await validate_and_filter_module(main_module, resource_path)
         return filtered_module

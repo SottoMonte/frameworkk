@@ -1,4 +1,11 @@
-class Testadapter():
+imports = {
+    'console': 'infrastructure/message/console.py',
+    'contract': 'framework/service/contract.py',
+}
+
+import unittest
+
+class Testadapter(unittest.IsolatedAsyncioTestCase):
 
     def setUp(self):
         
@@ -17,4 +24,5 @@ class Testadapter():
 
         await self.check_cases(language.resource, success)
         await self.check_cases(language.resource, failure)'''
-        pass
+        print("Running test_post...")
+        assert False, "Not implemented yet."
