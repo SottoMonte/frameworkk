@@ -7,7 +7,9 @@ imports = {
     'model': 'framework/schema/model.json',
 }
 
-class TestModule():
+import unittest
+
+class TestModule(unittest.IsolatedAsyncioTestCase):
 
     def setUp(self):
         

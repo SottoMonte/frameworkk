@@ -136,10 +136,104 @@ async def format(target ,**constants):
         raise ValueError(f"Errore formattazione: {e}")
 
 # =====================================================================
+# --- Funzioni di Generazione ---
+# =====================================================================
+
+def calculate_hash_of_function(func):
+    import marshal
+    """
+    Calcola un hash SHA256 dell'intero oggetto codice della funzione.
+    """
+    code_obj = func.__code__
+    # Serializza l'oggetto codice (contiene bytecode, costanti, nomi, ecc.)
+    serialized = marshal.dumps(code_obj)
+    return hashlib.sha256(serialized).hexdigest()
+
+async def generate_and_validate_contract_json(
+    main_path: str, 
+) -> Dict[str, Dict[str, Dict[str, Dict[str, str]]]]:
+    """
+    Genera il contratto JSON, mappando ogni metodo in un oggetto annidato
+    che distingue l'hash di produzione da quello di test.
+    """
+    
+    # 1. Caricamento e Analisi
+    contract_path = main_path.replace('.py', '.test.py')
+    
+    main_code = await backend(path=main_path)
+    contract_code = await backend(path=contract_path)
+    
+    if not main_code or not contract_code:
+        print(f"⚠️ Impossibile caricare i file sorgente o di test ({main_path} / {contract_path}).")
+        return {}
+
+    main_module = await _load_python_module("main_module_temp", main_path, main_code)
+    contract_module = await _load_python_module("contract_module_temp", contract_path, contract_code)
+    contract_ana = analyze_module(contract_code, contract_path)
+    
+    contract_hashes: Dict[str, Dict[str, Dict[str, str]]] = {} # Struttura interna modificata
+
+    # 2. Itera e Genera Hash
+    for mname, data in contract_ana.items():
+        if not isinstance(data, dict):
+            continue 
+            
+        target_name = '__module__' if mname == 'TestModule' else mname.replace('Test', '')
+        is_module_level_test = (mname == 'TestModule')
+        
+        # Recupero target di produzione e test
+        target_prod = main_module if is_module_level_test else getattr(main_module, target_name, None)
+        target_test = getattr(contract_module, mname, None)
+        
+        if target_test is None or target_prod is None:
+            continue
+
+        # Dizionario che conterrà i contratti dei singoli metodi: {'post': {...}, 'read': {...}}
+        group_contracts: Dict[str, Dict[str, str]] = {}
+        test_methods_data = data.get('data', {}).get('methods', {})
+        
+        # Ciclo compatto
+        for test_name in test_methods_data.keys():
+            if not test_name.startswith('test_'):
+                continue
+
+            method_name = test_name.replace('test_', '')
+            
+            # Oggetto per il contratto singolo: {'production': hash, 'test': hash}
+            method_contract: Dict[str, str] = {}
+            
+            # A. Hash del Metodo di Test
+            test_fn = getattr(target_test, test_name, None)
+            if test_fn:
+                method_contract['test'] = calculate_hash_of_function(test_fn)
+            
+            # B. Hash del Metodo di Produzione
+            main_fn = getattr(target_prod, method_name, None)
+            if main_fn:
+                method_contract['production'] = calculate_hash_of_function(main_fn)
+            
+            # Aggiunge il contratto solo se almeno un hash è presente
+            if method_contract:
+                group_contracts[method_name] = method_contract
+
+        if group_contracts:
+            contract_hashes[target_name] = group_contracts
+
+    # 3. Scrittura JSON e Ritorno
+    json_path = main_path.replace('.py', '.contract.json')
+    json_content = json.dumps(contract_hashes, indent=4)
+    # await backend(path=json_path, content=json_content, mode='w') 
+
+    print(f"✅ Generato e scritto il contratto JSON in {json_path}")
+    
+    # Ritorno del formato finale a 5 livelli
+    return {main_path: contract_hashes}
+
+# =====================================================================
 # --- Funzioni di Caricamento ---
 # =====================================================================
 
-async def validate_and_filter_module(
+async def _validate_and_filter_module2(
     main_module: types.ModuleType, 
     path: str, 
 ) -> types.ModuleType:
@@ -265,101 +359,272 @@ async def validate_and_filter_module(
     print(f"\n✅ Validazione e filtro riusciti per {path}. Membri esposti: {validated_members}")
     return filtered_module
 
-def calculate_hash_of_function(func: Any) -> str:
+async def _validate_and_filter_module(
+    main_module: types.ModuleType, 
+    path: str, 
+) -> types.ModuleType:
     """
-    Calcola l'hash SHA256 del codice sorgente di una funzione o metodo.
+    Copia le classi e le funzioni dal main_module al filtered_module, mantenendo
+    solo i membri che hanno un contratto valido e presente nel file .contract.json.
     """
+    validated_members: List[str] = []
+    
+    # 1. Caricamento e Analisi dei Contatti Esterni (.contract.json)
+    
+    # 1.1. Carica il contratto di STABILITÀ dal file JSON
+    contract_json_path = path.replace('.py', '.contract.json')
     try:
-        # Tenta di ottenere il codice sorgente
-        code_obj = func.__code__
-        source_code = str(code_obj.co_code)
-        print(f"Calcolo hash per funzione {source_code}...")
-        # Normalizza (rimuove spazi bianchi iniziali/finali) e codifica
-        source_code = source_code.strip().encode('utf-8')
-        return hashlib.sha256(source_code).hexdigest()
-    except Exception:
-        # Questo può fallire se il modulo è caricato in modo dinamico/complesso
-        return ""
+        # Usiamo il backend per leggere il contenuto del file JSON
+        json_content = await backend(path=contract_json_path)
+        # Assumiamo che il tuo 'convert' o 'json.loads' lo possa gestire
+        # Il contenuto sarà nel formato {'adapter': {'post': {'production': '...', 'test': '...'}}}
+        external_contracts: Dict[str, Any] = await convert(json_content, dict, 'json')
+        print(f"🔍 Contratto JSON esterno caricato da {contract_json_path}.")
+    except (FileNotFoundError, json.JSONDecodeError, Exception) as e:
+        print(f"⚠️ ATTENZIONE: Nessun contratto JSON valido trovato in {contract_json_path}. Disattivazione del filtro basato sull'hash.",e)
+        external_contracts = {}
 
-async def generate_and_validate_contract_json(
-    main_path: str, 
-) -> Dict[str, Dict[str, Dict[str, Dict[str, str]]]]:
-    """
-    Genera il contratto JSON, mappando ogni metodo in un oggetto annidato
-    che distingue l'hash di produzione da quello di test.
-    """
-    
-    # 1. Caricamento e Analisi
-    contract_path = main_path.replace('.py', '.test.py')
-    
-    main_code = await backend(path=main_path)
+
+    # 1.2. Set per tracciare i metodi/funzioni che hanno superato il 'contratto JSON'
+    # Formato: { 'nome_classe': set_di_metodi_validi } o { '__module__': set_di_funzioni_valide }
+    contract_validated_methods: Dict[str, set[str]] = {}
+    contract_path = path.replace('.py', '.test.py')
     contract_code = await backend(path=contract_path)
+    contract_ana: Dict[str, Any] = analyze_module(contract_code, contract_path)
+    contract_module: Dict[str, Any] = await resource(path=contract_path)
+    '''for target_name, group_contracts in external_contracts.items():
+        if not isinstance(group_contracts, dict):
+            continue
+            
+        contract_validated_methods[target_name] = set()
+        
+        for method_name, hashes in group_contracts.items():
+            if (isinstance(hashes, dict) and 'production' in hashes and 'test' in hashes):
+                
+                # Non c'è bisogno di ricalcolare l'hash qui; 
+                # assumiamo che se la chiave esiste nel JSON, 
+                # significa che l'hash è stato verificato e salvato 
+                # durante la fase di generazione del contratto (generate_and_validate_contract_json).
+                # Se vogliamo essere rigorosi, dovremmo ricalcolare l'hash di produzione qui e confrontarlo.
+                # Per ora, manteniamo la logica di 'se il contratto esiste, è valido per l'esposizione'.
+                
+                contract_validated_methods[target_name].add(method_name)'''
     
-    if not main_code or not contract_code:
-        print(f"⚠️ Impossibile caricare i file sorgente o di test ({main_path} / {contract_path}).")
-        return {}
+    '''for target_name, group_contracts in external_contracts.items():
+        if not isinstance(group_contracts, dict):
+            continue
+            
+        contract_validated_methods[target_name] = set()
+        
+        # Recupera l'oggetto padre (Classe o Modulo) dal modulo di produzione
+        if target_name == '__module__':
+            target_obj = main_module
+        else:
+            target_obj = getattr(main_module, target_name, None)
+            
+        if target_obj is None:
+            print(f"⚠️ Ignorata chiave di contratto '{target_name}': Oggetto di produzione non trovato.")
+            continue
+        
+        for method_name, hashes in group_contracts.items():
+            if (isinstance(hashes, dict) and 'production' in hashes and 'test' in hashes):
+                
+                # --- Logica di Verifica dell'Hash Rigorosa ---
+                
+                saved_prod_hash = hashes['production']
+                
+                # 1. Trova la funzione/metodo di produzione attuale
+                prod_fn: Optional[Callable] = getattr(target_obj, method_name, None)
 
-    main_module = await _load_python_module("main_module_temp", main_path, main_code)
-    contract_module = await _load_python_module("contract_module_temp", contract_path, contract_code)
-    contract_ana = analyze_module(contract_code, contract_path)
+                if prod_fn is None:
+                    print(f"❌ Errore Contratto: Metodo/funzione '{target_name}.{method_name}' non trovato nel codice di produzione.")
+                    continue
+
+                # 2. Ricalcola l'hash del codice di produzione ATTUALE
+                try:
+                    current_prod_hash = calculate_hash_of_function(prod_fn)
+                except Exception as e:
+                    print(f"❌ Errore Contratto: Impossibile calcolare hash per '{method_name}': {e}")
+                    continue
+
+                # 3. Confronto degli Hash!
+                if current_prod_hash == saved_prod_hash:
+                    # Contratto superato: l'hash salvato corrisponde a quello attuale
+                    contract_validated_methods[target_name].add(method_name)
+                else:
+                    # Contratto fallito: codice di produzione modificato
+                    print(f"❌ CONTRATTO ROTTO: Metodo '{target_name}.{method_name}' modificato. Hash atteso: {saved_prod_hash[:8]}... Hash attuale: {current_prod_hash[:8]}...")
+                    # L'hash di test è irrilevante qui, perché il codice di produzione è cambiato.'''
+    for target_name, group_contracts in external_contracts.items():
+        if not isinstance(group_contracts, dict):
+            continue
+            
+        contract_validated_methods[target_name] = set()
+        
+        # Recupera l'oggetto padre (Classe o Modulo) dal modulo di produzione
+        if target_name == '__module__':
+            target_prod_obj = main_module
+            #target_test_obj = contract_module # Modulo di test
+            target_test_obj = getattr(contract_module, f'TestModule', None) 
+        else:
+            target_prod_obj = getattr(main_module, target_name, None)
+            # Il modulo di test potrebbe contenere una classe 'TestAdapter' per 'Adapter'
+            target_test_obj = getattr(contract_module, f'Test{target_name}', None) 
+            
+        if target_prod_obj is None or target_test_obj is None:
+            print(f"⚠️ Ignorata chiave di contratto '{target_name}': Oggetto di produzione o test non trovato.")
+            continue
+        
+        for method_name, hashes in group_contracts.items():
+            if (isinstance(hashes, dict) and 'production' in hashes and 'test' in hashes):
+                
+                # --- Hash Salvati ---
+                saved_prod_hash = hashes['production']
+                saved_test_hash = hashes['test']
+                
+                # 1. Verifica Hash di Produzione
+                prod_fn: Optional[Callable] = getattr(target_prod_obj, method_name, None)
+                if prod_fn is None:
+                    print(f"❌ Errore Contratto: Metodo/funzione di produzione '{target_name}.{method_name}' non trovato.")
+                    continue
+
+                try:
+                    current_prod_hash = calculate_hash_of_function(prod_fn)
+                except Exception as e:
+                    print(f"❌ Errore Contratto: Impossibile calcolare hash Prod per '{method_name}': {e}")
+                    continue
+
+                # 2. Verifica Hash del Test
+                # Il nome della funzione di test è sempre 'test_' + nome del metodo di produzione
+                test_fn_name = f'test_{method_name}'
+                test_fn: Optional[Callable] = getattr(target_test_obj, test_fn_name, None)
+
+                if test_fn is None:
+                    print(f"❌ Errore Contratto: Funzione di test '{test_fn_name}' non trovata nell'oggetto di test.")
+                    continue
+                
+                try:
+                    current_test_hash = calculate_hash_of_function(test_fn)
+                except Exception as e:
+                    print(f"❌ Errore Contratto: Impossibile calcolare hash Test per '{test_fn_name}': {e}")
+                    continue
+                    
+                # 3. Confronto degli Hash!
+                
+                # Controlla l'hash di Produzione
+                if current_prod_hash != saved_prod_hash:
+                    print(f"❌ CONTRATTO ROTTO: Metodo '{target_name}.{method_name}' **Produzione modificata**. Hash atteso: {saved_prod_hash[:8]}... Attuale: {current_prod_hash[:8]}...")
+                    continue # Passa al prossimo metodo
+
+                # Controlla l'hash di Test
+                if current_test_hash != saved_test_hash:
+                    print(f"❌ CONTRATTO ROTTO: Metodo '{target_name}.{method_name}' **Test modificato**. Hash atteso: {saved_test_hash[:8]}... Attuale: {current_test_hash[:8]}...")
+                    continue # Passa al prossimo metodo
+
+                # Contratto Superato
+                contract_validated_methods[target_name].add(method_name)
+
+    # 2. Caricamento e Analisi del Modulo di Test per i nomi (metodi e classi)
+    # Questa parte serve per sapere quali membri erano destinati ad essere testati, 
+    # utile per rimuovere le funzioni di produzione senza un test registrato (anche se senza contratto hash)
     
-    contract_hashes: Dict[str, Dict[str, Dict[str, str]]] = {} # Struttura interna modificata
-
-    # 2. Itera e Genera Hash
+    
+    # 2.1. Costruiamo il set di metodi solo per nome (per fallback e log)
+    contract_methods_by_name: Dict[str, set[str]] = {}
     for mname, data in contract_ana.items():
         if not isinstance(data, dict):
             continue 
-            
         target_name = '__module__' if mname == 'TestModule' else mname.replace('Test', '')
-        is_module_level_test = (mname == 'TestModule')
+        test_methods = data.get('data', {}).get('methods', {}).keys()
         
-        # Recupero target di produzione e test
-        target_prod = main_module if is_module_level_test else getattr(main_module, target_name, None)
-        target_test = getattr(contract_module, mname, None)
-        
-        if target_test is None or target_prod is None:
-            continue
+        contract_methods_by_name[target_name] = set()
+        for test_name in test_methods:
+            if test_name.startswith('test_'):
+                contract_methods_by_name[target_name].add(test_name.replace('test_', ''))
 
-        # Dizionario che conterrà i contratti dei singoli metodi: {'post': {...}, 'read': {...}}
-        group_contracts: Dict[str, Dict[str, str]] = {}
-        test_methods_data = data.get('data', {}).get('methods', {})
-        
-        # Ciclo compatto
-        for test_name in test_methods_data.keys():
-            if not test_name.startswith('test_'):
-                continue
-
-            method_name = test_name.replace('test_', '')
-            
-            # Oggetto per il contratto singolo: {'production': hash, 'test': hash}
-            method_contract: Dict[str, str] = {}
-            
-            # A. Hash del Metodo di Test
-            test_fn = getattr(target_test, test_name, None)
-            if test_fn:
-                method_contract['test'] = calculate_hash_of_function(test_fn)
-            
-            # B. Hash del Metodo di Produzione
-            main_fn = getattr(target_prod, method_name, None)
-            if main_fn:
-                method_contract['production'] = calculate_hash_of_function(main_fn)
-            
-            # Aggiunge il contratto solo se almeno un hash è presente
-            if method_contract:
-                group_contracts[method_name] = method_contract
-
-        if group_contracts:
-            contract_hashes[target_name] = group_contracts
-
-    # 3. Scrittura JSON e Ritorno
-    json_path = main_path.replace('.py', '.contract.json')
-    json_content = json.dumps(contract_hashes, indent=4)
-    # await backend(path=json_path, content=json_content, mode='w') 
-
-    print(f"✅ Generato e scritto il contratto JSON in {json_path}")
+    print(f"🔍 Avvio filtro: i membri saranno mantenuti solo se presenti in {contract_json_path}.")
     
-    # Ritorno del formato finale a 5 livelli
-    return {main_path: contract_hashes}
+    # 3. Creazione e Popolamento del Modulo Filtrato
+    
+    filtered_module = types.ModuleType(f"filtered:{main_module.__name__}")
+    if hasattr(main_module, '__file__'):
+        filtered_module.__file__ = main_module.__file__
+    
+    # ... Ometto la copia iniziale di __file__, __doc__, ecc. per brevità ...
+    
+    for name in dir(main_module):
+        if name.startswith('__'):
+            continue 
+
+        member = getattr(main_module, name)
+        
+        # Le funzioni/metodi di produzione validati dal CONTRATTO JSON
+        module_or_class_key = name if inspect.isclass(member) else '__module__'
+        contract_validated = contract_validated_methods.get(module_or_class_key, set())
+        
+        is_special = name.startswith('__') and name.endswith('__')
+        is_protected = name.startswith('_') and not is_special
+        
+        
+        if inspect.isclass(member):
+            
+            # --- Gestione CLASSI ---
+            
+            # Se la classe non ha elementi validati nel contratto, la saltiamo
+            if not contract_validated_methods.get(name):
+                 # Controlliamo anche se è un attributo essenziale (come un helper non testabile)
+                if not is_protected and not is_special and name in contract_methods_by_name:
+                    print(f" - Rimosso Classe: {name} (Nessun contratto hash valido trovato)")
+                continue
+            
+            # ... Logica di clonazione della classe (come avevi) ...
+            
+            original_attrs = dict(inspect.getmembers(member, lambda x: not inspect.isfunction(x) and not inspect.ismethod(x)))
+            original_attrs.update({k: v for k, v in member.__dict__.items() if inspect.isfunction(v) or inspect.ismethod(v)})
+            original_attrs['__module__'] = filtered_module.__name__
+            
+            FilteredClass = type(
+                member.__name__, 
+                member.__bases__, 
+                original_attrs
+            )
+            
+            setattr(filtered_module, name, FilteredClass)
+            validated_members.append(name)
+            
+            # 2. RIMOZIONE SELETTIVA dei metodi che NON sono nel contratto JSON
+            
+            for attr_name, attr_value in inspect.getmembers(FilteredClass, inspect.isfunction):
+                
+                is_validated = attr_name in contract_validated
+                
+                if not is_special and not is_protected and not is_validated:
+                    # Rimuovi il metodo se non è speciale, non è protetto E NON è validato dal contratto
+                    delattr(FilteredClass, attr_name)
+                    print(f"   - Rimosso metodo: {name}.{attr_name} (non nel contratto JSON)")
+                # Altrimenti: mantenuto (perché è speciale, protetto o validato)
+
+
+        elif inspect.isfunction(member):
+            
+            # --- Gestione FUNZIONI a livello di Modulo ---
+            
+            is_validated = name in contract_validated
+            
+            if not is_special and not is_protected and not is_validated:
+                # Rimuovi la funzione se non è speciale, non è protetta E NON è validata
+                print(f"   - Rimosso funzione: {name} (non nel contratto JSON)")
+            else:
+                # Copia la funzione se è essenziale, protetta o validata
+                setattr(filtered_module, name, member)
+                validated_members.append(name)
+                
+        else:
+            # --- Copia altri attributi (variabili, costanti, ecc.) ---
+            setattr(filtered_module, name, member)
+
+    print(f"\n✅ Validazione e filtro riusciti per {path}. Membri esposti: {validated_members}")
+    return filtered_module
 
 def resolve_path(resource_path: str | None) -> str:
     """Normalizza e aggiunge il prefisso 'src/' al percorso della risorsa."""
@@ -435,7 +700,7 @@ async def resource(path: str | None = None, **kwargs) -> Any:
         if resource_path.endswith(".test.py"):
             return main_module
         # La funzione di validazione è astratta/esterna
-        filtered_module = await validate_and_filter_module(main_module, resource_path)
+        filtered_module = await _validate_and_filter_module(main_module, resource_path)
         return filtered_module
         
     return content

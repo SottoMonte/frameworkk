@@ -385,6 +385,10 @@ def test():
             pass
     print("\n✅ TEST SUPERATI. CONTRATTI AGGIORNATI:")
     print(all_contract_hashes)
+    for file_path, groups in all_contract_hashes.items():
+        with open(file_path.replace('.py','.contract.json'), "w") as f:
+            converted = asyncio.run(language.convert(groups,str,'json'))
+            f.write(converted)
     print("\n=====================================")
     print("        FINE ESECUZIONE TEST         ")
     print("=====================================")
