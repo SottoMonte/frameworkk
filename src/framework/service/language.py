@@ -283,75 +283,83 @@ def calculate_hash_of_function(func: Any) -> str:
 
 async def generate_and_validate_contract_json(
     main_path: str, 
-) -> Dict[str, Dict[str, str]]:
+) -> Dict[str, Dict[str, Dict[str, Dict[str, str]]]]:
     """
-    Genera il file .contract.json calcolando gli hash del modulo principale 
-    e dei suoi test.
+    Genera il contratto JSON, mappando ogni metodo in un oggetto annidato
+    che distingue l'hash di produzione da quello di test.
+    """
     
-    Ritorna la mappa degli hash generati.
-    """
+    # 1. Caricamento e Analisi
     contract_path = main_path.replace('.py', '.test.py')
-    json_path = 'src/framework/schema/file.json'
     
-    # 1. Caricamento e analisi dei moduli
     main_code = await backend(path=main_path)
     contract_code = await backend(path=contract_path)
     
     if not main_code or not contract_code:
-        print("⚠️ Impossibile caricare i file sorgente o di test. Generazione JSON interrotta.")
+        print(f"⚠️ Impossibile caricare i file sorgente o di test ({main_path} / {contract_path}).")
         return {}
-        
+
     main_module = await _load_python_module("main_module_temp", main_path, main_code)
     contract_module = await _load_python_module("contract_module_temp", contract_path, contract_code)
     contract_ana = analyze_module(contract_code, contract_path)
     
-    contract_hashes: Dict[str, Dict[str, str]] = {}
+    contract_hashes: Dict[str, Dict[str, Dict[str, str]]] = {} # Struttura interna modificata
 
-    # 2. Itera sui risultati dell'analisi per calcolare gli hash
+    # 2. Itera e Genera Hash
     for mname, data in contract_ana.items():
         if not isinstance(data, dict):
             continue 
             
-        # Determina il nome della classe o '__module__'
         target_name = '__module__' if mname == 'TestModule' else mname.replace('Test', '')
+        is_module_level_test = (mname == 'TestModule')
         
-        # Recupera la classe/modulo corrispondente nel main_module
-        if target_name == '__module__':
-            main_target = main_module
-            test_target = contract_module
-        elif hasattr(main_module, target_name) and hasattr(contract_module, mname):
-            main_target = getattr(main_module, target_name)
-            test_target = getattr(contract_module, mname)
-        else:
-            continue # Classe di test senza classe corrispondente
+        # Recupero target di produzione e test
+        target_prod = main_module if is_module_level_test else getattr(main_module, target_name, None)
+        target_test = getattr(contract_module, mname, None)
+        
+        if target_test is None or target_prod is None:
+            continue
 
-        contract_hashes[target_name] = {}
+        # Dizionario che conterrà i contratti dei singoli metodi: {'post': {...}, 'read': {...}}
+        group_contracts: Dict[str, Dict[str, str]] = {}
+        test_methods_data = data.get('data', {}).get('methods', {})
         
-        test_methods_keys = data.get('data', {}).get('methods', {}).keys()
-        
-        for test_name in test_methods_keys:
+        # Ciclo compatto
+        for test_name in test_methods_data.keys():
             if not test_name.startswith('test_'):
                 continue
 
             method_name = test_name.replace('test_', '')
             
-            # Calcolo hash del metodo principale
-            if hasattr(main_target, method_name):
-                main_method = getattr(main_target, method_name)
-                contract_hashes[target_name][method_name] = calculate_hash_of_function(main_method)
+            # Oggetto per il contratto singolo: {'production': hash, 'test': hash}
+            method_contract: Dict[str, str] = {}
             
-            # Calcolo hash del metodo di test
-            if hasattr(test_target, test_name):
-                test_method = getattr(test_target, test_name)
-                contract_hashes[target_name][test_name] = calculate_hash_of_function(test_method)
+            # A. Hash del Metodo di Test
+            test_fn = getattr(target_test, test_name, None)
+            if test_fn:
+                method_contract['test'] = calculate_hash_of_function(test_fn)
+            
+            # B. Hash del Metodo di Produzione
+            main_fn = getattr(target_prod, method_name, None)
+            if main_fn:
+                method_contract['production'] = calculate_hash_of_function(main_fn)
+            
+            # Aggiunge il contratto solo se almeno un hash è presente
+            if method_contract:
+                group_contracts[method_name] = method_contract
 
-    # 3. Scrittura del file JSON (Simulata con il backend)
+        if group_contracts:
+            contract_hashes[target_name] = group_contracts
+
+    # 3. Scrittura JSON e Ritorno
+    json_path = main_path.replace('.py', '.contract.json')
     json_content = json.dumps(contract_hashes, indent=4)
-    # Assumiamo che il backend abbia una funzione per la scrittura
-    # await backend(path=json_path, content=json_content, mode='w')
-    print(f"✅ Generato e scritto il contratto JSON in {json_path}")
+    # await backend(path=json_path, content=json_content, mode='w') 
 
-    return {main_path:contract_hashes}
+    print(f"✅ Generato e scritto il contratto JSON in {json_path}")
+    
+    # Ritorno del formato finale a 5 livelli
+    return {main_path: contract_hashes}
 
 def resolve_path(resource_path: str | None) -> str:
     """Normalizza e aggiunge il prefisso 'src/' al percorso della risorsa."""

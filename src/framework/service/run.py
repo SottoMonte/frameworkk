@@ -91,7 +91,7 @@ def sync_github_repo(local_base_dir, github_user, repo, branch='main'):
 # 4. FUNZIONE 'TEST' MODIFICATA
 # =========================================================================
 
-def map_failed_tests(result) -> set[tuple[str, str]]:
+def map_failed_tests2(result) -> set[tuple[str, str]]:
     """
     Estrae il percorso del file e il nome completo del metodo di test fallito 
     (FAIL o ERROR).
@@ -135,6 +135,68 @@ def map_failed_tests(result) -> set[tuple[str, str]]:
             
         failed_set.add((file_path, method_name))
         
+    return failed_set
+
+def map_failed_tests(result) :
+    """
+    Estrae il percorso del file, il nome della classe del test e il nome completo 
+    del metodo di test fallito (FAIL o ERROR).
+    
+    Ritorna un set di tuple: 
+    {(path_del_file, nome_classe_del_test, nome_metodo), ...}
+    """
+    failed_set = set()
+
+    # Combina Failures (F) e Errors (E)
+    all_issues = result.failures + result.errors
+
+    for test, _ in all_issues:
+        # L'ID del test è solitamente nel formato:
+        # <nome_modulo>.<nome_classe>.<nome_metodo>
+        # Esempio: src.infrastructure.message.console.Testadapter.test_post
+        test_id: str = test.id()
+        
+        parts: list[str] = test_id.split('.')
+        
+        if len(parts) < 3:
+            # Caso anomalo, saltiamo
+            continue
+            
+        # 1. Nome del Metodo (l'ultimo elemento)
+        method_name: str = parts[-1]
+        
+        # 2. Nome della Classe del Test (il penultimo elemento)
+        test_class_name: str = parts[-2]
+        
+        # 3. Percorso del File/Modulo
+        # I primi elementi compongono il nome del modulo (es. src.infrastructure.message.console)
+        module_name: str = ".".join(parts[:-2])
+        
+        # Tenta di convertire il nome del modulo in un percorso di file
+        file_path: str = module_name
+        
+        try:
+            # Importa il modulo per trovare il percorso fisico del file
+            # NOTA: Questo richiede che il modulo sia importabile nell'ambiente di esecuzione
+            modulo_obj = __import__(module_name, fromlist=[''])
+            if hasattr(modulo_obj, '__file__'):
+                # Ottiene il percorso assoluto e rimuove le estensioni di bytecode
+                path_assoluto = modulo_obj.__file__
+                if path_assoluto.endswith(('.pyc', '.pyo')):
+                    path_assoluto = path_assoluto[:-1]
+                
+                # Per replicare la pulizia come nel codice precedente, potresti dover 
+                # rimuovere parti non necessarie (ad esempio, renderlo relativo al root del progetto).
+                # Usiamo il percorso pulito
+                file_path = path_assoluto
+                
+        except Exception:
+            # Fallback al nome del modulo se non riusciamo a trovare il file fisico
+            pass
+
+        # Aggiungiamo la tupla con il nome della classe
+        failed_set.add((file_path, test_class_name, method_name))
+            
     return failed_set
 
 async def discover_and_run_tests():
@@ -184,109 +246,113 @@ async def discover_and_run_tests():
                     test_suite.addTest(unittest.defaultTestLoader.loadTestsFromModule(module))
                 except Exception as e:
                     print(f"Errore nell'importazione/filtro del modulo: {main_path_rel}, {e}")
-    print("\n📋 Tutti i contratti generati:",all_contract_hashes)
-    return all_contract_hashes,test_suite
-
-def rimuovi_falliti_e_specchi(contratti_completi: dict, test_falliti_set: set) -> dict:
-    """
-    Filtra un dizionario di contratti (hash) rimuovendo:
-    1. Gli hash delle funzioni di test fallite (es. 'test_post').
-    2. Gli hash delle funzioni 'specchio' corrispondenti (es. 'post').
-
-    Args:
-        contratti_completi: Il dizionario dei contratti (es. all_contract_hashes).
-        test_falliti_set: Un set contenente tuple (percorso_file, nome_test) dei test falliti.
-
-    Returns:
-        Un nuovo dizionario con gli hash rimossi.
-    """
-    risultato_filtrato = {}
     
-    # 1. Identifica i nomi delle funzioni da rimuovere (test + specchio)
-    nomi_da_rimuovere = set()
-    for _, nome_test in test_falliti_set:
-        nomi_da_rimuovere.add(nome_test)
+    checking = estrai_test_da_suite(test_suite)
+    def filtra_contratti_test_compattato(
+    all_contract_hashes,
+    checking
+):
+        """
+        Filtra il dizionario completo (all_contract_hashes) per mantenere SOLO gli hash
+        dei metodi di test presenti nel dizionario di controllo (checking).
+        """
         
-        # Estrae la funzione 'specchio' rimuovendo il prefisso 'test_'
-        if nome_test.startswith('test_'):
-            nome_funzione_specchio = nome_test[len('test_'):]
-            nomi_da_rimuovere.add(nome_funzione_specchio)
-            
-    # Esempio: nomi_da_rimuovere sarà {'test_post', 'post', 'test_asynchronous', 'asynchronous', ...}
-    
-    # 2. Itera sulla struttura dei contratti e applica il filtro
-    for modulo_path, contenuto_modulo in contratti_completi.items():
-        nuovo_contenuto_modulo = {}
-        
-        for container_name, funzioni_hash in contenuto_modulo.items():
-            nuove_funzioni_hash = {}
-            
-            for nome_funzione, hash_valore in funzioni_hash.items():
-                
-                # Rimuoviamo la chiave se il suo nome è nel set nomi_da_rimuovere
-                if nome_funzione in nomi_da_rimuovere:
-                    continue
-                
-                # Altrimenti, conserva la funzione
-                nuove_funzioni_hash[nome_funzione] = hash_valore
-            
-            # Aggiunge il container filtrato solo se non è vuoto
-            if nuove_funzioni_hash:
-                nuovo_contenuto_modulo[container_name] = nuove_funzioni_hash
-        
-        # Aggiunge il modulo filtrato solo se non è vuoto
-        if nuovo_contenuto_modulo:
-            risultato_filtrato[modulo_path] = nuovo_contenuto_modulo
-            
-    return risultato_filtrato
+        a =  {
+            file_path.replace('.test.py','.py'): {
+                '__module__'if 'TestModule' in name else name.replace('Test',''):{
+                    test_name: test_value
+                    for test_name,test_value in all_contract_hashes.get(file_path.replace('.test.py','.py'), {}).get('__module__'if 'TestModule' in name else name.replace('Test',''), {}).items()
+                    #if test_name in test_groups.keys()
+                }
+                for name, test_groups in test_groups.items()
 
-def estrai_test_da_suite(suite) -> set[tuple[str, str]]:
-    from unittest.case import TestCase
-    from unittest.suite import TestSuite
+            }
+            # Ciclo sui file di 'checking'
+            for file_path, test_groups in checking.items()
+        
+            
+        }
+        return a
+    return filtra_contratti_test_compattato(all_contract_hashes,checking),test_suite
+
+def estrai_test_da_suite(suite: any) -> dict[str, dict[str, dict[str, str]]]:
     """
     Attraversa ricorsivamente un oggetto unittest.suite.TestSuite annidato
-    e restituisce un set di tuple (percorso_file_o_modulo, nome_metodo).
-    
-    Usa la logica standard di unittest per estrarre il nome del metodo e il modulo.
+    e restituisce un dizionario strutturato nel formato:
+    {
+        "percorso/file.py": {
+            "nome_classe_o_modulo": {
+                "nome_metodo": "TO_BE_HASHED" 
+            }
+        }
+    }
     """
-    test_estratti = set()
+    import unittest
+    # Usiamo un dizionario temporaneo per la struttura intermedia
+    risultato_intermedio: dict[str, dict[str, dict[str, str]]] = {}
     
-    # La suite è iterabile, che sia una TestSuite o una lista di test
-    for test in suite:
-        if isinstance(test, TestSuite):
-            # Caso 1: È una sottosuite. Chiamiamo ricorsivamente.
-            test_estratti.update(estrai_test_da_suite(test))
+    # --- Funzione Helper Ricorsiva ---
+    def _raccogli_test(s: any) -> None:
+        for test in s:
+            if isinstance(test, unittest.TestSuite):
+                # Caso 1: È una sottosuite. Chiamiamo ricorsivamente.
+                _raccogli_test(test)
             
-        elif isinstance(test, TestCase):
-            # Caso 2: È un TestCase effettivo (il nodo finale)
-            
-            # 1. Estrai il nome del metodo (es. 'test_synchronous')
-            nome_metodo = getattr(test, '_testMethodName', 'unknown_method')
-            
-            # 2. Estrai il percorso del file / modulo
-            nome_modulo = test.__class__.__module__
-            percorso_test_pulito = nome_modulo
-            
-            # Tenta di trovare il percorso fisico del file sorgente
-            try:
-                modulo_obj = __import__(nome_modulo, fromlist=[''])
-                if hasattr(modulo_obj, '__file__'):
-                    # Ottiene il percorso assoluto e pulisce eventuali estensioni di byte-code
-                    percorso_file_assoluto = modulo_obj.__file__
-                    if percorso_file_assoluto.endswith(('.pyc', '.pyo')):
-                        percorso_file_assoluto = percorso_file_assoluto[:-1]
-                        
-                    # Usa il percorso assoluto come identificatore del file
-                    percorso_test_pulito = percorso_file_assoluto
-                    
-            except Exception:
-                # In caso di errore (es. modulo non importabile o caricato dinamicamente)
-                # manteniamo il nome del modulo come fallback.
-                pass
+            elif isinstance(test, unittest.TestCase):
+                # Caso 2: È un TestCase effettivo (il nodo finale)
                 
-            test_estratti.add((percorso_test_pulito, nome_metodo))
+                # 1. Estrai il nome del metodo
+                nome_metodo: str = getattr(test, '_testMethodName', 'unknown_method')
+                
+                # 2. Estrai il nome della classe del test (usato per la chiave intermedia)
+                nome_classe_test: str = test.__class__.__name__
+                # Usiamo 'adapter' come nell'esempio per la coerenza, 
+                # ma in genere sarebbe il nome della classe.
+                nome_gruppo: str = nome_classe_test # o test.__class__.__name__ 
+                
+                # 3. Estrai il percorso del file / modulo
+                nome_modulo: str = test.__class__.__module__
+                percorso_test_pulito: str = nome_modulo
+                
+                # Tenta di trovare il percorso fisico del file sorgente
+                try:
+                    # Importa il modulo
+                    modulo_obj: any = __import__(nome_modulo, fromlist=[''])
+                    if hasattr(modulo_obj, '__file__'):
+                        percorso_file_assoluto: str = modulo_obj.__file__
+                        # Pulizia .pyc/.pyo
+                        if percorso_file_assoluto.endswith(('.pyc', '.pyo')):
+                             percorso_file_assoluto = percorso_file_assoluto[:-1]
+                            
+                        percorso_test_pulito = percorso_file_assoluto
+                        
+                except Exception:
+                    # Fallback al nome del modulo
+                    pass
+                
+                # --- Costruzione del Dizionario ---
+                percorso_chiave = percorso_test_pulito
+                
+                if percorso_chiave not in risultato_intermedio:
+                    risultato_intermedio[percorso_chiave] = {}
+                
+                if nome_gruppo not in risultato_intermedio[percorso_chiave]:
+                    risultato_intermedio[percorso_chiave][nome_gruppo] = {}
+                    
+                # Inserisci il metodo di test con il segnaposto "TO_BE_HASHED"
+                risultato_intermedio[percorso_chiave][nome_gruppo][nome_metodo] = "TO_BE_HASHED"
 
-    return test_estratti
+    # Esegui la ricorsione
+    _raccogli_test(suite)
+    
+    # Rimuovi i percorsi che sono solo nomi di moduli (se possibile) e normalizza
+    risultato_finale: dict[str, dict[str, dict[str, str]]] = {}
+    
+    # Piccola normalizzazione per pulire l'output
+    for path, groups in risultato_intermedio.items():
+            risultato_finale[path] = groups
+
+    return risultato_finale
 
 def test():
     """Funzione di avvio principale per la generazione del contratto e l'esecuzione dei test."""
@@ -297,7 +363,7 @@ def test():
     # Aggiungi le tue importazioni qui (os, asyncio, unittest, language, loader)
     
     # Esegui il bootstrap del framework (se necessario)
-    asyncio.run(loader.bootstrap())
+    #asyncio.run(loader.bootstrap())
 
     # Scopri e genera i contratti, poi esegui i test
     all_contract_hashes, suite_test = asyncio.run(discover_and_run_tests())
@@ -308,12 +374,17 @@ def test():
     print("\n=====================================")
     print("        INIZIO ESECUZIONE TEST       ")
     print("=====================================")
-    print(suite)
     result = runner.run(suite)
-    #print(map_failed_tests(result))
-    print(estrai_test_da_suite(suite))
-    print(map_failed_tests(result))
-    print(rimuovi_falliti_e_specchi(all_contract_hashes, map_failed_tests(result)))
+    fail = map_failed_tests(result)
+    print("\n❌ TEST FALLITI O ERRORE NEI TEST:",fail)
+    for f in fail:
+        try:
+            del all_contract_hashes[f[0].replace('.test.py','.py')]['__module__'if 'TestModule' in f[1] else f[1].replace('Test','')][f[2].replace('test_','')]
+        except KeyError:
+        # Ignora l'errore se la chiave non è presente
+            pass
+    print("\n✅ TEST SUPERATI. CONTRATTI AGGIORNATI:")
+    print(all_contract_hashes)
     print("\n=====================================")
     print("        FINE ESECUZIONE TEST         ")
     print("=====================================")
