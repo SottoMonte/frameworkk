@@ -1,8 +1,0 @@
-{
-    "src/infrastructure/message/console.py": {
-        "adapter": {
-            "post": "c49042be7e8d8c97af49a9e445b038b0e7f5bf08c9ebb6b22bfbecbe373b48b7", 
-            "test_post": "3a7251840ec1b648b60bd676a8945a566098cf5acc50a4488b5fea9574cdaf32"
-        }
-    }
-}

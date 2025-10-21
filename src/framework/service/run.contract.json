@@ -1,8 +1,8 @@
 {
     "__module__": {
         "application": {
-            "test": "d116da403eea7342e49e0dd687048f7469cd554cae6c5932612682e12bb91000",
-            "production": "45bfebea704dfa7f3c5ec9947245aad88bce7aa56916e48999bc1691f6df259e"
+            "test": "20a3c56eba9d3918a913a74a5a7ef7b98f65d5e2cf5e2df3894afbc5f2bf7549",
+            "production": "b199315df79a1156ae0cf966347fcc1520cf470755eddcd0f1e09615895a750d"
         }
     }
 }

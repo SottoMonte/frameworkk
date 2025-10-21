@@ -139,14 +139,34 @@ async def format(target ,**constants):
 # --- Funzioni di Generazione ---
 # =====================================================================
 
-def calculate_hash_of_function(func):
+def calculate_hash_of_function(func: types.FunctionType):
+    """
+    Calcola un hash SHA256 stabile, svelando le funzioni decorate.
+    """
     import marshal
-    """
-    Calcola un hash SHA256 dell'intero oggetto codice della funzione.
-    """
-    code_obj = func.__code__
-    # Serializza l'oggetto codice (contiene bytecode, costanti, nomi, ecc.)
-    serialized = marshal.dumps(code_obj)
+    from inspect import unwrap
+    # 🌟 PASSO CRUCIALE: Svela la funzione originale se è stata decorata
+    unwrapped_func = unwrap(func)
+    
+    if not hasattr(unwrapped_func, '__code__'):
+        raise TypeError(f"L'oggetto {func.__name__} non è ispezionabile.")
+
+    code_obj = unwrapped_func.__code__
+    
+    # Costruisce la tupla con i componenti essenziali della LOGICA
+    relevant_parts = (
+        code_obj.co_code,
+        code_obj.co_consts,
+        code_obj.co_names,
+        code_obj.co_varnames,
+        code_obj.co_freevars,
+        code_obj.co_cellvars,
+        code_obj.co_argcount,
+        code_obj.co_kwonlyargcount,
+        code_obj.co_flags
+    )
+    
+    serialized = marshal.dumps(relevant_parts)
     return hashlib.sha256(serialized).hexdigest()
 
 async def generate_and_validate_contract_json(
@@ -229,135 +249,94 @@ async def generate_and_validate_contract_json(
     # Ritorno del formato finale a 5 livelli
     return {main_path: contract_hashes}
 
-# =====================================================================
-# --- Funzioni di Caricamento ---
-# =====================================================================
-
-async def _validate_and_filter_module2(
-    main_module: types.ModuleType, 
-    path: str, 
-) -> types.ModuleType:
-    """
-    Copia le classi e le funzioni dal main_module al filtered_module.
-    Successivamente, rimuove selettivamente i metodi di classe e le funzioni di modulo 
-    che non hanno un corrispondente test nel modulo di contratto, 
-    escludendo i metodi speciali (__xx__) e privati/protetti (_x).
-    """
-    validated_members: List[str] = []
+def analyze_function_calls(func: types.FunctionType) -> set[str]:
+    """Analizza una funzione e restituisce i nomi di tutte le funzioni chiamate al suo interno."""
     
-    # --- Caricamento e Analisi del Contratto ---
-    contract_path = path.replace('.py', '.test.py')
-    # ... Caricamento del modulo di contratto (omesso) ...
-    contract_code = await backend(path=contract_path)
-    contract_module = await _load_python_module("contract_module", contract_path, contract_code)
-    contract_ana: Dict[str, Any] = analyze_module(contract_code, contract_path)
-    contract_hashes: Dict[str, Dict[str, str]] = await resource(path="src/framework/schema/file.json")
-    
-    
-    print(f"🔍 Validazione contratto per {path} usando {contract_path}...")
+    source_code = inspect.getsource(func)
+    tree = ast.parse(source_code)
+    called_names: set[str] = set()
 
-    # Set per tracciare i metodi/funzioni che hanno superato il 'contratto'
-    # Formato: { 'nome_classe': set_di_metodi_validi } o { '__module__': set_di_funzioni_valide }
-    contract_methods: Dict[str, set[str]] = {}
-
-    # Riempiamo contract_methods con tutti i nomi dei metodi/funzioni testati (senza 'test_')
-    for mname, data in contract_ana.items():
-        if not isinstance(data, dict):
-            print(f"⚠️ ATTENZIONE: Saltato il membro '{mname}'. I dati analizzati non sono un dizionario.")
-            continue # Skip this entry
-        # Determina il nome della classe/modulo di destinazione
-        target_name = '__module__' if mname == 'TestModule' else mname.replace('Test', '')
-        print(f" - Analisi contratto per {mname} -> {data}")
-        test_methods = data.get('data', {}).get('methods', {}).keys()
-        
-        contract_methods[target_name] = set()
-        for test_name in test_methods:
-            if test_name.startswith('test_'):
-                contract_methods[target_name].add(test_name.replace('test_', ''))
-
-    # --- Creazione e Popolamento del Modulo Filtrato ---
-    filtered_module = types.ModuleType(f"filtered:{main_module.__name__}")
-    if hasattr(main_module, '__file__'):
-        filtered_module.__file__ = main_module.__file__
-
-    # Copia tutti i membri e poi filtra
-    for name in dir(main_module):
-        # Ignora i membri importati internamente e i nomi speciali del modulo
-        if name.startswith('__'):
-            continue 
-
-        member = getattr(main_module, name)
-
-        if inspect.isclass(member):
-            
-            # --- Gestione CLASSI ---
-            
-            if name not in contract_methods:
-                # Se la classe non ha un modulo di test, la saltiamo (non è stata validata)
-                continue
-
-            # 1. Copia la classe (creando una copia superficiale per poterla modificare)
-            # Creiamo una nuova classe che eredita dalla classe originale (copia completa)
-            # Usiamo type() per creare un clone modificabile.
-            
-            # Copiamo tutti gli attributi della classe originale nel dict
-            original_attrs = dict(inspect.getmembers(member, lambda x: not inspect.isfunction(x) and not inspect.ismethod(x)))
-            # Aggiungiamo i metodi e le funzioni
-            original_attrs.update({k: v for k, v in member.__dict__.items() if inspect.isfunction(v) or inspect.ismethod(v)})
-            original_attrs['__module__'] = filtered_module.__name__
-            
-            # Creazione del CLONE della classe
-            FilteredClass = type(
-                member.__name__, 
-                member.__bases__, 
-                original_attrs
-            )
-            
-            setattr(filtered_module, name, FilteredClass)
-            validated_members.append(name)
-            
-            # 2. RIMOZIONE SELETTIVA dei metodi non testati
-            tested_methods = contract_methods.get(name, set())
-            
-            for attr_name, attr_value in inspect.getmembers(FilteredClass, inspect.isfunction):
-                
-                # Regole di Esclusione (Non Rimuovere MAI):
-                is_special = attr_name.startswith('__') and attr_name.endswith('__') # es. __init__
-                is_protected = attr_name.startswith('_') and not is_special # es. _helper
-                is_tested = attr_name in tested_methods # è coperto da un test
-                
-                if not is_special and not is_protected and not is_tested:
-                    # Rimuovi il metodo se non è speciale, non è protetto e non è testato
-                    delattr(FilteredClass, attr_name)
-                    print(f"   - Rimosso metodo: {name}.{attr_name} (non testato)")
+    class CallVisitor(ast.NodeVisitor):
+        def visit_Call(self, node):
+            # Cerca le chiamate dirette (es. 'B()')
+            if isinstance(node.func, ast.Name):
+                called_names.add(node.func.id)
+            # Cerca le chiamate a metodi (es. 'self.method()')
+            elif isinstance(node.func, ast.Attribute):
+                # Potrebbe essere un metodo o una chiamata a un modulo/oggetto esterno
+                if isinstance(node.func.value, ast.Name):
+                    called_names.add(node.func.value.id + '.' + node.func.attr)
                 else:
-                    # Metodo mantenuto (testato, speciale o protetto)
-                    pass
+                    called_names.add(node.func.attr) # solo il nome del metodo/attributo
+            
+            # Continua la visita dei nodi interni (argomenti, ecc.)
+            self.generic_visit(node)
 
-        elif inspect.isfunction(member):
-            
-            # --- Gestione FUNZIONI a livello di Modulo ---
-            
-            tested_functions = contract_methods.get('__module__', set())
-            
-            is_special = name.startswith('__') and name.endswith('__')
-            is_protected = name.startswith('_') and not is_special
-            is_tested = name in tested_functions
+    visitor = CallVisitor()
+    visitor.visit(tree)
+    return called_names
 
-            if not is_special and not is_protected and not is_tested:
-                # Rimuovi la funzione se non è speciale, non è protetta e non è testata
-                print(f"   - Rimosso funzione: {name} (non testata)")
-            else:
-                # Copia la funzione se è essenziale o testata
-                setattr(filtered_module, name, member)
-                validated_members.append(name)
+def map_dependencies(module: types.ModuleType):
+    """Crea la mappa delle dipendenze: {funzione_pubblica: {dipendenze_chiamate}}."""
+    dependency_map = {}
+    
+    # Itera su tutti i membri del modulo
+    for name, member in inspect.getmembers(module):
+        # Filtra solo le funzioni pubbliche (non _nascoste) che sono definite nel modulo
+        if (inspect.isfunction(member) or inspect.ismethod(member)) and \
+           not name.startswith('_') and member.__module__ == module.__name__:
+            
+            try:
+                # Analizza la funzione pubblica
+                calls = analyze_function_calls(member)
+                dependency_map[name] = calls
+            except Exception as e:
+                # Gestisce errori nel recupero del codice sorgente (es. funzioni C-built-in)
+                print(f"⚠️ Errore nell'analisi AST per {name}: {e}")
                 
-        else:
-            # --- Copia altri attributi (variabili, costanti, ecc.) ---
-            setattr(filtered_module, name, member)
+    return dependency_map
 
-    print(f"\n✅ Validazione e filtro riusciti per {path}. Membri esposti: {validated_members}")
-    return filtered_module
+def correlate_failure(failing_test_name: str, dependency_map: Dict[str, set[str]]):
+    """
+    Identifica la funzione pubblica interessata dal fallimento del test.
+    
+    Args:
+        failing_test_name: Il nome della funzione il cui test è fallito (es. 'test_exposed_function').
+    """
+    # 1. Caso Semplice: Il test fallito è un test di integrazione diretto.
+    # Se fallisce 'test_exposed_function', allora 'exposed_function' è il problema.
+    if failing_test_name.startswith('test_'):
+        target_fn_name = failing_test_name.replace('test_', '')
+        
+        # 2. Correlazione Indiretta: Cerca se la funzione fallita è una dipendenza
+        
+        # Inverti la mappa per una ricerca più veloce
+        # {'_private_logic': {'exposed_function'}, ...}
+        inverted_map: Dict[str, set[str]] = {}
+        for caller, callees in dependency_map.items():
+            for callee in callees:
+                inverted_map.setdefault(callee, set()).add(caller)
+        
+        # Quali funzioni pubbliche chiamano la funzione fallita/instabile?
+        affected_public_functions = inverted_map.get(target_fn_name, set())
+        
+        if affected_public_functions:
+            print(f"🚨 TEST FALLITO: Il fallimento in '{target_fn_name}' ha un impatto sulle seguenti funzioni pubbliche:")
+            for fn in affected_public_functions:
+                print(f"   -> {fn}")
+            return affected_public_functions
+            
+        elif target_fn_name in dependency_map:
+            # Fallito il test di integrazione principale
+            print(f"❌ TEST FALLITO: Fallimento diretto del test di integrazione di '{target_fn_name}'.")
+            return {target_fn_name}
+        
+    print(f"❓ TEST FALLITO: Impossibile correlare '{failing_test_name}' a una funzione pubblica. (Potrebbe essere un test non standard)")
+    return set()
+
+# =====================================================================
+# --- Funzioni di Caricamento --- CDDF (Contract-Driven Dependency Filter)
+# =====================================================================
 
 async def _validate_and_filter_module(
     main_module: types.ModuleType, 
@@ -513,12 +492,12 @@ async def _validate_and_filter_module(
                 
                 # Controlla l'hash di Produzione
                 if current_prod_hash != saved_prod_hash:
-                    print(f"❌ CONTRATTO ROTTO: Metodo '{target_name}.{method_name}' **Produzione modificata**. Hash atteso: {saved_prod_hash[:8]}... Attuale: {current_prod_hash[:8]}...")
+                    print(f"❌ CONTRATTO ROTTO: Metodo '{target_name}.{method_name}' **Produzione modificata**. Hash atteso: {saved_prod_hash}... Attuale: {current_prod_hash}...")
                     continue # Passa al prossimo metodo
 
                 # Controlla l'hash di Test
                 if current_test_hash != saved_test_hash:
-                    print(f"❌ CONTRATTO ROTTO: Metodo '{target_name}.{method_name}' **Test modificato**. Hash atteso: {saved_test_hash[:8]}... Attuale: {current_test_hash[:8]}...")
+                    print(f"❌ CONTRATTO ROTTO: Metodo '{target_name}.{method_name}' **Test modificato**. Hash atteso: {saved_test_hash}... Attuale: {current_test_hash}...")
                     continue # Passa al prossimo metodo
 
                 # Contratto Superato
@@ -597,8 +576,10 @@ async def _validate_and_filter_module(
             for attr_name, attr_value in inspect.getmembers(FilteredClass, inspect.isfunction):
                 
                 is_validated = attr_name in contract_validated
+
+                should_keep = is_special or is_protected or is_validated
                 
-                if not is_special and not is_protected and not is_validated:
+                if should_keep:
                     # Rimuovi il metodo se non è speciale, non è protetto E NON è validato dal contratto
                     delattr(FilteredClass, attr_name)
                     print(f"   - Rimosso metodo: {name}.{attr_name} (non nel contratto JSON)")

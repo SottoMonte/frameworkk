@@ -45,6 +45,7 @@ def synchronous(**constants):
     inject = [di[manager] for manager in constants.get('managers', [])]
 
     def decorator(function):
+        @functools.wraps(function)
         def wrapper(*args, **kwargs):
             test = list(args) + inject
             output = function(*test, **kwargs)

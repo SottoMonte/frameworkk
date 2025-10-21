@@ -7,7 +7,7 @@ imports = {'flow': 'framework.service.flow'}
 if sys.platform == 'emscripten':
     from js import console
     from pyodide.ffi import to_js
-    async def log_backend(self,level, message):
+    async def _log_backend(self,level, message):
             """Logging in Pyodide tramite console JavaScript."""
             js_message = to_js(f"{level.upper()}: {message}")
             match level:
@@ -19,7 +19,7 @@ if sys.platform == 'emscripten':
                 case _: console.log(js_message)
 else:
     
-    async def log_backend(self,level, message):
+    async def _log_backend(self,level, message):
         
         """Logging in ambiente Python nativo."""
 
