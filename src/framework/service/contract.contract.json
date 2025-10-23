@@ -1,0 +1,8 @@
+{
+    "Contract": {
+        "check_cases": {
+            "test": "dfb043c56ff84e1bb3ea0e8b6200d0fff6c4bdcbd7b0d00a7427d0e4758bdd5f",
+            "production": "edb691c68373b4203a0261c6a6f4c1cd871ce13c822b74def2586da132763857"
+        }
+    }
+}

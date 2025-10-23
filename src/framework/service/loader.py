@@ -103,11 +103,7 @@ async def installa_dipendenze_browser() -> None:
 # ----------------------------------------------------------------------
 
 @language.asynchronous()
-async def bootstrap() -> None:
-    """
-    Funzione principale di bootstrap che orchestra il caricamento del framework.
-    """
-
+async def bootstrap_core() -> None:
     manager_loader_path = [
         {
             'path': 'framework/manager/messenger.py', # Percorso per resource'name': 'UserManager', # Chiave nel DI E nome della classe da estrarre
@@ -147,10 +143,16 @@ async def bootstrap() -> None:
         # Assumiamo che language.load_manager sollevi ResourceLoadError in caso di fallimento
         await language.load_di_entry(**mgr)
 
-    
+@language.asynchronous()
+async def bootstrap() -> None:
+    """
+    Funzione principale di bootstrap che orchestra il caricamento del framework.
+    """
+    await bootstrap_core()
     
     dependency_executor = di['executor']
     dependency_messenger = di['messenger']
+    print(dir(dependency_messenger))
     #print('EXEC-',dependency_messenger)
     await dependency_messenger.post(domain='debug', message="✅ Manager di base (Messenger, Executor) caricati e pronti.")
 

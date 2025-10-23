@@ -1,0 +1,12 @@
+{
+    "messenger": {
+        "post": {
+            "test": "20a3c56eba9d3918a913a74a5a7ef7b98f65d5e2cf5e2df3894afbc5f2bf7549",
+            "production": "c7b2e9c4815a250c9cd8b09213291c33fe720d5700b208edf64372a113235b03"
+        },
+        "read": {
+            "test": "20a3c56eba9d3918a913a74a5a7ef7b98f65d5e2cf5e2df3894afbc5f2bf7549",
+            "production": "fd521b6d3c26e47ba0f83f062b6a01f7721d44742f469994acc79daf1353b00e"
+        }
+    }
+}

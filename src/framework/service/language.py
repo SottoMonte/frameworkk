@@ -573,17 +573,38 @@ async def _validate_and_filter_module(
             
             # 2. RIMOZIONE SELETTIVA dei metodi che NON sono nel contratto JSON
             
-            for attr_name, attr_value in inspect.getmembers(FilteredClass, inspect.isfunction):
+            '''for attr_name, attr_value in inspect.getmembers(FilteredClass, inspect.isfunction):
                 
                 is_validated = attr_name in contract_validated
 
                 should_keep = is_special or is_protected or is_validated
                 
-                if should_keep:
+                if not should_keep:
                     # Rimuovi il metodo se non è speciale, non è protetto E NON è validato dal contratto
                     delattr(FilteredClass, attr_name)
                     print(f"   - Rimosso metodo: {name}.{attr_name} (non nel contratto JSON)")
-                # Altrimenti: mantenuto (perché è speciale, protetto o validato)
+                # Altrimenti: mantenuto (perché è speciale, protetto o validato)'''
+            for attr_name, attr_value in inspect.getmembers(FilteredClass, inspect.isfunction):
+
+                is_validated = attr_name in contract_validated
+
+                # Per i metodi della classe, riusiamo la stessa logica di "special/protected"
+                is_special_method = attr_name.startswith('__') and attr_name.endswith('__')
+                is_protected_method = attr_name.startswith('_') and not is_special_method
+
+                should_keep = is_special_method or is_protected_method or is_validated
+
+                # Se NON dobbiamo mantenere il metodo, lo rimuoviamo
+                if not should_keep:
+                    try:
+                        delattr(FilteredClass, attr_name)
+                        print(f"   - Rimosso metodo: {name}.{attr_name} (non nel contratto JSON)")
+                    except AttributeError:
+                        # Nel caso non sia presente per qualche motivo, ignoriamo
+                        pass
+                else:
+                    # Manteniamo il metodo: registra il membro esposto (Classe.metodo)
+                    validated_members.append(f"{name}.{attr_name}")
 
 
         elif inspect.isfunction(member):

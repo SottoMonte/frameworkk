@@ -1,14 +1,12 @@
-import unittest
 import asyncio
 
-# La tua classe repository modificata per usare self.language invece di language globale
-resources = {
+imports = {
     'factory': 'framework/service/factory.py',
-    'flow': 'framework/service/flow.py',
+    'contract': 'framework/service/contract.py',
     'model': 'framework/schema/model.json',
 }
 
-class TestRepository(unittest.IsolatedAsyncioTestCase):
+class Testrepository(contract.Contract):
     def setUp(self):
         self.repo = factory.repository(
             location={
@@ -22,6 +20,8 @@ class TestRepository(unittest.IsolatedAsyncioTestCase):
             payloads={},
             model=model
         )
+        print("Setting up the test environment...",self.repo,__file__)
+        pass
 
     # === do_format ===
     '''def test_do_format(self):
@@ -36,10 +36,10 @@ class TestRepository(unittest.IsolatedAsyncioTestCase):
         formatted = self.repo.do_format(template, data)
         self.assertEqual(formatted, "repos/user/repo/contents/src")'''
 
-    '''# === parameters (async) ===
+    # === parameters (async) ===
     async def test_parameters(self):
         
-        payloads = {}
+        '''payloads = {}
         self.repo.payloads = payloads
         inputs = {
             "payload": {
@@ -51,10 +51,11 @@ class TestRepository(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result["location"], "repos/user/repo/contents/src")
         self.assertEqual(result["provider"], "dev")
         self.assertEqual(result["payload"], {"location": "user/repo", "path": "src"})'''
+        pass
 
     # === results (async) ===
-    '''async def test_results(self):
-        self.repo.fields = ['location']
+    async def test_results(self):
+        '''self.repo.fields = ['location']
         transaction = {
             "result": [{"location": "loc1"}, {"location": "loc2"}]
         }
@@ -63,4 +64,5 @@ class TestRepository(unittest.IsolatedAsyncioTestCase):
         result = await self.repo.results(**data)
         self.assertEqual(len(result["result"]), 2)
         self.assertEqual(result["result"][0]["location"], "loc1")'''
+        pass
 

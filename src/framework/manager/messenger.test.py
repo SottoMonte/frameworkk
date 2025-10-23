@@ -1,4 +1,6 @@
-class Testmessenger():
+import unittest
+
+class Testmessenger(unittest.IsolatedAsyncioTestCase):
 
     def setUp(self):
         

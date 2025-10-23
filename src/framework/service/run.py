@@ -1,8 +1,6 @@
 import asyncio
 import sys
 
-#loader = language.load_main(language,area="framework",service='service',adapter='loader')
-
 imports = {
     'flow': 'framework/service/flow.py',
     'loader': 'framework/service/loader.py'
@@ -363,7 +361,7 @@ def test():
     # Aggiungi le tue importazioni qui (os, asyncio, unittest, language, loader)
     
     # Esegui il bootstrap del framework (se necessario)
-    #asyncio.run(loader.bootstrap())
+    asyncio.run(loader.bootstrap_core())
 
     # Scopri e genera i contratti, poi esegui i test
     all_contract_hashes, suite_test = asyncio.run(discover_and_run_tests())
