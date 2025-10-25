@@ -363,6 +363,18 @@ async def _validate_and_filter_module(
         print(f"⚠️ ATTENZIONE: Nessun contratto JSON valido trovato in {contract_json_path}. Disattivazione del filtro basato sull'hash.",e)
         external_contracts = {}
 
+    # 1. Controlla la presenza e il tipo di 'exports'
+    # Se 'exports' è definito nel modulo e/o è un dizionario, usiamolo come lista dei membri
+    # che possono essere esposti (API pubblica). Altrimenti consideriamo che non ci
+    # sia alcun export esplicito e applichiamo il comportamento di default (nessun export).
+    if hasattr(main_module, 'exports') and isinstance(main_module.exports, dict):
+        exports_map: Dict[str, Any] = main_module.exports
+        print(f"🔐 exports trovato in {path}: {list(exports_map.keys())}")
+    else:
+        print(f"⚠️ Warning: 'exports' non trovato o non è un dizionario in {path}. Nessun membro esplicito sarà esposto.")
+        exports_map: Dict[str, Any] = {}
+
+    
 
     # 1.2. Set per tracciare i metodi/funzioni che hanno superato il 'contratto JSON'
     # Formato: { 'nome_classe': set_di_metodi_validi } o { '__module__': set_di_funzioni_valide }
@@ -371,69 +383,7 @@ async def _validate_and_filter_module(
     contract_code = await backend(path=contract_path)
     contract_ana: Dict[str, Any] = analyze_module(contract_code, contract_path)
     contract_module: Dict[str, Any] = await resource(path=contract_path)
-    '''for target_name, group_contracts in external_contracts.items():
-        if not isinstance(group_contracts, dict):
-            continue
-            
-        contract_validated_methods[target_name] = set()
-        
-        for method_name, hashes in group_contracts.items():
-            if (isinstance(hashes, dict) and 'production' in hashes and 'test' in hashes):
-                
-                # Non c'è bisogno di ricalcolare l'hash qui; 
-                # assumiamo che se la chiave esiste nel JSON, 
-                # significa che l'hash è stato verificato e salvato 
-                # durante la fase di generazione del contratto (generate_and_validate_contract_json).
-                # Se vogliamo essere rigorosi, dovremmo ricalcolare l'hash di produzione qui e confrontarlo.
-                # Per ora, manteniamo la logica di 'se il contratto esiste, è valido per l'esposizione'.
-                
-                contract_validated_methods[target_name].add(method_name)'''
     
-    '''for target_name, group_contracts in external_contracts.items():
-        if not isinstance(group_contracts, dict):
-            continue
-            
-        contract_validated_methods[target_name] = set()
-        
-        # Recupera l'oggetto padre (Classe o Modulo) dal modulo di produzione
-        if target_name == '__module__':
-            target_obj = main_module
-        else:
-            target_obj = getattr(main_module, target_name, None)
-            
-        if target_obj is None:
-            print(f"⚠️ Ignorata chiave di contratto '{target_name}': Oggetto di produzione non trovato.")
-            continue
-        
-        for method_name, hashes in group_contracts.items():
-            if (isinstance(hashes, dict) and 'production' in hashes and 'test' in hashes):
-                
-                # --- Logica di Verifica dell'Hash Rigorosa ---
-                
-                saved_prod_hash = hashes['production']
-                
-                # 1. Trova la funzione/metodo di produzione attuale
-                prod_fn: Optional[Callable] = getattr(target_obj, method_name, None)
-
-                if prod_fn is None:
-                    print(f"❌ Errore Contratto: Metodo/funzione '{target_name}.{method_name}' non trovato nel codice di produzione.")
-                    continue
-
-                # 2. Ricalcola l'hash del codice di produzione ATTUALE
-                try:
-                    current_prod_hash = calculate_hash_of_function(prod_fn)
-                except Exception as e:
-                    print(f"❌ Errore Contratto: Impossibile calcolare hash per '{method_name}': {e}")
-                    continue
-
-                # 3. Confronto degli Hash!
-                if current_prod_hash == saved_prod_hash:
-                    # Contratto superato: l'hash salvato corrisponde a quello attuale
-                    contract_validated_methods[target_name].add(method_name)
-                else:
-                    # Contratto fallito: codice di produzione modificato
-                    print(f"❌ CONTRATTO ROTTO: Metodo '{target_name}.{method_name}' modificato. Hash atteso: {saved_prod_hash[:8]}... Hash attuale: {current_prod_hash[:8]}...")
-                    # L'hash di test è irrilevante qui, perché il codice di produzione è cambiato.'''
     for target_name, group_contracts in external_contracts.items():
         if not isinstance(group_contracts, dict):
             continue
@@ -522,6 +472,42 @@ async def _validate_and_filter_module(
                 contract_methods_by_name[target_name].add(test_name.replace('test_', ''))
 
     print(f"🔍 Avvio filtro: i membri saranno mantenuti solo se presenti in {contract_json_path}.")
+    # --- Nuova logica: costruisce l'insieme di export consentiti basato su `exports` e sulla
+    # presenza dei test (contract_methods_by_name). Se `exports_map` è vuoto si mantiene il
+    # comportamento precedente (nessun export esplicito richiesto).
+    allowed_exports: set[str] = set()
+    if exports_map:
+        for export_key, export_val in exports_map.items():
+            # Consideriamo il nome dell'export sia nella chiave che (per compatibilità) nel valore se è stringa
+            candidates = []
+            if isinstance(export_key, str):
+                candidates.append(export_key)
+            if isinstance(export_val, str) and export_val not in candidates:
+                candidates.append(export_val)
+
+            for candidate in candidates:
+                if hasattr(main_module, candidate):
+                    member = getattr(main_module, candidate)
+                    if inspect.isclass(member):
+                        # la classe è esposta se ci sono test che la riguardano (metodi nella mappa)
+                        if contract_methods_by_name.get(candidate):
+                            allowed_exports.add(candidate)
+                        else:
+                            print(f"   - Export ignorato (nessun test trovato): {candidate}")
+                    elif inspect.isfunction(member):
+                        # funzione di modulo: controlla i test a livello di modulo
+                        if candidate in contract_methods_by_name.get('__module__', set()):
+                            allowed_exports.add(candidate)
+                        else:
+                            print(f"   - Export ignorato (nessun test trovato): {candidate}")
+                    else:
+                        # attributi/const: non esponiamo a meno che ci sia un test esplicito
+                        if candidate in contract_methods_by_name.get('__module__', set()):
+                            allowed_exports.add(candidate)
+                        else:
+                            print(f"   - Export ignorato (non funzione/classe o senza test): {candidate}")
+                else:
+                    print(f"⚠️ Export dichiarato ma non trovato nel modulo: {candidate}")
     
     # 3. Creazione e Popolamento del Modulo Filtrato
     
@@ -529,102 +515,73 @@ async def _validate_and_filter_module(
     if hasattr(main_module, '__file__'):
         filtered_module.__file__ = main_module.__file__
     
-    # ... Ometto la copia iniziale di __file__, __doc__, ecc. per brevità ...
-    
-    for name in dir(main_module):
-        if name.startswith('__'):
-            continue 
-
-        member = getattr(main_module, name)
-        
-        # Le funzioni/metodi di produzione validati dal CONTRATTO JSON
-        module_or_class_key = name if inspect.isclass(member) else '__module__'
-        contract_validated = contract_validated_methods.get(module_or_class_key, set())
-        
-        is_special = name.startswith('__') and name.endswith('__')
-        is_protected = name.startswith('_') and not is_special
-        
-        
-        if inspect.isclass(member):
-            
-            # --- Gestione CLASSI ---
-            
-            # Se la classe non ha elementi validati nel contratto, la saltiamo
-            if not contract_validated_methods.get(name):
-                 # Controlliamo anche se è un attributo essenziale (come un helper non testabile)
-                if not is_protected and not is_special and name in contract_methods_by_name:
-                    print(f" - Rimosso Classe: {name} (Nessun contratto hash valido trovato)")
-                continue
-            
-            # ... Logica di clonazione della classe (come avevi) ...
-            
-            original_attrs = dict(inspect.getmembers(member, lambda x: not inspect.isfunction(x) and not inspect.ismethod(x)))
-            original_attrs.update({k: v for k, v in member.__dict__.items() if inspect.isfunction(v) or inspect.ismethod(v)})
-            original_attrs['__module__'] = filtered_module.__name__
-            
-            FilteredClass = type(
-                member.__name__, 
-                member.__bases__, 
-                original_attrs
-            )
-            
-            setattr(filtered_module, name, FilteredClass)
-            validated_members.append(name)
-            
-            # 2. RIMOZIONE SELETTIVA dei metodi che NON sono nel contratto JSON
-            
-            '''for attr_name, attr_value in inspect.getmembers(FilteredClass, inspect.isfunction):
-                
-                is_validated = attr_name in contract_validated
-
-                should_keep = is_special or is_protected or is_validated
-                
-                if not should_keep:
-                    # Rimuovi il metodo se non è speciale, non è protetto E NON è validato dal contratto
-                    delattr(FilteredClass, attr_name)
-                    print(f"   - Rimosso metodo: {name}.{attr_name} (non nel contratto JSON)")
-                # Altrimenti: mantenuto (perché è speciale, protetto o validato)'''
-            for attr_name, attr_value in inspect.getmembers(FilteredClass, inspect.isfunction):
-
-                is_validated = attr_name in contract_validated
-
-                # Per i metodi della classe, riusiamo la stessa logica di "special/protected"
-                is_special_method = attr_name.startswith('__') and attr_name.endswith('__')
-                is_protected_method = attr_name.startswith('_') and not is_special_method
-
-                should_keep = is_special_method or is_protected_method or is_validated
-
-                # Se NON dobbiamo mantenere il metodo, lo rimuoviamo
-                if not should_keep:
-                    try:
-                        delattr(FilteredClass, attr_name)
-                        print(f"   - Rimosso metodo: {name}.{attr_name} (non nel contratto JSON)")
-                    except AttributeError:
-                        # Nel caso non sia presente per qualche motivo, ignoriamo
-                        pass
-                else:
-                    # Manteniamo il metodo: registra il membro esposto (Classe.metodo)
-                    validated_members.append(f"{name}.{attr_name}")
-
-
-        elif inspect.isfunction(member):
-            
-            # --- Gestione FUNZIONI a livello di Modulo ---
-            
-            is_validated = name in contract_validated
-            
-            if not is_special and not is_protected and not is_validated:
-                # Rimuovi la funzione se non è speciale, non è protetta E NON è validata
-                print(f"   - Rimosso funzione: {name} (non nel contratto JSON)")
+    # Nuova logica: espone SOLO i membri dichiarati in `exports` e che hanno test.
+    # exports_map è nella forma {'public_name': 'private_name'}
+    if exports_map:
+        for public_name, private_spec in exports_map.items():
+            # supporto semplice: valore stringa = nome privato
+            if isinstance(private_spec, str):
+                private_name = private_spec
             else:
-                # Copia la funzione se è essenziale, protetta o validata
-                setattr(filtered_module, name, member)
-                validated_members.append(name)
-                
-        else:
-            # --- Copia altri attributi (variabili, costanti, ecc.) ---
-            setattr(filtered_module, name, member)
+                # fallback: se non è stringa consideriamo lo stesso nome pubblico
+                private_name = public_name
 
+            if public_name not in allowed_exports:
+                # non ha test o non è valido: skip e log
+                print(f"   - Export ignorato (no test o non valido): {public_name} -> {private_name}")
+                continue
+
+            if not hasattr(main_module, private_name):
+                print(f"⚠️ Export dichiarato ma non trovato nel modulo: {private_name} (dichiarato come {public_name})")
+                continue
+
+            member = getattr(main_module, private_name)
+
+            # Se è una classe, clonala e filtra i suoi metodi in base al contratto JSON
+            if inspect.isclass(member):
+                original_attrs = dict(inspect.getmembers(member, lambda x: not inspect.isfunction(x) and not inspect.ismethod(x)))
+                original_attrs.update({k: v for k, v in member.__dict__.items() if inspect.isfunction(v) or inspect.ismethod(v)})
+                original_attrs['__module__'] = filtered_module.__name__
+
+                FilteredClass = type(
+                    member.__name__,
+                    member.__bases__,
+                    original_attrs
+                )
+
+                setattr(filtered_module, public_name, FilteredClass)
+                validated_members.append(public_name)
+
+                # Rimuove i metodi non presenti nel contract (se il contract è disponibile)
+                contract_validated = contract_validated_methods.get(member.__name__, set())
+                for attr_name, attr_value in inspect.getmembers(FilteredClass, inspect.isfunction):
+                    is_special_method = attr_name.startswith('__') and attr_name.endswith('__')
+                    is_protected_method = attr_name.startswith('_') and not is_special_method
+
+                    should_keep = is_special_method or is_protected_method or (attr_name in contract_validated)
+
+                    if not should_keep:
+                        try:
+                            delattr(FilteredClass, attr_name)
+                            print(f"   - Rimosso metodo: {member.__name__}.{attr_name} (non nel contratto JSON)")
+                        except AttributeError:
+                            pass
+                    else:
+                        validated_members.append(f"{public_name}.{attr_name}")
+
+            elif inspect.isfunction(member):
+                # Funzioni di modulo: mappate al nome pubblico
+                setattr(filtered_module, public_name, member)
+                validated_members.append(public_name)
+
+            else:
+                # Altri attributi (variabili, costanti, ecc.)
+                setattr(filtered_module, public_name, member)
+                validated_members.append(public_name)
+    else:
+        # Nessun exports dichiarato -> per nuova policy non esponiamo nulla automaticamente
+        print("⚠️ Nessun 'exports' dichiarato: nessun membro sarà esposto dal modulo filtrato.")
+ 
     print(f"\n✅ Validazione e filtro riusciti per {path}. Membri esposti: {validated_members}")
     return filtered_module
 
