@@ -3,6 +3,10 @@ imports = {
     'contract': 'framework/service/contract.py',
 }
 
+exports = {
+    'application': 'application',
+}
+
 class TestModule(contract.Contract):
 
     def setUp(self):

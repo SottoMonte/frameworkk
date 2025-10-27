@@ -367,22 +367,20 @@ async def _validate_and_filter_module(
     # Se 'exports' è definito nel modulo e/o è un dizionario, usiamolo come lista dei membri
     # che possono essere esposti (API pubblica). Altrimenti consideriamo che non ci
     # sia alcun export esplicito e applichiamo il comportamento di default (nessun export).
-    if hasattr(main_module, 'exports') and isinstance(main_module.exports, dict):
-        exports_map: Dict[str, Any] = main_module.exports
-        print(f"🔐 exports trovato in {path}: {list(exports_map.keys())}")
-    else:
-        print(f"⚠️ Warning: 'exports' non trovato o non è un dizionario in {path}. Nessun membro esplicito sarà esposto.")
-        exports_map: Dict[str, Any] = {}
 
-    
-
-    # 1.2. Set per tracciare i metodi/funzioni che hanno superato il 'contratto JSON'
-    # Formato: { 'nome_classe': set_di_metodi_validi } o { '__module__': set_di_funzioni_valide }
     contract_validated_methods: Dict[str, set[str]] = {}
     contract_path = path.replace('.py', '.test.py')
     contract_code = await backend(path=contract_path)
     contract_ana: Dict[str, Any] = analyze_module(contract_code, contract_path)
     contract_module: Dict[str, Any] = await resource(path=contract_path)
+
+    if hasattr(contract_module, 'exports') and isinstance(contract_module.exports, dict):
+        exports_map: Dict[str, Any] = contract_module.exports
+        print(f"🔐 exports trovato in {path}: {list(exports_map.keys())}")
+    else:
+        print(f"⚠️ Warning: 'exports' non trovato o non è un dizionario in {path}. Nessun membro esplicito sarà esposto.")
+        exports_map: Dict[str, Any] = {}
+    
     
     for target_name, group_contracts in external_contracts.items():
         if not isinstance(group_contracts, dict):

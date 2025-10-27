@@ -6,6 +6,10 @@ imports = {
     #'model': 'framework/schema/model.json',
 }
 
+exports = {
+    'bootstrap':'bootstrap'
+}
+
 class TestModule(contract.Contract):
 
     def setUp(self):

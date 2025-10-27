@@ -1,5 +1,9 @@
 import unittest
 
+exports = {
+    'messenger': 'messenger',
+}
+
 class Testmessenger(unittest.IsolatedAsyncioTestCase):
 
     def setUp(self):

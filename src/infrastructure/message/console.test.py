@@ -3,6 +3,10 @@ imports = {
     'contract': 'framework/service/contract.py',
 }
 
+exports = {
+    'adapter': 'adapter',
+}
+
 import unittest
 
 class Testadapter(unittest.IsolatedAsyncioTestCase):

@@ -1,6 +1,11 @@
 imports = {
     'contract': 'framework/service/contract.py',
 }
+
+exports = {
+    'executor': 'executor',
+}
+
 import asyncio
 class Testexecutor(contract.Contract):
 
