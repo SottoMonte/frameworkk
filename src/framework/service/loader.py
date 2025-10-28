@@ -143,6 +143,10 @@ async def bootstrap_core() -> None:
         # Assumiamo che language.load_manager sollevi ResourceLoadError in caso di fallimento
         await language.load_di_entry(**mgr)
 
+    dependency_messenger = di['messenger']
+    for log in di['log_buffer']:
+        await dependency_messenger.post(domain=log.get('level','DEBUG'), message=log.get('message'))
+
 @language.asynchronous()
 async def bootstrap() -> None:
     """
@@ -152,8 +156,7 @@ async def bootstrap() -> None:
     
     dependency_executor = di['executor']
     dependency_messenger = di['messenger']
-    print(dir(dependency_messenger))
-    #print('EXEC-',dependency_messenger)
+
     await dependency_messenger.post(domain='debug', message="✅ Manager di base (Messenger, Executor) caricati e pronti.")
 
     await dependency_messenger.post(domain='debug', message="Avvio del processo di inizializzazione del Framework. Controllo ambiente...")

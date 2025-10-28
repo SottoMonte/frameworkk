@@ -31,6 +31,20 @@ if 'module_cache' not in di:
 if 'loading_stack' not in di:
     di['loading_stack'] = set()
 
+if 'log_buffer' not in di:
+    di['log_buffer'] = []
+
+def buffered_log(level: str, message: str, emoji: str = ""):
+    """Logger rudimentale che bufferizza i messaggi iniziali"""
+    formatted = f"{emoji} {message}"
+    di['log_buffer'].append({
+        'level': level,
+        'message': message,
+        'emoji': emoji,
+        'timestamp': datetime.now(timezone.utc).isoformat()
+    })
+    #print(formatted)  # Mantiene output semplice durante il bootstrap
+
 # Backend (sync file read wrapped in async for tests)
 if sys.platform != 'emscripten':
     async def backend(**kwargs) -> str:
@@ -184,7 +198,7 @@ async def generate_and_validate_contract_json(
     contract_code = await backend(path=contract_path)
     
     if not main_code or not contract_code:
-        print(f"⚠️ Impossibile caricare i file sorgente o di test ({main_path} / {contract_path}).")
+        buffered_log("INFO", "Impossibile caricare i file sorgente o di test ({main_path} / {contract_path}).")
         return {}
 
     main_module = await _load_python_module("main_module_temp", main_path, main_code)
@@ -244,7 +258,7 @@ async def generate_and_validate_contract_json(
     json_content = json.dumps(contract_hashes, indent=4)
     # await backend(path=json_path, content=json_content, mode='w') 
 
-    print(f"✅ Generato e scritto il contratto JSON in {json_path}")
+    buffered_log("INFO", f"✅ Generato e scritto il contratto JSON in {json_path}")
     
     # Ritorno del formato finale a 5 livelli
     return {main_path: contract_hashes}
@@ -292,7 +306,7 @@ def map_dependencies(module: types.ModuleType):
                 dependency_map[name] = calls
             except Exception as e:
                 # Gestisce errori nel recupero del codice sorgente (es. funzioni C-built-in)
-                print(f"⚠️ Errore nell'analisi AST per {name}: {e}")
+                buffered_log("ERROR", f"Errore nell'analisi AST per {name}: {e}")
                 
     return dependency_map
 
@@ -358,9 +372,9 @@ async def _validate_and_filter_module(
         # Assumiamo che il tuo 'convert' o 'json.loads' lo possa gestire
         # Il contenuto sarà nel formato {'adapter': {'post': {'production': '...', 'test': '...'}}}
         external_contracts: Dict[str, Any] = await convert(json_content, dict, 'json')
-        print(f"🔍 Contratto JSON esterno caricato da {contract_json_path}.")
+        buffered_log("INFO", f"Contratto JSON esterno caricato da {contract_json_path}.")
     except (FileNotFoundError, json.JSONDecodeError, Exception) as e:
-        print(f"⚠️ ATTENZIONE: Nessun contratto JSON valido trovato in {contract_json_path}. Disattivazione del filtro basato sull'hash.",e)
+        buffered_log("WARNING", f"Nessun contratto JSON valido trovato in {contract_json_path}. Disattivazione del filtro basato sull'hash.", e)
         external_contracts = {}
 
     # 1. Controlla la presenza e il tipo di 'exports'
@@ -376,9 +390,9 @@ async def _validate_and_filter_module(
 
     if hasattr(contract_module, 'exports') and isinstance(contract_module.exports, dict):
         exports_map: Dict[str, Any] = contract_module.exports
-        print(f"🔐 exports trovato in {path}: {list(exports_map.keys())}")
+        buffered_log("INFO", f"🔐 exports trovato in {path}: {list(exports_map.keys())}")
     else:
-        print(f"⚠️ Warning: 'exports' non trovato o non è un dizionario in {path}. Nessun membro esplicito sarà esposto.")
+        buffered_log("WARNING", f"⚠️ Ignorata chiave di contratto '{target_name}': Oggetto di produzione o test non trovato.")
         exports_map: Dict[str, Any] = {}
     
     
@@ -399,7 +413,7 @@ async def _validate_and_filter_module(
             target_test_obj = getattr(contract_module, f'Test{target_name}', None) 
             
         if target_prod_obj is None or target_test_obj is None:
-            print(f"⚠️ Ignorata chiave di contratto '{target_name}': Oggetto di produzione o test non trovato.")
+            buffered_log("WARNING", f"⚠️ Ignorata chiave di contratto '{target_name}': Oggetto di produzione o test non trovato.")
             continue
         
         for method_name, hashes in group_contracts.items():
@@ -412,13 +426,13 @@ async def _validate_and_filter_module(
                 # 1. Verifica Hash di Produzione
                 prod_fn: Optional[Callable] = getattr(target_prod_obj, method_name, None)
                 if prod_fn is None:
-                    print(f"❌ Errore Contratto: Metodo/funzione di produzione '{target_name}.{method_name}' non trovato.")
+                    buffered_log("ERROR", f"❌ Errore Contratto: Metodo/funzione di produzione '{target_name}.{method_name}' non trovato.")
                     continue
 
                 try:
                     current_prod_hash = calculate_hash_of_function(prod_fn)
                 except Exception as e:
-                    print(f"❌ Errore Contratto: Impossibile calcolare hash Prod per '{method_name}': {e}")
+                    buffered_log("ERROR", f"❌ Errore Contratto: Impossibile calcolare hash Prod per '{method_name}': {e}")
                     continue
 
                 # 2. Verifica Hash del Test
@@ -427,25 +441,25 @@ async def _validate_and_filter_module(
                 test_fn: Optional[Callable] = getattr(target_test_obj, test_fn_name, None)
 
                 if test_fn is None:
-                    print(f"❌ Errore Contratto: Funzione di test '{test_fn_name}' non trovata nell'oggetto di test.")
+                    buffered_log("ERROR", f"❌ Errore Contratto: Funzione di test '{test_fn_name}' non trovata nell'oggetto di test.")
                     continue
                 
                 try:
                     current_test_hash = calculate_hash_of_function(test_fn)
                 except Exception as e:
-                    print(f"❌ Errore Contratto: Impossibile calcolare hash Test per '{test_fn_name}': {e}")
+                    buffered_log("ERROR", f"❌ Errore Contratto: Funzione di produzione '{test_fn}' non ispezionabile: {e}")
                     continue
                     
                 # 3. Confronto degli Hash!
                 
                 # Controlla l'hash di Produzione
                 if current_prod_hash != saved_prod_hash:
-                    print(f"❌ CONTRATTO ROTTO: Metodo '{target_name}.{method_name}' **Produzione modificata**. Hash atteso: {saved_prod_hash}... Attuale: {current_prod_hash}...")
+                    buffered_log("ERROR", f"❌ CONTRATTO ROTTO: Metodo '{target_name}.{method_name}' Produzione modificata. Hash atteso: {saved_prod_hash}... Attuale: {current_prod_hash}...")
                     continue # Passa al prossimo metodo
 
                 # Controlla l'hash di Test
                 if current_test_hash != saved_test_hash:
-                    print(f"❌ CONTRATTO ROTTO: Metodo '{target_name}.{method_name}' **Test modificato**. Hash atteso: {saved_test_hash}... Attuale: {current_test_hash}...")
+                    buffered_log("ERROR", f"❌ CONTRATTO ROTTO: Metodo '{target_name}.{method_name}' Test modificato. Hash atteso: {saved_test_hash}... Attuale: {current_test_hash}...")
                     continue # Passa al prossimo metodo
 
                 # Contratto Superato
@@ -469,7 +483,7 @@ async def _validate_and_filter_module(
             if test_name.startswith('test_'):
                 contract_methods_by_name[target_name].add(test_name.replace('test_', ''))
 
-    print(f"🔍 Avvio filtro: i membri saranno mantenuti solo se presenti in {contract_json_path}.")
+    buffered_log("INFO", f"🔍 Avvio filtro: i membri saranno mantenuti solo se presenti in {contract_json_path}.")
     # --- Nuova logica: costruisce l'insieme di export consentiti basato su `exports` e sulla
     # presenza dei test (contract_methods_by_name). Se `exports_map` è vuoto si mantiene il
     # comportamento precedente (nessun export esplicito richiesto).
@@ -491,21 +505,21 @@ async def _validate_and_filter_module(
                         if contract_methods_by_name.get(candidate):
                             allowed_exports.add(candidate)
                         else:
-                            print(f"   - Export ignorato (nessun test trovato): {candidate}")
+                            buffered_log("DEBUG", f"   - Export ignorato (nessun test trovato): {candidate}")
                     elif inspect.isfunction(member):
                         # funzione di modulo: controlla i test a livello di modulo
                         if candidate in contract_methods_by_name.get('__module__', set()):
                             allowed_exports.add(candidate)
                         else:
-                            print(f"   - Export ignorato (nessun test trovato): {candidate}")
+                            buffered_log("DEBUG", f"   - Export ignorato (nessun test trovato): {candidate}")
                     else:
                         # attributi/const: non esponiamo a meno che ci sia un test esplicito
                         if candidate in contract_methods_by_name.get('__module__', set()):
                             allowed_exports.add(candidate)
                         else:
-                            print(f"   - Export ignorato (non funzione/classe o senza test): {candidate}")
+                            buffered_log("DEBUG", f"   - Export ignorato (non funzione/classe o senza test): {candidate}")
                 else:
-                    print(f"⚠️ Export dichiarato ma non trovato nel modulo: {candidate}")
+                    buffered_log("WARNING", f"⚠️ Export dichiarato ma non trovato nel modulo: {candidate}")
     
     # 3. Creazione e Popolamento del Modulo Filtrato
     
@@ -526,11 +540,11 @@ async def _validate_and_filter_module(
 
             if public_name not in allowed_exports:
                 # non ha test o non è valido: skip e log
-                print(f"   - Export ignorato (no test o non valido): {public_name} -> {private_name}")
+                buffered_log("DEBUG", f"   - Export ignorato (no test o non valido): {public_name} -> {private_name}")
                 continue
 
             if not hasattr(main_module, private_name):
-                print(f"⚠️ Export dichiarato ma non trovato nel modulo: {private_name} (dichiarato come {public_name})")
+                buffered_log("WARNING", f"⚠️ Export dichiarato ma non trovato nel modulo: {private_name} (dichiarato come {public_name})")
                 continue
 
             member = getattr(main_module, private_name)
@@ -561,7 +575,7 @@ async def _validate_and_filter_module(
                     if not should_keep:
                         try:
                             delattr(FilteredClass, attr_name)
-                            print(f"   - Rimosso metodo: {member.__name__}.{attr_name} (non nel contratto JSON)")
+                            buffered_log("DEBUG", f"   - Rimosso metodo: {member.__name__}.{attr_name} (non nel contratto JSON)")
                         except AttributeError:
                             pass
                     else:
@@ -578,9 +592,9 @@ async def _validate_and_filter_module(
                 validated_members.append(public_name)
     else:
         # Nessun exports dichiarato -> per nuova policy non esponiamo nulla automaticamente
-        print("⚠️ Nessun 'exports' dichiarato: nessun membro sarà esposto dal modulo filtrato.")
+        buffered_log("WARNING", "⚠️ Nessun 'exports' dichiarato: nessun membro sarà esposto dal modulo filtrato.")
  
-    print(f"\n✅ Validazione e filtro riusciti per {path}. Membri esposti: {validated_members}")
+    buffered_log("INFO", f"✅ Validazione e filtro riusciti per {path}. Membri esposti: {validated_members}")
     return filtered_module
 
 def resolve_path(resource_path: str | None) -> str:
@@ -596,7 +610,7 @@ async def _load_dependencies(module: types.ModuleType,dependencies) -> None:
     """Risolve le dipendenze 'imports' definite in un modulo."""
     
     for key, import_path in dependencies.items():
-        print(f"⏳ Caricamento dipendenza '{key}' da {import_path}...")
+        buffered_log("INFO", f"⏳ Caricamento dipendenza '{key}' da {import_path}...")
         try:
             imported_content = await backend(path='src/'+import_path)
         except FileNotFoundError:
@@ -612,7 +626,7 @@ async def _load_dependencies(module: types.ModuleType,dependencies) -> None:
         else:
             value = imported_content
         setattr(module, key, value)
-        print(f"📦 Dipendenza '{key}' caricata da {import_path}")
+        buffered_log("INFO", f"📦 Dipendenza '{key}' caricata da {import_path}")
 
 async def _load_python_module(name: str, path: str, code: str) -> types.ModuleType:
     """Crea ed esegue dinamicamente un modulo Python con le variabili globali necessarie."""
@@ -622,14 +636,11 @@ async def _load_python_module(name: str, path: str, code: str) -> types.ModuleTy
     module.__source__ = code
     module.__dict__['language'] = di['module_cache'].get('language')
     
-    #module.__dict__['imports'] = dependencies
-    #print(code)
-    
     try:
         dependencies = analyze_module(code, path)
         
         dependencies = dependencies.get('imports',{}).get('value',{})
-        print(f"🔍 Dipendenze trovate in {path}: {dependencies}")
+        buffered_log("INFO", f"🔍 Dipendenze trovate in {path}: {dependencies}")
         await _load_dependencies(module,dependencies.copy())
         exec(code, module.__dict__)
     except Exception as e:
@@ -648,7 +659,7 @@ async def resource(path: str | None = None, **kwargs) -> Any:
     content = await backend(path=resource_path)
     
     if resource_path.endswith(".json"):
-        print(f"📄 Caricamento e parsing JSON da {resource_path}...",type(content))
+        buffered_log("INFO", f"📄 Caricamento e parsing JSON da {resource_path}... type={type(content)}")
         return await convert(content, dict, 'json')
     
     if resource_path.endswith(".py"):
@@ -684,8 +695,8 @@ async def load_di_entry(**constants: Any) -> None:
     log_info = f"'{path}' con service '{service_name}' e attr '{attribute_name}'"
 
     if not path or not service_name or not attribute_name:
-         print(f"❌ Errore: Configurazioni DI insufficienti: {constants}")
-         return
+        buffered_log("ERROR", f"❌ Errore: Configurazioni DI insufficienti: {constants}")
+        return
     
     # 3. Inizializzazione della Chiave nel DI (se assente)
     # Si usa una lambda che restituisce [] per poter collezionare Provider
@@ -711,7 +722,7 @@ async def load_di_entry(**constants: Any) -> None:
                 dependencies[dep_key] = di[dep_key]
             #print(f"⏳ Caricamento Manager: '{service_name}' ({log_info}) con dipendenze {dependencies}",dependency_keys)
             di[service_name] = lambda _di: resource_class(**init_args|{'providers': dependencies})
-            print(f"✅ Registrato Factory: '{service_name}' ({log_info})")
+            buffered_log("INFO", f"✅ Registrato Factory: '{service_name}' ({log_info})")
 
         else:
             # --- CASO: PROVIDER/SINGLETON (Istanziamento eager in una lista) ---
@@ -721,7 +732,7 @@ async def load_di_entry(**constants: Any) -> None:
             #provider = getattr(module, 'adapter')
             di[service_name].append(resource_class(config=init_args))
             
-            print(f"✅ Aggiunto Provider a lista: '{service_name}' ({log_info})")
+            buffered_log("INFO", f"✅ Aggiunto Provider a lista: '{service_name}' ({log_info})")
 
 # =====================================================================
 # --- Funzioni Principali di Analisi ---
