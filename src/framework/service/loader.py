@@ -145,7 +145,7 @@ async def bootstrap_core() -> None:
 
     dependency_messenger = di['messenger']
     for log in di['log_buffer']:
-        await dependency_messenger.post(domain=log.get('level','DEBUG'), message=log.get('message'))
+        await dependency_messenger.post(domain=log.get('level','DEBUG').lower(), message=log.get('message'))
 
 @language.asynchronous()
 async def bootstrap() -> None:

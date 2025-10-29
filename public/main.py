@@ -11,7 +11,12 @@ async def main():
         cwd = os.getcwd()
         sys.path.insert(1, cwd+'/src')
         import framework.service.language as language
-        language.di['module_cache']['language'] = language
+        
+        
+        lang = await language.resource(path="framework/service/language.py")
+        #language.di['module_cache']['language'] = language
+        language.di['module_cache']['language'] = lang
+        print(dir(lang))
         #loader = await language.load_module(language, path="framework.service.loader", area="framework", service='service', adapter='loader')
         #await loader.bootstrap()
         run = await language.resource(path="framework/service/run.py")

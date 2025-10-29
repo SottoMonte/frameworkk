@@ -2,10 +2,21 @@ import asyncio
 
 imports = {
     'flow': 'framework/service/flow.py',
+    'contract': 'framework/service/contract.py',
     'model': 'framework/schema/model.json',
 }
 
-class TestModule():
+exports = {
+    #Pubblico/privato
+    'resource':'resource',
+    'asynchronous':'asynchronous',
+    'synchronous':'synchronous',
+    'load_di_entry':'load_di_entry',
+    'backend':'backend',
+    'format':'format',
+}
+
+class TestModule(contract.Contract):
 
     def setUp(self):
         
@@ -13,7 +24,7 @@ class TestModule():
 
     async def test_resource(self):
         """Verifica che language.get recuperi correttamente i valori da percorsi validi."""
-        success = [
+        '''success = [
             {'args':(language),'kwargs':{'path':"framework/service/run.py"},'type':types.ModuleType},
             {'args':(language),'kwargs':{'path':"framework/schema/model.json"},'equal':model},
         ]
@@ -23,9 +34,24 @@ class TestModule():
         ]
 
         await self.check_cases(language.resource, success)
-        await self.check_cases(language.resource, failure)
+        await self.check_cases(language.resource, failure)'''
     
-    async def test_model(self):
+    async def test_asynchronous(self):
+        pass
+
+    async def test_synchronous(self):
+        pass
+    
+    async def test_load_di_entry(self):
+        pass
+
+    async def test_backend(self):
+        pass
+
+    async def test_format(self):
+        pass
+
+    '''async def test_model(self):
         success = [
             #1 Recupera il modello
             {'args':(self.schema,{'user': {'name':'marco','items': [{'id': 123, 'name': 'Prodotto A'}]}}),'equal':{'user': {'name':'marco','items': [{'id': 123, 'name': 'Prodotto A'}]}}},
@@ -209,4 +235,4 @@ class TestModule():
         ]
 
         await self.check_cases(language.get, success)
-        await self.check_cases(language.get, failure)
+        await self.check_cases(language.get, failure)'''

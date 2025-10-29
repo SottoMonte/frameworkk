@@ -5,7 +5,7 @@ import asyncio
 
 imports  = {
     #'flow': 'framework/service/flow.py',
-    'loader': 'framework/service/loader.py'
+    #'loader': 'framework/service/loader.py'
 }
 
 class Contract(IsolatedAsyncioTestCase):

@@ -610,10 +610,20 @@ async def _load_dependencies(module: types.ModuleType,dependencies) -> None:
     """Risolve le dipendenze 'imports' definite in un modulo."""
     
     for key, import_path in dependencies.items():
+        # Normalizza percorso usato come chiave cache (stesso formato di _load_python_module)
+        cache_key = import_path
+        # Se è già nel cache, riutilizza (DEBUG)
+        if import_path.endswith(".py") and cache_key in di['module_cache']:
+            value = di['module_cache'][cache_key]
+            setattr(module, key, value)
+            buffered_log("DEBUG", f"♻️ Cache hit per dipendenza '{key}' da {cache_key}")
+            continue
+
         buffered_log("INFO", f"⏳ Caricamento dipendenza '{key}' da {import_path}...")
         try:
             imported_content = await backend(path='src/'+import_path)
         except FileNotFoundError:
+            buffered_log("WARNING", f"⚠️ Dipendenza non trovata: {import_path}")
             continue
         value: Any
         if isinstance(imported_content, str) and import_path.endswith(".json"):
@@ -622,6 +632,7 @@ async def _load_dependencies(module: types.ModuleType,dependencies) -> None:
             except Exception:
                 value = json.loads(imported_content)
         elif import_path.endswith(".py"):
+            # carica come modulo dinamico (salvato nella cache dentro _load_python_module)
             value = await _load_python_module(key, import_path, imported_content)
         else:
             value = imported_content
@@ -643,6 +654,8 @@ async def _load_python_module(name: str, path: str, code: str) -> types.ModuleTy
         buffered_log("INFO", f"🔍 Dipendenze trovate in {path}: {dependencies}")
         await _load_dependencies(module,dependencies.copy())
         exec(code, module.__dict__)
+        # salva nel cache globale per riusi futuri (evita ricaricamenti ripetuti)
+        di['module_cache'][path] = module
     except Exception as e:
         raise ImportError(f"Esecuzione modulo Python fallita per {path}: {e}") from e
     return module
@@ -657,7 +670,6 @@ async def resource(path: str | None = None, **kwargs) -> Any:
     """
     resource_path = resolve_path(path)
     content = await backend(path=resource_path)
-    
     if resource_path.endswith(".json"):
         buffered_log("INFO", f"📄 Caricamento e parsing JSON da {resource_path}... type={type(content)}")
         return await convert(content, dict, 'json')

@@ -1,0 +1,28 @@
+{
+    "__module__": {
+        "resource": {
+            "test": "b874b7356ca7394515242e4f68dce4df67452d8832166e55f1bc44ce642c9fc6",
+            "production": "5f2ac0138515ce3c409d5b9f211b78e917f0c7dde646ebf91fa0b3e997474d89"
+        },
+        "asynchronous": {
+            "test": "dfb043c56ff84e1bb3ea0e8b6200d0fff6c4bdcbd7b0d00a7427d0e4758bdd5f",
+            "production": "ed8b622d7c6cba24536f0613f0f8e0fc9c814ba7d446fa4eedc3341dd38e2bc1"
+        },
+        "synchronous": {
+            "test": "dfb043c56ff84e1bb3ea0e8b6200d0fff6c4bdcbd7b0d00a7427d0e4758bdd5f",
+            "production": "10d5c2a6b6e300d62193672cf2b9f6b324f56c481a9c6f68dcb6af673d4a4008"
+        },
+        "load_di_entry": {
+            "test": "dfb043c56ff84e1bb3ea0e8b6200d0fff6c4bdcbd7b0d00a7427d0e4758bdd5f",
+            "production": "402ba915cb25cd3c74d5686510783861415a76f2f5382cde6529ab26b4133c8e"
+        },
+        "backend": {
+            "test": "dfb043c56ff84e1bb3ea0e8b6200d0fff6c4bdcbd7b0d00a7427d0e4758bdd5f",
+            "production": "ccea6eea99548dee0e15c4fbed5315623ffda93dca8abc2901e1ff2dedec91ab"
+        },
+        "format": {
+            "test": "dfb043c56ff84e1bb3ea0e8b6200d0fff6c4bdcbd7b0d00a7427d0e4758bdd5f",
+            "production": "f69506a6a48dc286dfd9e78b71e9af05331241902422c07d209e2b57f6848b59"
+        }
+    }
+}

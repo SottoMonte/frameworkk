@@ -1,7 +1,7 @@
 import sys
 import logging
 import time
-imports = {'flow': 'framework.service.flow'}
+imports = {'flow': 'framework/service/flow2.py'}
 # Controllo se il codice sta girando in Pyodide
 
 if sys.platform == 'emscripten':
@@ -60,7 +60,7 @@ class adapter:
 
         # 2. Modifica il Formatter per includere il campo 'domain'
         formatter = self.ColoredFormatter(
-            constants.get('format', "%(asctime)s.%(msecs)03d | [T+%(delta_ms)s]ms | [ΔT%(delta_inter_ms)s]ms | %(levelname)-8s | %(filename)s:%(lineno)d | %(funcName)-25s | %(process)d | %(message)s"),
+            constants.get('format', "%(asctime)s.%(msecs)03d | [T+%(delta_ms)s]ms | [ΔT%(delta_inter_ms)s]ms | %(levelname)-16s | %(filename)s:%(lineno)d | %(funcName)-25s | %(process)d | %(message)s"),
             datefmt="%Y-%m-%d %H:%M:%S"
         )
 
