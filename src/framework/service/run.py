@@ -219,7 +219,7 @@ async def discover_and_run_tests():
                 try:
                     
                     hashes = await language.generate_and_validate_contract_json(main_path_rel)
-
+                    ok = await language.generate(main_path_rel)
 
                     all_contract_hashes |= hashes
                     

@@ -103,7 +103,7 @@ mappa = {
     (str,dict,''): lambda v: v if isinstance(v, dict) else {},
     (str,dict,'json'): lambda v: json.loads(v) if isinstance(v, str) else {},
     (dict,str,'json'): lambda v: json.dumps(v,indent=4,cls=LogReportEncoder) if isinstance(v, dict) else '',
-
+    (str,str,'hash'): lambda v: hashlib.sha256(v.encode('utf-8')).hexdigest() if isinstance(v, str) else '',
 }
 
 async def convert(target, output,input=''):
@@ -263,6 +263,129 @@ async def generate_and_validate_contract_json(
     # Ritorno del formato finale a 5 livelli
     return {main_path: contract_hashes}
 
+def estrai_righe_da_codice(codice_sorgente: str, riga_inizio: int, riga_fine: int) -> str:
+    """
+    Estrae il codice sorgente tra riga_inizio (inclusa) e riga_fine (inclusa).
+    
+    ATTENZIONE: i numeri di riga sono basati su 1 (come in un editor).
+    Gli indici delle liste in Python partono da 0.
+    """
+    
+    # 1. Dividi il codice in una lista di righe
+    righe = codice_sorgente.splitlines()
+    
+    # 2. Converti i numeri di riga (base 1) in indici di lista (base 0)
+    # L'indice iniziale è riga_inizio - 1
+    indice_inizio = riga_inizio - 1
+    
+    # L'indice finale è riga_fine (perché lo slicing [start:end] esclude 'end')
+    indice_fine = riga_fine
+    
+    # 3. Estrai la porzione della lista
+    righe_selezionate = righe[indice_inizio:indice_fine]
+    
+    # 4. Ricongiungi le righe selezionate in una singola stringa, 
+    #    mantenendo il carattere di nuova riga ('\n')
+    codice_estratto = '\n'.join(righe_selezionate)
+    
+    return codice_estratto
+
+async def generate(
+    main_path: str, 
+) -> Dict[str, Dict[str, Dict[str, Dict[str, str]]]]:
+    """
+    Genera il contratto JSON, mappando ogni metodo in un oggetto annidato
+    che distingue l'hash di produzione da quello di test.
+    """
+    print("GENERATE CALLED",main_path)
+    # 1. Caricamento e Analisi
+    contract_path = main_path.replace('.py', '.test.py')
+    main_code = await backend(path=main_path)
+    contract_code = await backend(path=contract_path)
+    
+    if not main_code or not contract_code:
+        buffered_log("INFO", "Impossibile caricare i file sorgente o di test ({main_path} / {contract_path}).")
+        return {}
+
+    main_module = analyze_module(main_code, main_path)
+    contract_ana = analyze_module(contract_code, contract_path)
+    print(contract_path,main_path)
+    contract_hashes = {} # Struttura interna modificata
+    #Module
+    for x,data in contract_ana['TestModule'].get('data',{}).get('methods').items():
+        target_name = '__module__' if x == 'TestModule' else x.replace('test_', '')
+        print(x,estrai_righe_da_codice(contract_code,data.get('lineno',0),data.get('end_lineno',0)),'\n++\n')
+        if target_name not in main_module:
+            continue
+        data = main_module[target_name].get('data',{})
+        print(target_name,estrai_righe_da_codice(main_code,data.get('lineno',0),data.get('end_lineno',0)),'\n++\n')
+        hash_prod = await convert(estrai_righe_da_codice(main_code,data.get('lineno',0),data.get('end_lineno',0)) ,str,'hash')
+        hash_test = await convert(estrai_righe_da_codice(contract_code,data.get('lineno',0),data.get('end_lineno',0)) ,str,'hash')
+        print('HASH:',hash_prod,hash_test)
+    # 2. Itera e Genera Hash
+    for mname, data in contract_ana.items():
+        if not isinstance(data, dict):
+            continue 
+        
+        target_name = '__module__' if mname == 'TestModule' else mname.replace('Test', '')
+        is_module_level_test = (mname == 'TestModule')
+        if is_module_level_test:
+            print('-------------------------------------------->',contract_ana['TestModule'].get('data',{}).get('methods').keys())
+        else:
+        #print(target_name,is_module_level_test,'##############################################',mname,data)
+        
+            #print('??????????????????????',main_module[target_name].get('data',{}).get('methods',{}))
+            #print('======================',contract_ana[mname].get('data',{}).get('methods',{}))
+            pass
+        '''
+        # Recupero target di produzione e test
+        target_prod = main_module if is_module_level_test else getattr(main_module, target_name, None)
+        target_test = getattr(contract_module, mname, None)
+        
+        if target_test is None or target_prod is None:
+            continue
+
+        # Dizionario che conterrà i contratti dei singoli metodi: {'post': {...}, 'read': {...}}
+        group_contracts: Dict[str, Dict[str, str]] = {}
+        test_methods_data = data.get('data', {}).get('methods', {})
+        
+        # Ciclo compatto
+        for test_name in test_methods_data.keys():
+            if not test_name.startswith('test_'):
+                continue
+
+            method_name = test_name.replace('test_', '')
+            
+            # Oggetto per il contratto singolo: {'production': hash, 'test': hash}
+            method_contract: Dict[str, str] = {}
+            
+            # A. Hash del Metodo di Test
+            test_fn = getattr(target_test, test_name, None)
+            if test_fn:
+                method_contract['test'] = calculate_hash_of_function(test_fn)
+            
+            # B. Hash del Metodo di Produzione
+            main_fn = getattr(target_prod, method_name, None)
+            if main_fn:
+                method_contract['production'] = calculate_hash_of_function(main_fn)
+            
+            # Aggiunge il contratto solo se almeno un hash è presente
+            if method_contract:
+                group_contracts[method_name] = method_contract
+
+        if group_contracts:
+            contract_hashes[target_name] = group_contracts'''
+
+    # 3. Scrittura JSON e Ritorno
+    json_path = main_path.replace('.py', '.contract.json')
+    json_content = json.dumps(contract_hashes, indent=4)
+    # await backend(path=json_path, content=json_content, mode='w') 
+
+    buffered_log("INFO", f"✅ Generato e scritto il contratto JSON in {json_path}")
+    
+    # Ritorno del formato finale a 5 livelli
+    return {main_path: contract_hashes}
+
 def analyze_function_calls(func: types.FunctionType) -> set[str]:
     """Analizza una funzione e restituisce i nomi di tutte le funzioni chiamate al suo interno."""
     
@@ -366,7 +489,7 @@ async def _validate_and_filter_module(
     try:
         json_content = await backend(path=contract_json_path)
         external_contracts: Dict[str, Any] = await convert(json_content, dict, 'json')
-        buffered_log("INFO", f"Contratto JSON esterno caricato da {contract_json_path}.")
+        buffered_log("DEBUG", f"Contratto JSON esterno caricato da {contract_json_path}.")
     except Exception as e:
         buffered_log("WARNING", f"Nessun contratto JSON valido trovato in {contract_json_path}. Filtro hash disabilitato.", e)
         external_contracts = {}
@@ -378,7 +501,7 @@ async def _validate_and_filter_module(
 
     exports_map = getattr(contract_module, 'exports', {}) if isinstance(getattr(contract_module, 'exports', None), dict) else {}
     if exports_map:
-        buffered_log("INFO", f"🔐 exports trovato in {path}: {list(exports_map.keys())}")
+        buffered_log("DEBUG", f"🔐 exports trovato in {path}: {list(exports_map.keys())}")
     else:
         buffered_log("WARNING", "⚠️ Nessun 'exports' dichiarato: nessun membro sarà esposto automaticamente.")
 
@@ -536,7 +659,6 @@ async def _load_dependencies(module: types.ModuleType,dependencies) -> None:
             buffered_log("DEBUG", f"♻️ Cache hit per dipendenza '{key}' da {cache_key}")
             continue
 
-        buffered_log("INFO", f"⏳ Caricamento dipendenza '{key}' da {import_path}...")
         try:
             imported_content = await backend(path='src/'+import_path)
         except FileNotFoundError:
@@ -554,7 +676,7 @@ async def _load_dependencies(module: types.ModuleType,dependencies) -> None:
         else:
             value = imported_content
         setattr(module, key, value)
-        buffered_log("INFO", f"📦 Dipendenza '{key}' caricata da {import_path}")
+        buffered_log("DEBUG", f"📦 Dipendenza '{key}' caricata da {import_path}")
 
 async def _load_python_module(name: str, path: str, code: str) -> types.ModuleType:
     """Crea ed esegue dinamicamente un modulo Python con le variabili globali necessarie."""
@@ -908,6 +1030,7 @@ def analyze_module(source_code: str, module_name: str) -> Dict[str, Any]:
                     "type": "class",
                     "data": {
                         "lineno": node.lineno,
+                        "end_lineno": node.end_lineno,
                         "docstring": ast.get_docstring(node),
                         "bases": [
                             ast.get_source_segment(source_code, base)
@@ -930,6 +1053,7 @@ def analyze_module(source_code: str, module_name: str) -> Dict[str, Any]:
                         method_info = {
                             "type": "method",
                             "lineno": class_member.lineno,
+                            "end_lineno": class_member.end_lineno,
                             "docstring": ast.get_docstring(class_member),
                             "args": [
                                 a.arg for a in class_member.args.posonlyargs + class_member.args.args + [class_member.args.vararg] 
@@ -962,6 +1086,7 @@ def analyze_module(source_code: str, module_name: str) -> Dict[str, Any]:
                         "type": "function",
                         "data": {
                             "lineno": node.lineno,
+                            "end_lineno": node.end_lineno,
                             "code": ast.get_source_segment(source_code, node),
                             "docstring": ast.get_docstring(node),
                             "args": [a.arg for a in node.args.posonlyargs + node.args.args + [node.args.vararg] if a],
@@ -986,6 +1111,7 @@ def analyze_module(source_code: str, module_name: str) -> Dict[str, Any]:
                         info = {
                             "type": type(node.value).__name__,
                             "lineno": node.lineno,
+                            "end_lineno": node.end_lineno,
                             "value": var_value,
                         }
                         structure[var_name] = info
