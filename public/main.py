@@ -15,7 +15,7 @@ async def main():
         
         lang = await language.resource(path="framework/service/language.py")
         #language.di['module_cache']['language'] = language
-        language.di['module_cache']['language'] = lang
+        language.di['module_cache']['language'] = language
         print(dir(lang))
         #loader = await language.load_module(language, path="framework.service.loader", area="framework", service='service', adapter='loader')
         #await loader.bootstrap()

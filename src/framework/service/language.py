@@ -361,239 +361,156 @@ async def _validate_and_filter_module(
     solo i membri che hanno un contratto valido e presente nel file .contract.json.
     """
     validated_members: List[str] = []
-    
-    # 1. Caricamento e Analisi dei Contatti Esterni (.contract.json)
-    
-    # 1.1. Carica il contratto di STABILITÀ dal file JSON
+
     contract_json_path = path.replace('.py', '.contract.json')
     try:
-        # Usiamo il backend per leggere il contenuto del file JSON
         json_content = await backend(path=contract_json_path)
-        # Assumiamo che il tuo 'convert' o 'json.loads' lo possa gestire
-        # Il contenuto sarà nel formato {'adapter': {'post': {'production': '...', 'test': '...'}}}
         external_contracts: Dict[str, Any] = await convert(json_content, dict, 'json')
         buffered_log("INFO", f"Contratto JSON esterno caricato da {contract_json_path}.")
-    except (FileNotFoundError, json.JSONDecodeError, Exception) as e:
-        buffered_log("WARNING", f"Nessun contratto JSON valido trovato in {contract_json_path}. Disattivazione del filtro basato sull'hash.", e)
+    except Exception as e:
+        buffered_log("WARNING", f"Nessun contratto JSON valido trovato in {contract_json_path}. Filtro hash disabilitato.", e)
         external_contracts = {}
 
-    # 1. Controlla la presenza e il tipo di 'exports'
-    # Se 'exports' è definito nel modulo e/o è un dizionario, usiamolo come lista dei membri
-    # che possono essere esposti (API pubblica). Altrimenti consideriamo che non ci
-    # sia alcun export esplicito e applichiamo il comportamento di default (nessun export).
-
-    contract_validated_methods: Dict[str, set[str]] = {}
     contract_path = path.replace('.py', '.test.py')
     contract_code = await backend(path=contract_path)
-    contract_ana: Dict[str, Any] = analyze_module(contract_code, contract_path)
-    contract_module: Dict[str, Any] = await resource(path=contract_path)
+    contract_ana = analyze_module(contract_code, contract_path)
+    contract_module = await resource(path=contract_path)
 
-    if hasattr(contract_module, 'exports') and isinstance(contract_module.exports, dict):
-        exports_map: Dict[str, Any] = contract_module.exports
+    exports_map = getattr(contract_module, 'exports', {}) if isinstance(getattr(contract_module, 'exports', None), dict) else {}
+    if exports_map:
         buffered_log("INFO", f"🔐 exports trovato in {path}: {list(exports_map.keys())}")
     else:
-        buffered_log("WARNING", f"⚠️ Ignorata chiave di contratto '{target_name}': Oggetto di produzione o test non trovato.")
-        exports_map: Dict[str, Any] = {}
-    
-    
-    for target_name, group_contracts in external_contracts.items():
-        if not isinstance(group_contracts, dict):
+        buffered_log("WARNING", "⚠️ Nessun 'exports' dichiarato: nessun membro sarà esposto automaticamente.")
+
+    # Build map of test-targeted methods: {TargetName: {method1, method2}}
+    contract_methods_by_name: Dict[str, set[str]] = {
+        ('__module__' if mname == 'TestModule' else mname.replace('Test', '')):
+            {tn.replace('test_', '') for tn in (data.get('data', {}).get('methods', {}) or {}).keys() if tn.startswith('test_')}
+        for mname, data in contract_ana.items() if isinstance(data, dict)
+    }
+
+    # Validate hashes (compact loop): produce contract_validated_methods only for methods with matching hashes
+    contract_validated_methods = {}
+    for tgt, group in (external_contracts or {}).items():
+        if not isinstance(group, dict):
             continue
-            
-        contract_validated_methods[target_name] = set()
-        
-        # Recupera l'oggetto padre (Classe o Modulo) dal modulo di produzione
-        if target_name == '__module__':
-            target_prod_obj = main_module
-            #target_test_obj = contract_module # Modulo di test
-            target_test_obj = getattr(contract_module, f'TestModule', None) 
-        else:
-            target_prod_obj = getattr(main_module, target_name, None)
-            # Il modulo di test potrebbe contenere una classe 'TestAdapter' per 'Adapter'
-            target_test_obj = getattr(contract_module, f'Test{target_name}', None) 
-            
-        if target_prod_obj is None or target_test_obj is None:
-            buffered_log("WARNING", f"⚠️ Ignorata chiave di contratto '{target_name}': Oggetto di produzione o test non trovato.")
+        prod_obj = main_module if tgt == '__module__' else getattr(main_module, tgt, None)
+        test_obj = getattr(contract_module, 'TestModule' if tgt == '__module__' else f'Test{tgt}', None)
+        if not prod_obj or not test_obj:
+            buffered_log("WARNING", f"Oggetto produzione/test mancante per contratto: {tgt}")
             continue
+
+        valid = {
+            m for m, hashes in group.items()
+            if isinstance(hashes, dict) and 'production' in hashes and 'test' in hashes
+                for _ in [0]
+                if (getattr(prod_obj, m, None) is not None and getattr(test_obj, f'test_{m}', None) is not None)
+                and (lambda p, t, s_p=hashes['production'], s_t=hashes['test']: (calculate_hash_of_function(p) == s_p and calculate_hash_of_function(t) == s_t))(getattr(prod_obj, m), getattr(test_obj, f'test_{m}'))
+        }
         
-        for method_name, hashes in group_contracts.items():
-            if (isinstance(hashes, dict) and 'production' in hashes and 'test' in hashes):
-                
-                # --- Hash Salvati ---
-                saved_prod_hash = hashes['production']
-                saved_test_hash = hashes['test']
-                
-                # 1. Verifica Hash di Produzione
-                prod_fn: Optional[Callable] = getattr(target_prod_obj, method_name, None)
-                if prod_fn is None:
-                    buffered_log("ERROR", f"❌ Errore Contratto: Metodo/funzione di produzione '{target_name}.{method_name}' non trovato.")
-                    continue
+        for m, hashes in group.items():
+            # 1. Filtro iniziale: verifica che 'hashes' sia un dict e contenga le chiavi necessarie
+            if not (isinstance(hashes, dict) and 'production' in hashes and 'test' in hashes):
+                continue
+            
+            # 2. Ottiene i membri
+            prod_func = getattr(prod_obj, m, None)
+            test_func = getattr(test_obj, f'test_{m}', None)
+            
+            # 3. Filtro di esistenza: verifica che i membri esistano
+            if prod_func is None or test_func is None:
+                print(f"DEBUG: Membro '{m}' non trovato in prod o test. Saltato.")
+                continue
+            
+            # Estrai gli hash di riferimento
+            expected_prod_hash = hashes['production']
+            expected_test_hash = hashes['test']
 
-                try:
-                    current_prod_hash = calculate_hash_of_function(prod_fn)
-                except Exception as e:
-                    buffered_log("ERROR", f"❌ Errore Contratto: Impossibile calcolare hash Prod per '{method_name}': {e}")
-                    continue
-
-                # 2. Verifica Hash del Test
-                # Il nome della funzione di test è sempre 'test_' + nome del metodo di produzione
-                test_fn_name = f'test_{method_name}'
-                test_fn: Optional[Callable] = getattr(target_test_obj, test_fn_name, None)
-
-                if test_fn is None:
-                    buffered_log("ERROR", f"❌ Errore Contratto: Funzione di test '{test_fn_name}' non trovata nell'oggetto di test.")
-                    continue
-                
-                try:
-                    current_test_hash = calculate_hash_of_function(test_fn)
-                except Exception as e:
-                    buffered_log("ERROR", f"❌ Errore Contratto: Funzione di produzione '{test_fn}' non ispezionabile: {e}")
-                    continue
-                    
-                # 3. Confronto degli Hash!
-                
-                # Controlla l'hash di Produzione
-                if current_prod_hash != saved_prod_hash:
-                    buffered_log("ERROR", f"❌ CONTRATTO ROTTO: Metodo '{target_name}.{method_name}' Produzione modificata. Hash atteso: {saved_prod_hash}... Attuale: {current_prod_hash}...")
-                    continue # Passa al prossimo metodo
-
-                # Controlla l'hash di Test
-                if current_test_hash != saved_test_hash:
-                    buffered_log("ERROR", f"❌ CONTRATTO ROTTO: Metodo '{target_name}.{method_name}' Test modificato. Hash atteso: {saved_test_hash}... Attuale: {current_test_hash}...")
-                    continue # Passa al prossimo metodo
-
-                # Contratto Superato
-                contract_validated_methods[target_name].add(method_name)
-
-    # 2. Caricamento e Analisi del Modulo di Test per i nomi (metodi e classi)
-    # Questa parte serve per sapere quali membri erano destinati ad essere testati, 
-    # utile per rimuovere le funzioni di produzione senza un test registrato (anche se senza contratto hash)
-    
-    
-    # 2.1. Costruiamo il set di metodi solo per nome (per fallback e log)
-    contract_methods_by_name: Dict[str, set[str]] = {}
-    for mname, data in contract_ana.items():
-        if not isinstance(data, dict):
-            continue 
-        target_name = '__module__' if mname == 'TestModule' else mname.replace('Test', '')
-        test_methods = data.get('data', {}).get('methods', {}).keys()
+            # Calcola gli hash correnti
+            current_prod_hash = calculate_hash_of_function(prod_func)
+            current_test_hash = calculate_hash_of_function(test_func)
+            
+            # **********************************************
+            # 🔥 Punti in cui viene eseguita la stampa degli hash (Aggiunti come richiesto)
+            print("---")
+            print(f"Membro: {m}")
+            print(prod_func)
+            print(f"Hash Production (Atteso): {expected_prod_hash}")
+            print(f"Hash Production (Corrente): {current_prod_hash}")
+            print(test_func)
+            print(f"Hash Test (Atteso): {expected_test_hash}")
+            print(f"Hash Test (Corrente): {current_test_hash}")
+            # **********************************************
+            
+            # 4. Filtro di validazione hash
+            if current_prod_hash == expected_prod_hash and current_test_hash == expected_test_hash:
+                valid.add(m)
+                print(f"VALIDATO: Membro '{m}' aggiunto a 'valid'.")
+            else:
+                print(f"FALLITO: Membro '{m}' non validato (hash non corrispondenti).")
         
-        contract_methods_by_name[target_name] = set()
-        for test_name in test_methods:
-            if test_name.startswith('test_'):
-                contract_methods_by_name[target_name].add(test_name.replace('test_', ''))
+        if valid:
+            contract_validated_methods[tgt] = valid
+    #print(valid,contract_validated_methods,contract_methods_by_name,'###########')
+    buffered_log("DEBUG", f"🔍 Avvio filtro: membri mantenuti se presenti in {contract_json_path} e/o testati.")
 
-    buffered_log("INFO", f"🔍 Avvio filtro: i membri saranno mantenuti solo se presenti in {contract_json_path}.")
-    # --- Nuova logica: costruisce l'insieme di export consentiti basato su `exports` e sulla
-    # presenza dei test (contract_methods_by_name). Se `exports_map` è vuoto si mantiene il
-    # comportamento precedente (nessun export esplicito richiesto).
-    allowed_exports: set[str] = set()
-    if exports_map:
-        for export_key, export_val in exports_map.items():
-            # Consideriamo il nome dell'export sia nella chiave che (per compatibilità) nel valore se è stringa
-            candidates = []
-            if isinstance(export_key, str):
-                candidates.append(export_key)
-            if isinstance(export_val, str) and export_val not in candidates:
-                candidates.append(export_val)
-
-            for candidate in candidates:
-                if hasattr(main_module, candidate):
-                    member = getattr(main_module, candidate)
-                    if inspect.isclass(member):
-                        # la classe è esposta se ci sono test che la riguardano (metodi nella mappa)
-                        if contract_methods_by_name.get(candidate):
-                            allowed_exports.add(candidate)
-                        else:
-                            buffered_log("DEBUG", f"   - Export ignorato (nessun test trovato): {candidate}")
-                    elif inspect.isfunction(member):
-                        # funzione di modulo: controlla i test a livello di modulo
-                        if candidate in contract_methods_by_name.get('__module__', set()):
-                            allowed_exports.add(candidate)
-                        else:
-                            buffered_log("DEBUG", f"   - Export ignorato (nessun test trovato): {candidate}")
-                    else:
-                        # attributi/const: non esponiamo a meno che ci sia un test esplicito
-                        if candidate in contract_methods_by_name.get('__module__', set()):
-                            allowed_exports.add(candidate)
-                        else:
-                            buffered_log("DEBUG", f"   - Export ignorato (non funzione/classe o senza test): {candidate}")
-                else:
-                    buffered_log("WARNING", f"⚠️ Export dichiarato ma non trovato nel modulo: {candidate}")
-    
-    # 3. Creazione e Popolamento del Modulo Filtrato
-    
+    # Compute allowed exports based on exports_map + presence of tests/validated methods
+    allowed_exports = {
+        public 
+        for public, priv in exports_map.items()
+        for candidate in [public] + ([priv] if isinstance(priv, str) else [])
+        if hasattr(main_module, candidate) and (
+            (inspect.isclass(getattr(main_module, candidate)) and (contract_methods_by_name.get(candidate) or contract_validated_methods.get(candidate))) or
+            (inspect.isfunction(getattr(main_module, candidate)) and (candidate in contract_methods_by_name.get('__module__', {}) and candidate in contract_validated_methods.get('__module__', {})))
+        )
+    }
+    buffered_log("DEBUG", f"🔍 Avvio filtro: membri mantenuti se presenti in {allowed_exports} e/o testati.")
+    # Create filtered module and populate only allowed exports
     filtered_module = types.ModuleType(f"filtered:{main_module.__name__}")
     if hasattr(main_module, '__file__'):
         filtered_module.__file__ = main_module.__file__
-    
-    # Nuova logica: espone SOLO i membri dichiarati in `exports` e che hanno test.
-    # exports_map è nella forma {'public_name': 'private_name'}
+
     if exports_map:
         for public_name, private_spec in exports_map.items():
-            # supporto semplice: valore stringa = nome privato
-            if isinstance(private_spec, str):
-                private_name = private_spec
-            else:
-                # fallback: se non è stringa consideriamo lo stesso nome pubblico
-                private_name = public_name
-
+            private_name = private_spec if isinstance(private_spec, str) else public_name
             if public_name not in allowed_exports:
-                # non ha test o non è valido: skip e log
-                buffered_log("DEBUG", f"   - Export ignorato (no test o non valido): {public_name} -> {private_name}")
+                buffered_log("DEBUG", f"Export ignorato: {public_name} -> {private_name}")
                 continue
-
             if not hasattr(main_module, private_name):
-                buffered_log("WARNING", f"⚠️ Export dichiarato ma non trovato nel modulo: {private_name} (dichiarato come {public_name})")
+                buffered_log("WARNING", f"Export dichiarato ma non trovato nel modulo: {private_name} (dichiarato come {public_name})")
                 continue
 
             member = getattr(main_module, private_name)
-
-            # Se è una classe, clonala e filtra i suoi metodi in base al contratto JSON
             if inspect.isclass(member):
-                original_attrs = dict(inspect.getmembers(member, lambda x: not inspect.isfunction(x) and not inspect.ismethod(x)))
-                original_attrs.update({k: v for k, v in member.__dict__.items() if inspect.isfunction(v) or inspect.ismethod(v)})
-                original_attrs['__module__'] = filtered_module.__name__
-
-                FilteredClass = type(
-                    member.__name__,
-                    member.__bases__,
-                    original_attrs
-                )
-
+                # shallow clone of class attributes, preserving special/protected methods
+                attrs = {k: v for k, v in member.__dict__.items()}
+                attrs['__module__'] = filtered_module.__name__
+                FilteredClass = type(member.__name__, member.__bases__, attrs)
                 setattr(filtered_module, public_name, FilteredClass)
                 validated_members.append(public_name)
 
-                # Rimuove i metodi non presenti nel contract (se il contract è disponibile)
-                contract_validated = contract_validated_methods.get(member.__name__, set())
-                for attr_name, attr_value in inspect.getmembers(FilteredClass, inspect.isfunction):
-                    is_special_method = attr_name.startswith('__') and attr_name.endswith('__')
-                    is_protected_method = attr_name.startswith('_') and not is_special_method
-
-                    should_keep = is_special_method or is_protected_method or (attr_name in contract_validated)
-
-                    if not should_keep:
+                # remove methods not in validated set (but keep specials and protected)
+                valid_set = contract_validated_methods.get(member.__name__, set()) or contract_methods_by_name.get(member.__name__, set())
+                for attr_name, _ in inspect.getmembers(FilteredClass, inspect.isfunction):
+                    if attr_name.startswith('__') and attr_name.endswith('__'):
+                        continue
+                    if attr_name.startswith('_'):
+                        continue
+                    if attr_name not in valid_set:
                         try:
                             delattr(FilteredClass, attr_name)
-                            buffered_log("DEBUG", f"   - Rimosso metodo: {member.__name__}.{attr_name} (non nel contratto JSON)")
-                        except AttributeError:
+                            buffered_log("DEBUG", f"Rimosso metodo: {member.__name__}.{attr_name}")
+                        except Exception:
                             pass
                     else:
                         validated_members.append(f"{public_name}.{attr_name}")
 
-            elif inspect.isfunction(member):
-                # Funzioni di modulo: mappate al nome pubblico
-                setattr(filtered_module, public_name, member)
-                validated_members.append(public_name)
-
-            else:
-                # Altri attributi (variabili, costanti, ecc.)
+            elif inspect.isfunction(member) or not inspect.isclass(member):
                 setattr(filtered_module, public_name, member)
                 validated_members.append(public_name)
     else:
-        # Nessun exports dichiarato -> per nuova policy non esponiamo nulla automaticamente
         buffered_log("WARNING", "⚠️ Nessun 'exports' dichiarato: nessun membro sarà esposto dal modulo filtrato.")
- 
+
     buffered_log("INFO", f"✅ Validazione e filtro riusciti per {path}. Membri esposti: {validated_members}")
     return filtered_module
 
@@ -681,8 +598,9 @@ async def resource(path: str | None = None, **kwargs) -> Any:
             return main_module
         # La funzione di validazione è astratta/esterna
         filtered_module = await _validate_and_filter_module(main_module, resource_path)
+        buffered_log("DEBUG", f"📦 Modulo Python caricato e validato da {resource_path}.")
         return filtered_module
-        
+    buffered_log("WARNING", f"⚠️ Tipo di risorsa non supportato per {resource_path}. Restituito contenuto grezzo.")
     return content
 
 async def load_di_entry(**constants: Any) -> None:
