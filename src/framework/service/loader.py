@@ -127,7 +127,7 @@ async def bootstrap_core() -> None:
         }
     ]
 
-    await language.load_di_entry(**{
+    await language.register(**{
         'path': 'infrastructure/message/console.py', # Percorso per resource
         'service': 'message', # Chiave nel DI per la lista dei provider
         'adapter': 'adapter', # Nome della classe da estrarre dal modulo
@@ -141,7 +141,7 @@ async def bootstrap_core() -> None:
     # 1. Caricamento sequenziale dei manager essenziali e controllo del risultato
     for mgr in manager_loader_path:
         # Assumiamo che language.load_manager sollevi ResourceLoadError in caso di fallimento
-        await language.load_di_entry(**mgr)
+        await language.register(**mgr)
 
     dependency_messenger = di['messenger']
     for log in di['log_buffer']:
@@ -185,7 +185,7 @@ async def bootstrap() -> None:
     await dependency_messenger.post(domain='debug', message=f"Configurazione ambiente preparata per: {platform_type}.")
     # Correzione del nome della funzione (get_confi -> get_config)
     
-    text = await language.backend(path="pyproject.toml")
+    text = await language.resource(path="pyproject.toml")
     config = await language.format(text,**config_params)
     await dependency_messenger.post(domain='debug', message=f"Configurazione caricata con successo (Ambiente: {platform_type}).")
     

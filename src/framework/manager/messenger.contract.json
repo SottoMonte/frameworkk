@@ -1,12 +1,12 @@
 {
     "messenger": {
         "post": {
-            "test": "20a3c56eba9d3918a913a74a5a7ef7b98f65d5e2cf5e2df3894afbc5f2bf7549",
-            "production": "c7b2e9c4815a250c9cd8b09213291c33fe720d5700b208edf64372a113235b03"
+            "test": "7db7747f2c4e1b4c5b3d00f8b7e2efd4de6b38c0c7c6e103c13b59ab40ec9566",
+            "production": "4860e0c644f48c78fbb068c38643b4a972565253055cf94e871653a3623ffd38"
         },
         "read": {
-            "test": "20a3c56eba9d3918a913a74a5a7ef7b98f65d5e2cf5e2df3894afbc5f2bf7549",
-            "production": "fd521b6d3c26e47ba0f83f062b6a01f7721d44742f469994acc79daf1353b00e"
+            "test": "d8f4dccb7bfce541b30e10780bc1af20e817b9fe4bc6b8e57ebc1229c8984f66",
+            "production": "ba2fe43c718443bb40267ae8d9f919f4c4a1948fcd8957e4375b68c6fbc9d0bc"
         }
     }
 }

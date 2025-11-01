@@ -1,5 +1,3 @@
-import asyncio
-
 imports = {
     'flow': 'framework/service/flow.py',
     'contract': 'framework/service/contract.py',
@@ -11,9 +9,10 @@ exports = {
     'resource':'resource',
     'asynchronous':'asynchronous',
     'synchronous':'synchronous',
-    'load_di_entry':'load_di_entry',
-    'backend':'backend',
+    'register':'load_di_entry',
     'format':'format',
+    'generate':'generate',
+    'convert':'convert',
 }
 
 class TestModule(contract.Contract):
@@ -45,10 +44,13 @@ class TestModule(contract.Contract):
     async def test_load_di_entry(self):
         pass
 
-    async def test_backend(self):
+    async def test_format(self):
         pass
 
-    async def test_format(self):
+    async def test_generate(self):
+        pass
+
+    async def test_convert(self):
         pass
 
     '''async def test_model(self):

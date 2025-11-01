@@ -197,6 +197,16 @@ def map_failed_tests(result) :
             
     return failed_set
 
+
+APP_CONTEXT = {
+    "APP_VERSION": "1.2.5",
+    "USER_ID": "user_1234",
+    "REQUEST_ID": "req_xyz987"
+}
+
+@language.asynchronous(
+    #custom_filename=__file__,
+    app_context=APP_CONTEXT)
 async def discover_and_run_tests():
     import unittest
     import json
@@ -214,13 +224,10 @@ async def discover_and_run_tests():
                 json_path = main_path_rel.replace('.py', '.contract.json')
                 
                 print(f"\n🔍 Generazione contratto per: {module_path_rel}")
-                
-                # --- Caricamento per l'Hashing ---
                 try:
                     
-                    hashes = await language.generate_and_validate_contract_json(main_path_rel)
-                    ok = await language.generate(main_path_rel)
-
+                    #hashes = await language.generate_and_validate_contract_json(main_path_rel)
+                    hashes = await language.generate(main_path_rel,'module')
                     all_contract_hashes |= hashes
                     
                     # --- SALVATAGGIO JSON (Simulato) ---
@@ -231,6 +238,7 @@ async def discover_and_run_tests():
                     
                 except Exception as e:
                     print(f"❌ Errore critico nella generazione del contratto: {e}")
+
                     continue
                     
                 # 2. FASE DI CARICAMENTO TEST (per l'esecuzione)
@@ -390,12 +398,6 @@ def test():
     print("\n=====================================")
     print("        FINE ESECUZIONE TEST         ")
     print("=====================================")
-        
-APP_CONTEXT = {
-    "APP_VERSION": "1.2.5",
-    "USER_ID": "user_1234",
-    "REQUEST_ID": "req_xyz987"
-}
 
 #@flow.asynchronous(managers=('tester',))
 @language.synchronous(

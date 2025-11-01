@@ -1,8 +1,8 @@
 {
     "Contract": {
         "check_cases": {
-            "test": "dfb043c56ff84e1bb3ea0e8b6200d0fff6c4bdcbd7b0d00a7427d0e4758bdd5f",
-            "production": "edb691c68373b4203a0261c6a6f4c1cd871ce13c822b74def2586da132763857"
+            "test": "05d4a7ffb263dc00018e09574046f963f66de201c33dd109f15b420a837619f4",
+            "production": "66fe875f4fea71a35f016c8655a476d63a80c6357978369ed296765f8c2b9fe2"
         }
     }
 }

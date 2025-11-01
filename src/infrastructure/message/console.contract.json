@@ -1,8 +1,8 @@
 {
     "adapter": {
         "post": {
-            "test": "83c004459ef5f02595460acce4300451d7102b1d6ebe694df762daccf5aa83e4",
-            "production": "ad6406064c35017d523750f0be65d7ce902d31010d184449d651b19032685c9f"
+            "test": "2edf57c5a86e5f6a58b62417f8cc01b06893fd955b4ddb6b42074a2d466993aa",
+            "production": "9d9b43ef43deb2ffbff341a1b635808154e8209fcb923936448a0aacbcbae473"
         }
     }
 }

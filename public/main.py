@@ -12,14 +12,22 @@ async def main():
         sys.path.insert(1, cwd+'/src')
         import framework.service.language as language
         
-        
-        lang = await language.resource(path="framework/service/language.py")
+        try:
+            lang = await language.resource(path="framework/service/language.py")
+        except Exception as e:
+            print("Errore durante il caricamento del modulo language:", e)
+            
         #language.di['module_cache']['language'] = language
-        language.di['module_cache']['language'] = language
-        print(dir(lang))
+        language.di['module_cache']['language'] = lang
+        #print(dir(lang))
         #loader = await language.load_module(language, path="framework.service.loader", area="framework", service='service', adapter='loader')
         #await loader.bootstrap()
-        run = await language.resource(path="framework/service/run.py")
+        try:
+            run = await lang.resource(path="framework/service/run.py")
+        except Exception as e:
+            language.di['module_cache']['language'] = language
+            run = await language.resource(path="framework/service/run.py")
+            
         
     
     return run

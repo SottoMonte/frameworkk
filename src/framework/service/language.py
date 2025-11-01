@@ -45,9 +45,86 @@ def buffered_log(level: str, message: str, emoji: str = ""):
     })
     #print(formatted)  # Mantiene output semplice durante il bootstrap
 
+def asynchronous(custom_filename: str = __file__, app_context: Optional[Dict[str, Any]] = None):
+    """
+    Decoratore per catturare eccezioni, generare un rapporto di debug dettagliato e loggarlo usando il logger configurato.
+    """
+    def decorator(func):
+        @functools.wraps(func)
+        async def wrapper(*args, **kwargs):
+            try:
+                return await func(*args, **kwargs)
+            except Exception:
+                # Recupera il codice sorgente del modulo della funzione
+                source_code = None
+                '''try:
+                    source_code = inspect.getsource(func)
+                except KeyboardInterrupt:
+                    print("Interruzione da tastiera (Ctrl + C).")
+                except (OSError, TypeError):
+                    source_code = ""'''
+
+                source_code = await _load_resource(path="/"+custom_filename)
+
+                # Genera il rapporto usando l'eccezione attiva
+                report = analyze_exception(
+                    source_code=source_code,
+                    custom_filename=custom_filename,
+                    app_context=app_context
+                )
+                
+                ok = await convert(report, str, 'json')
+
+                print(ok)
+
+                # Rilancia l'eccezione
+                #raise
+
+        return wrapper
+    return decorator
+
+def synchronous(custom_filename: str = __file__, app_context: Optional[Dict[str, Any]] = None):
+    """
+    Decoratore per catturare eccezioni, generare un rapporto di debug dettagliato e loggarlo usando il logger configurato.
+    """
+    def decorator(func):
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs):
+            try:
+                return func(*args, **kwargs)
+            except Exception:
+                # Recupera il codice sorgente del modulo della funzione
+                source_code = None
+                try:
+                    source_code = inspect.getsource(func)
+                except KeyboardInterrupt:
+                    print("Interruzione da tastiera (Ctrl + C).")
+                except (OSError, TypeError):
+                    source_code = ""
+
+                # Genera il rapporto usando l'eccezione attiva
+                report = analyze_exception(
+                    source_code=source_code,
+                    custom_filename=custom_filename,
+                    app_context=app_context
+                )
+                
+                #exc_type, exc_value, _ = sys.exc_info()
+                #error_message = f"Errore intercettato in '{func.__name__}': {type(exc_value).__name__} - {str(exc_value)}"
+                #ok = await convert(report, 'str', 'json')
+                ok = asyncio.run(convert(report, str, 'json'))
+
+                print(ok)
+
+                # Rilancia l'eccezione
+                #raise
+
+        return wrapper
+    return decorator
+
 # Backend (sync file read wrapped in async for tests)
 if sys.platform != 'emscripten':
-    async def backend(**kwargs) -> str:
+    async def _load_resource(**kwargs) -> str:
         path = kwargs.get("path", "")
         if path.startswith('/'):
             path = path[1:]
@@ -58,7 +135,7 @@ if sys.platform != 'emscripten':
             raise FileNotFoundError(f"File non trovato: {path}")
 else:
     import js
-    async def backend(**kwargs) -> str:
+    async def _load_resource(**kwargs) -> str:
         path = kwargs.get("path", "")
         # browser-specific fetching (placeholder)
         try:
@@ -149,6 +226,199 @@ async def format(target ,**constants):
     except Exception as e:
         raise ValueError(f"Errore formattazione: {e}")
 
+async def normalize(schema, value=None, mode='full'):
+    """
+    Convalida, popola, trasforma e struttura i dati utilizzando uno schema Cerberus.
+
+    Args:
+        schema (dict): Lo schema Cerberus da applicare ai dati.
+        value (dict, optional): I dati da elaborare. Defaults a {}.
+        mode (str, optional): Modalità di elaborazione (es. 'full'). Non completamente utilizzato qui,
+                              ma mantenuto per coerenza se hai logiche esterne che lo usano.
+        lang (str, optional): Lingua per il caricamento dinamico degli schemi (se implementato).
+
+    Returns:
+        dict: I dati elaborati e validati.
+
+    Raises:
+        ValueError: Se la validazione fallisce.
+    """
+    value = value or {}
+
+    if not isinstance(schema, dict):
+        raise TypeError("Lo schema deve essere un dizionario valido per Cerberus.")
+
+    # 1. Popolamento e Trasformazione Iniziale (Default, Funzioni)
+    # Cerberus gestisce i 'default', ma le 'functions' richiedono un pre-processing
+    processed_value = value.copy() # Lavora su una copia per non modificare l'originale
+
+    for key in schema.copy():
+        item = schema[key]
+        for field_name, field_rules in item.copy().items():
+            if field_name.startswith('_'):
+                schema.get(key).pop(field_name)
+
+
+    for field_name, field_rules in schema.copy().items():
+        #print(f"Processing field: {field_name} with rules: {field_rules}")
+        if isinstance(field_rules, dict) and 'function' in field_rules:
+            func_name = field_rules['function']
+            if func_name == 'generate_identifier':
+                # Applica solo se il campo non è già presente
+                if field_name not in processed_value:
+                    #processed_value[field_name] = generate_identifier()
+                    pass
+            elif func_name == 'time_now_utc':
+                # Applica solo se il campo non è già presente
+                if field_name not in processed_value:
+                    #processed_value[field_name] = time_now_utc()
+                    pass
+            # Aggiungi altre funzioni qui
+
+    # Cerberus Validation (Convalida, Tipi, Required, Regex, Default)
+    # Crea un validatore Cerberus con lo schema fornito
+    print("##################",schema)
+    v = Validator(schema,allow_unknown=True)
+
+    # Permetti a Cerberus di gestire i valori di default durante la validazione
+    # Cerberus gestirà 'type', 'required', 'default' e 'regex' direttamente
+    if not v.validate(processed_value):
+        # La validazione fallisce, Cerberus fornisce i messaggi di errore
+        #errors_str = "; ".join([f"{k}: {', '.join(v)}" for k, v in v.errors.items()])
+        print(f"⚠️ Errore di validazione: {v.errors}  | data:{processed_value}")
+        raise ValueError(f"⚠️ Errore di validazione: {v.errors} | data:{processed_value}")
+
+    final_output = v.document
+
+    return final_output
+
+def transform(data_dict, mapper, values, input, output):
+
+    """ Trasforma un set di costanti in un output mappato. """
+
+    translated = {}
+
+    if not isinstance(data_dict, dict):
+        raise TypeError("Il primo argomento deve essere un dizionario.")
+
+    if not isinstance(mapper, dict):
+        raise TypeError("'mapper' deve essere un dizionario.")
+
+    if not isinstance(values, dict):
+        raise TypeError("'values' deve essere un dizionario.")
+    
+    if not isinstance(input, dict):
+        raise TypeError("'input' deve essere un dizionario.")
+    
+    if not isinstance(output, dict):
+        raise TypeError("'output' deve essere un dizionario.")
+
+    key = find_matching_keys(mapper,output) or find_matching_keys(mapper,input)
+    #print(f"find_matching_keys: {key}######################")
+    for k, v in mapper.items():
+        
+        n1 = get(data_dict, k)
+        n2 = get(data_dict, v.get(key, None))
+        
+        if n1:
+            output_key = v.get(key, None)
+            value = n1
+            translated |= put(translated, output_key, value, output)
+        if n2:
+            output_key = k
+            value = n2
+            translated |= put(translated, output_key, value, output)
+
+        #print(f"translation: k:{k},key:{key} = {v},{data_dict}",n1,n2) 
+
+    fieldsData = data_dict.keys()
+    fieldsOutput = output.keys()
+
+
+    for field in fieldsData:
+        if field in fieldsOutput:
+            value = get(data_dict, field)
+            translated |= put(translated, field, value, output)
+
+    return translated
+
+def _get_next_schema(schema, key):
+    if isinstance(schema, dict):
+        if 'schema' in schema:
+            if schema.get('type') == 'list': return schema['schema']
+            if isinstance(schema['schema'], dict): return schema['schema'].get(key)
+        return schema.get(key)
+    return None
+
+def put(data: dict, path: str, value: any, schema: dict) -> dict:
+    if not isinstance(data, dict): raise TypeError("Il dizionario iniziale deve essere di tipo dict.")
+    if not isinstance(path, str) or not path: raise ValueError("Il dominio deve essere una stringa non vuota.")
+    if not isinstance(schema, dict) or not schema: raise ValueError("Lo schema deve essere un dizionario valido.")
+
+    result = copy.deepcopy(data)
+    node, sch = result, schema
+    chunks = path.split('.')
+
+    for i, chunk in enumerate(chunks):
+        is_last = i == len(chunks) - 1
+        is_index = chunk.lstrip('-').isdigit()
+        key = int(chunk) if is_index else chunk
+        next_sch = _get_next_schema(sch, chunk)
+
+        if isinstance(node, dict):
+            if is_index:
+                raise IndexError(f"Indice numerico '{chunk}' usato in un dizionario a livello {i}.")
+            if is_last:
+                if next_sch is None:
+                    raise IndexError(f"Campo '{chunk}' non definito nello schema.")
+                if not Validator({chunk: next_sch}, allow_unknown=False).validate({chunk: value}):
+                    raise ValueError(f"Valore non valido per '{chunk}': {value}")
+                node[key] = value
+            else:
+                node.setdefault(key, {} if next_sch and next_sch.get('type') == 'dict'
+                                     else [] if next_sch and next_sch.get('type') == 'list'
+                                     else None)
+                if node[key] is None:
+                    raise IndexError(f"Nodo intermedio '{chunk}' non valido nello schema.")
+                node, sch = node[key], next_sch
+
+        elif isinstance(node, list):
+            if not is_index:
+                raise IndexError(f"Chiave '{chunk}' non numerica usata in una lista a livello {i}.")
+            if not isinstance(next_sch, dict) or 'type' not in next_sch:
+                raise IndexError(f"Schema non valido per lista a livello {i}.")
+
+            if key == -1:  # Append mode
+                t = next_sch['type']
+                new_elem = {} if t == 'dict' else [] if t == 'list' else None
+                node.append(new_elem)
+                key = len(node) - 1
+
+            if key < 0:
+                raise IndexError(f"Indice negativo '{chunk}' non valido in lista.")
+
+            while len(node) <= key:
+                t = next_sch['type']
+                node.append({} if t == 'dict' else [] if t == 'list' else None)
+
+            if is_last:
+                if not Validator({chunk: next_sch}, allow_unknown=False).validate({chunk: value}):
+                    raise ValueError(f"Valore non valido per indice '{chunk}': {value}")
+                node[key] = value
+            else:
+                if node[key] is None or not isinstance(node[key], (dict, list)):
+                    t = next_sch['type']
+                    if t == 'dict': node[key] = {}
+                    elif t == 'list': node[key] = []
+                    else: raise IndexError(f"Tipo non contenitore '{t}' per nodo '{chunk}' in lista.")
+                node, sch = node[key], next_sch
+
+        else:
+            raise IndexError(f"Nodo non indicizzabile al passo '{chunk}' (tipo: {type(node).__name__})")
+
+    return result
+
+
 # =====================================================================
 # --- Funzioni di Generazione ---
 # =====================================================================
@@ -183,86 +453,6 @@ def calculate_hash_of_function(func: types.FunctionType):
     serialized = marshal.dumps(relevant_parts)
     return hashlib.sha256(serialized).hexdigest()
 
-async def generate_and_validate_contract_json(
-    main_path: str, 
-) -> Dict[str, Dict[str, Dict[str, Dict[str, str]]]]:
-    """
-    Genera il contratto JSON, mappando ogni metodo in un oggetto annidato
-    che distingue l'hash di produzione da quello di test.
-    """
-    
-    # 1. Caricamento e Analisi
-    contract_path = main_path.replace('.py', '.test.py')
-    
-    main_code = await backend(path=main_path)
-    contract_code = await backend(path=contract_path)
-    
-    if not main_code or not contract_code:
-        buffered_log("INFO", "Impossibile caricare i file sorgente o di test ({main_path} / {contract_path}).")
-        return {}
-
-    main_module = await _load_python_module("main_module_temp", main_path, main_code)
-    contract_module = await _load_python_module("contract_module_temp", contract_path, contract_code)
-    contract_ana = analyze_module(contract_code, contract_path)
-    
-    contract_hashes: Dict[str, Dict[str, Dict[str, str]]] = {} # Struttura interna modificata
-
-    # 2. Itera e Genera Hash
-    for mname, data in contract_ana.items():
-        if not isinstance(data, dict):
-            continue 
-            
-        target_name = '__module__' if mname == 'TestModule' else mname.replace('Test', '')
-        is_module_level_test = (mname == 'TestModule')
-        
-        # Recupero target di produzione e test
-        target_prod = main_module if is_module_level_test else getattr(main_module, target_name, None)
-        target_test = getattr(contract_module, mname, None)
-        
-        if target_test is None or target_prod is None:
-            continue
-
-        # Dizionario che conterrà i contratti dei singoli metodi: {'post': {...}, 'read': {...}}
-        group_contracts: Dict[str, Dict[str, str]] = {}
-        test_methods_data = data.get('data', {}).get('methods', {})
-        
-        # Ciclo compatto
-        for test_name in test_methods_data.keys():
-            if not test_name.startswith('test_'):
-                continue
-
-            method_name = test_name.replace('test_', '')
-            
-            # Oggetto per il contratto singolo: {'production': hash, 'test': hash}
-            method_contract: Dict[str, str] = {}
-            
-            # A. Hash del Metodo di Test
-            test_fn = getattr(target_test, test_name, None)
-            if test_fn:
-                method_contract['test'] = calculate_hash_of_function(test_fn)
-            
-            # B. Hash del Metodo di Produzione
-            main_fn = getattr(target_prod, method_name, None)
-            if main_fn:
-                method_contract['production'] = calculate_hash_of_function(main_fn)
-            
-            # Aggiunge il contratto solo se almeno un hash è presente
-            if method_contract:
-                group_contracts[method_name] = method_contract
-
-        if group_contracts:
-            contract_hashes[target_name] = group_contracts
-
-    # 3. Scrittura JSON e Ritorno
-    json_path = main_path.replace('.py', '.contract.json')
-    json_content = json.dumps(contract_hashes, indent=4)
-    # await backend(path=json_path, content=json_content, mode='w') 
-
-    buffered_log("INFO", f"✅ Generato e scritto il contratto JSON in {json_path}")
-    
-    # Ritorno del formato finale a 5 livelli
-    return {main_path: contract_hashes}
-
 def estrai_righe_da_codice(codice_sorgente: str, riga_inizio: int, riga_fine: int) -> str:
     """
     Estrae il codice sorgente tra riga_inizio (inclusa) e riga_fine (inclusa).
@@ -290,18 +480,18 @@ def estrai_righe_da_codice(codice_sorgente: str, riga_inizio: int, riga_fine: in
     
     return codice_estratto
 
-async def generate(
+@asynchronous()
+async def generate_checksum(
     main_path: str, 
 ) -> Dict[str, Dict[str, Dict[str, Dict[str, str]]]]:
     """
     Genera il contratto JSON, mappando ogni metodo in un oggetto annidato
     che distingue l'hash di produzione da quello di test.
     """
-    print("GENERATE CALLED",main_path)
     # 1. Caricamento e Analisi
     contract_path = main_path.replace('.py', '.test.py')
-    main_code = await backend(path=main_path)
-    contract_code = await backend(path=contract_path)
+    main_code = await _load_resource(path=main_path)
+    contract_code = await _load_resource(path=contract_path)
     
     if not main_code or not contract_code:
         buffered_log("INFO", "Impossibile caricare i file sorgente o di test ({main_path} / {contract_path}).")
@@ -309,73 +499,155 @@ async def generate(
 
     main_module = analyze_module(main_code, main_path)
     contract_ana = analyze_module(contract_code, contract_path)
-    print(contract_path,main_path)
     contract_hashes = {} # Struttura interna modificata
     #Module
-    for x,data in contract_ana['TestModule'].get('data',{}).get('methods').items():
+    '''for x,data in contract_ana['TestModule'].get('data',{}).get('methods').items():
         target_name = '__module__' if x == 'TestModule' else x.replace('test_', '')
-        print(x,estrai_righe_da_codice(contract_code,data.get('lineno',0),data.get('end_lineno',0)),'\n++\n')
+        #print(x,estrai_righe_da_codice(contract_code,data.get('lineno',0),data.get('end_lineno',0)),'\n++\n')
         if target_name not in main_module:
             continue
         data = main_module[target_name].get('data',{})
-        print(target_name,estrai_righe_da_codice(main_code,data.get('lineno',0),data.get('end_lineno',0)),'\n++\n')
+        #print(target_name,estrai_righe_da_codice(main_code,data.get('lineno',0),data.get('end_lineno',0)),'\n++\n')
         hash_prod = await convert(estrai_righe_da_codice(main_code,data.get('lineno',0),data.get('end_lineno',0)) ,str,'hash')
         hash_test = await convert(estrai_righe_da_codice(contract_code,data.get('lineno',0),data.get('end_lineno',0)) ,str,'hash')
-        print('HASH:',hash_prod,hash_test)
+        contract_hashes[target_name] = {x.replace('test_',''):{'production':hash_prod,'test':hash_test}}
     # 2. Itera e Genera Hash
-    for mname, data in contract_ana.items():
-        if not isinstance(data, dict):
-            continue 
-        
-        target_name = '__module__' if mname == 'TestModule' else mname.replace('Test', '')
-        is_module_level_test = (mname == 'TestModule')
-        if is_module_level_test:
-            print('-------------------------------------------->',contract_ana['TestModule'].get('data',{}).get('methods').keys())
-        else:
-        #print(target_name,is_module_level_test,'##############################################',mname,data)
-        
-            #print('??????????????????????',main_module[target_name].get('data',{}).get('methods',{}))
-            #print('======================',contract_ana[mname].get('data',{}).get('methods',{}))
-            pass
-        '''
-        # Recupero target di produzione e test
-        target_prod = main_module if is_module_level_test else getattr(main_module, target_name, None)
-        target_test = getattr(contract_module, mname, None)
-        
-        if target_test is None or target_prod is None:
+    #print(contract_ana,'<<<-------------###############################################')
+    
+    for mname in contract_ana:
+        data = contract_ana.get(mname)
+        # Continua (salta l'iterazione) SE NON è un dizionario OPPURE se è un dizionario ma NON ha la chiave 'type'.
+        if not (isinstance(data, dict) and 'type' in data and data['type'] == 'class') and mname != '__module__':
             continue
-
-        # Dizionario che conterrà i contratti dei singoli metodi: {'post': {...}, 'read': {...}}
-        group_contracts: Dict[str, Dict[str, str]] = {}
-        test_methods_data = data.get('data', {}).get('methods', {})
-        
-        # Ciclo compatto
-        for test_name in test_methods_data.keys():
-            if not test_name.startswith('test_'):
+        methods = data.get('data', {}).get('methods', {})
+        for method_name, method_data in methods.items():
+            if not method_name.startswith('test_'):
                 continue
 
-            method_name = test_name.replace('test_', '')
+            target_name = '__module__' if mname == 'TestModule' else mname.replace('Test', '')
+            is_module_level_test = (mname == 'TestModule')
             
-            # Oggetto per il contratto singolo: {'production': hash, 'test': hash}
+            # Recupero target di produzione e test
+            target_prod = main_module if is_module_level_test else main_module.get(target_name, {})
+            target_test = contract_ana.get(mname, {})
+            
+            if not target_test or not target_prod:
+                continue
+
+            method_name_clean = method_name.replace('test_', '')
             method_contract: Dict[str, str] = {}
             
             # A. Hash del Metodo di Test
-            test_fn = getattr(target_test, test_name, None)
-            if test_fn:
-                method_contract['test'] = calculate_hash_of_function(test_fn)
+            test_method_data = target_test.get('data', {}).get('methods', {}).get(method_name, {})
+            if test_method_data:
+                test_code = estrai_righe_da_codice(
+                    contract_code,
+                    test_method_data.get('lineno', 0),
+                    test_method_data.get('end_lineno', 0)
+                )
+                method_contract['test'] = await convert(test_code, str, 'hash')
             
             # B. Hash del Metodo di Produzione
-            main_fn = getattr(target_prod, method_name, None)
-            if main_fn:
-                method_contract['production'] = calculate_hash_of_function(main_fn)
-            
+            prod_method_data = target_prod.get('data', {}).get('methods', {}).get(method_name_clean, {})
+            if prod_method_data:
+                prod_code = estrai_righe_da_codice(
+                    main_code,
+                    prod_method_data.get('lineno', 0),
+                    prod_method_data.get('end_lineno', 0)
+                )
+                method_contract['production'] = await convert(prod_code, str, 'hash')
+
             # Aggiunge il contratto solo se almeno un hash è presente
             if method_contract:
-                group_contracts[method_name] = method_contract
+                print(target_name,method_name_clean,method_contract)
+                #contract_hashes[target_name] = method_contract
+                '''
+            
+    # 2. Itera e Genera Hash (Logica Unificata)
+    for mname, data in contract_ana.items():
+        # Continua (salta l'iterazione) SE NON è un dizionario OPPURE se è un dizionario ma NON ha la chiave 'type'
+        # E NON è il modulo di base (mname != '__module__')
+        # Il controllo 'mname != '__module__'' è implicito nelle classi, ma esplicito per il caso base.
+        is_class = isinstance(data, dict) and 'type' in data and data['type'] == 'class'
+        
+        # Se non è una classe e non è il modulo di base, salta.
+        if not is_class and mname != '__module__':
+            continue
+            
+        # Per coerenza, se è il modulo di base, usa i dati di contract_ana (che potrebbe avere info a livello di modulo)
+        # Altrimenti usa i dati della classe/modulo specifico.
+        methods = data.get('data', {}).get('methods', {})
+        
+        # Se mname è '__module__', cerca i metodi a livello di modulo in contract_ana['__module__']
+        # Il primo blocco si occupava solo di contract_ana['TestModule'] che è un caso specifico
+        
+        # Usa TestModule per la logica di estrazione dei metodi
+        if mname == 'TestModule':
+            # Questo caso gestisce il primo blocco di codice fornito, usando la logica del secondo.
+            target_name = '__module__'
+        else:
+            # Questo caso gestisce le classi di test.
+            # Rimuove 'Test' dalla classe di test per trovare la classe di produzione
+            target_name = mname.replace('Test', '')
+        
+        # -------------------------------------------------------------------------------------
+        
+        for method_name, method_data in methods.items():
+            if not method_name.startswith('test_'):
+                continue
 
-        if group_contracts:
-            contract_hashes[target_name] = group_contracts'''
+            method_name_clean = method_name.replace('test_', '')
+            is_module_level_test = (mname == 'TestModule' or target_name == '__module__')
+            
+            # Recupero target di produzione e test
+            # Se è un test a livello di modulo, il target di produzione è 'main_module'
+            target_prod = main_module if is_module_level_test and method_name_clean in main_module else main_module.get(target_name, {})
+            # Il target di test è sempre il modulo/classe corrente (data)
+            target_test = data
+            
+            # Gestione del caso in cui i metodi sono direttamente nel modulo
+            if is_module_level_test:
+                # Qui cerchiamo la funzione di produzione direttamente in main_module
+                prod_data_source = target_prod
+                prod_method_data = prod_data_source.get(method_name_clean, {}).get('data',{})
+            else:
+                # Qui cerchiamo il metodo nella classe di produzione (target_prod)
+                prod_data_source = target_prod
+                prod_method_data = prod_data_source.get('data', {}).get('methods', {}).get(method_name_clean, {})
+            
+            # Dati del metodo di test (usiamo sempre method_data che viene dal ciclo for)
+            test_method_data = method_data
+            
+            if not test_method_data or not prod_method_data:
+                continue # Non abbiamo dati di test o di produzione validi, salta
 
+            method_contract: Dict[str, str] = {}
+            
+            # A. Hash del Metodo di Test
+            test_code = estrai_righe_da_codice(
+                contract_code,
+                test_method_data.get('lineno', 0),
+                test_method_data.get('end_lineno', 0)
+            )
+            method_contract['test'] = await convert(test_code, str, 'hash')
+            
+            # B. Hash del Metodo di Produzione
+            prod_code = estrai_righe_da_codice(
+                main_code,
+                prod_method_data.get('lineno', 0),
+                prod_method_data.get('end_lineno', 0)
+            )
+            method_contract['production'] = await convert(prod_code, str, 'hash')
+
+            # Aggiunge il contratto solo se almeno un hash è presente
+            if method_contract:
+                # Inizializza il dizionario per target_name se non esiste
+                if target_name not in contract_hashes:
+                    contract_hashes[target_name] = {}
+                
+                # Assegna il dizionario degli hash al nome del metodo pulito
+                contract_hashes[target_name][method_name_clean] = method_contract
+            
     # 3. Scrittura JSON e Ritorno
     json_path = main_path.replace('.py', '.contract.json')
     json_content = json.dumps(contract_hashes, indent=4)
@@ -471,6 +743,18 @@ def correlate_failure(failing_test_name: str, dependency_map: Dict[str, set[str]
     print(f"❓ TEST FALLITO: Impossibile correlare '{failing_test_name}' a una funzione pubblica. (Potrebbe essere un test non standard)")
     return set()
 
+genera = {
+    'module': generate_checksum,
+    #'timenow_utc': lambda: asyncio.sleep(0, time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())),
+    'identifier': lambda: asyncio.sleep(0, str(uuid.uuid4())),
+}
+
+async def generate(data,schema=None):
+    func = genera.get(schema)
+    if not func:
+        raise ValueError(f"Nessuna funzione di generazione per le chiavi: {schema}")
+    return await func(data)
+
 # =====================================================================
 # --- Funzioni di Caricamento --- CDDF (Contract-Driven Dependency Filter)
 # =====================================================================
@@ -487,7 +771,7 @@ async def _validate_and_filter_module(
 
     contract_json_path = path.replace('.py', '.contract.json')
     try:
-        json_content = await backend(path=contract_json_path)
+        json_content = await _load_resource(path=contract_json_path)
         external_contracts: Dict[str, Any] = await convert(json_content, dict, 'json')
         buffered_log("DEBUG", f"Contratto JSON esterno caricato da {contract_json_path}.")
     except Exception as e:
@@ -495,7 +779,7 @@ async def _validate_and_filter_module(
         external_contracts = {}
 
     contract_path = path.replace('.py', '.test.py')
-    contract_code = await backend(path=contract_path)
+    contract_code = await _load_resource(path=contract_path)
     contract_ana = analyze_module(contract_code, contract_path)
     contract_module = await resource(path=contract_path)
 
@@ -514,6 +798,9 @@ async def _validate_and_filter_module(
 
     # Validate hashes (compact loop): produce contract_validated_methods only for methods with matching hashes
     contract_validated_methods = {}
+
+    ccc = await generate_checksum(path)
+
     for tgt, group in (external_contracts or {}).items():
         if not isinstance(group, dict):
             continue
@@ -550,19 +837,19 @@ async def _validate_and_filter_module(
             expected_test_hash = hashes['test']
 
             # Calcola gli hash correnti
-            current_prod_hash = calculate_hash_of_function(prod_func)
-            current_test_hash = calculate_hash_of_function(test_func)
+            current_prod_hash = ccc.get(path,{}).get(tgt,{}).get(m,{}).get('production','')
+            current_test_hash = ccc.get(path,{}).get(tgt,{}).get(m,{}).get('test','')
             
             # **********************************************
             # 🔥 Punti in cui viene eseguita la stampa degli hash (Aggiunti come richiesto)
-            print("---")
+            '''print("---")
             print(f"Membro: {m}")
             print(prod_func)
             print(f"Hash Production (Atteso): {expected_prod_hash}")
             print(f"Hash Production (Corrente): {current_prod_hash}")
             print(test_func)
             print(f"Hash Test (Atteso): {expected_test_hash}")
-            print(f"Hash Test (Corrente): {current_test_hash}")
+            print(f"Hash Test (Corrente): {current_test_hash}")'''
             # **********************************************
             
             # 4. Filtro di validazione hash
@@ -660,7 +947,7 @@ async def _load_dependencies(module: types.ModuleType,dependencies) -> None:
             continue
 
         try:
-            imported_content = await backend(path='src/'+import_path)
+            imported_content = await _load_resource(path='src/'+import_path)
         except FileNotFoundError:
             buffered_log("WARNING", f"⚠️ Dipendenza non trovata: {import_path}")
             continue
@@ -708,7 +995,7 @@ async def resource(path: str | None = None, **kwargs) -> Any:
         path (str | None): Il percorso della risorsa.
     """
     resource_path = resolve_path(path)
-    content = await backend(path=resource_path)
+    content = await _load_resource(path=resource_path)
     if resource_path.endswith(".json"):
         buffered_log("INFO", f"📄 Caricamento e parsing JSON da {resource_path}... type={type(content)}")
         return await convert(content, dict, 'json')
@@ -804,204 +1091,6 @@ def _get_system_info() -> Dict[str, Any]:
         "os_name": platform.platform(),
     }
 
-def _get_line_from_source(source_lines: List[str], lineno: int) -> str:
-    """Recupera una specifica riga dal sorgente diviso."""
-    index = lineno - 1
-    if 0 <= index < len(source_lines):
-        return source_lines[index].strip()
-    return "RIGA SORGENTE NON TROVATA O FUORI LIMITE"
-
-def asynchronous(custom_filename: str = __file__, app_context: Optional[Dict[str, Any]] = None):
-    """
-    Decoratore per catturare eccezioni, generare un rapporto di debug dettagliato e loggarlo usando il logger configurato.
-    """
-    def decorator(func):
-        @functools.wraps(func)
-        async def wrapper(*args, **kwargs):
-            try:
-                return await func(*args, **kwargs)
-            except Exception:
-                # Recupera il codice sorgente del modulo della funzione
-                source_code = None
-                '''try:
-                    source_code = inspect.getsource(func)
-                except KeyboardInterrupt:
-                    print("Interruzione da tastiera (Ctrl + C).")
-                except (OSError, TypeError):
-                    source_code = ""'''
-
-                source_code = await backend(path="/"+custom_filename)
-
-                # Genera il rapporto usando l'eccezione attiva
-                report = analyze_exception(
-                    source_code=source_code,
-                    custom_filename=custom_filename,
-                    app_context=app_context
-                )
-                
-                ok = await convert(report, str, 'json')
-
-                print(ok)
-
-                # Rilancia l'eccezione
-                #raise
-
-        return wrapper
-    return decorator
-
-def synchronous(custom_filename: str = __file__, app_context: Optional[Dict[str, Any]] = None):
-    """
-    Decoratore per catturare eccezioni, generare un rapporto di debug dettagliato e loggarlo usando il logger configurato.
-    """
-    def decorator(func):
-        @functools.wraps(func)
-        def wrapper(*args, **kwargs):
-            try:
-                return func(*args, **kwargs)
-            except Exception:
-                # Recupera il codice sorgente del modulo della funzione
-                source_code = None
-                try:
-                    source_code = inspect.getsource(func)
-                except KeyboardInterrupt:
-                    print("Interruzione da tastiera (Ctrl + C).")
-                except (OSError, TypeError):
-                    source_code = ""
-
-                # Genera il rapporto usando l'eccezione attiva
-                report = analyze_exception(
-                    source_code=source_code,
-                    custom_filename=custom_filename,
-                    app_context=app_context
-                )
-                
-                #exc_type, exc_value, _ = sys.exc_info()
-                #error_message = f"Errore intercettato in '{func.__name__}': {type(exc_value).__name__} - {str(exc_value)}"
-                #ok = await convert(report, 'str', 'json')
-                ok = asyncio.run(convert(report, str, 'json'))
-
-                print(ok)
-
-                # Rilancia l'eccezione
-                #raise
-
-        return wrapper
-    return decorator
-
-def analyze_module2(source_code: str, module_name: str) -> Dict[str, Any]:
-    """Analizza il codice sorgente (AST) per ricavare la struttura del modulo."""
-    structure = {"module_name": module_name, "module_docstring": None}
-    
-    try:
-        tree = ast.parse(source_code)
-        if (docstring := ast.get_docstring(tree)): # Usa l'operatore := (Python 3.8+)
-            structure["module_docstring"] = docstring.strip()
-            
-        # Per un'analisi corretta, è meglio iterare direttamente su tree.body 
-        # e poi usare ast.walk/ast.iter_child_nodes per l'analisi interna.
-        # Oppure, per ast.walk, si deve migliorare lo scope check.
-        
-        # SOLUZIONE: Usiamo ast.walk ma miglioriamo lo scope check.
-        # Il modo più semplice per determinare il top-level è
-        # tenere traccia di se siamo entrati in un blocco FunctionDef o ClassDef.
-        
-        # Per semplicità, ci concentriamo sul correggere solo il controllo ast.Assign
-        
-        for node in ast.walk(tree):
-            # 1. Analisi Funzioni (codice originale)
-            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
-                func_info = {
-                    "type": "function",
-                    "data": {
-                        "lineno": node.lineno,
-                        # Nota: get_source_segment richiede Python 3.8+
-                        "code": ast.get_source_segment(source_code, node),
-                        "docstring": ast.get_docstring(node),
-                        "args": [a.arg for a in node.args.posonlyargs + node.args.args + [node.args.vararg] if a],
-                    }
-                }
-                structure[node.name] = func_info
-            # 2. Analisi Variabili/Dizionari (LOGICA MODIFICATA)
-            elif isinstance(node, ast.Assign):
-                
-                # --- INIZIO NUOVO SCOPE CHECK ---
-                
-                # Un'assegnazione è "a livello di modulo" se l'antenato è l'albero radice (module)
-                # O se è in un costrutto di blocco (if, for, while) che è a sua volta a livello di modulo.
-                # Per la tua esigenza, basta escludere quelle dentro a funzioni o classi.
-                
-                # Un modo più robusto, senza ricorrere ad ast.walk nidificato, è usare ast.NodeVisitor,
-                # ma per correggere il tuo codice esistente:
-                
-                # Cerchiamo l'antenato principale del nodo per l'assegnazione, 
-                # partendo dal corpo del modulo 'tree.body'.
-                
-                is_top_level_assign = False
-                
-                # Controlla se il nodo fa parte del corpo principale del modulo
-                # O se è in un nodo del corpo principale che non sia Funzione/Classe
-                for top_level_node in tree.body:
-                    if node is top_level_node:
-                        # Assegnazione diretta a livello di modulo
-                        is_top_level_assign = True
-                        break
-                    # Se non è un nodo diretto, controlla se è un discendente di un nodo 
-                    # che non è Funzione/Classe (e che non è stato già analizzato come Funzione/Classe)
-                    elif isinstance(top_level_node, (ast.If, ast.For, ast.While, ast.With)) and node in ast.walk(top_level_node):
-                        # L'assegnazione è dentro un blocco a livello di modulo (if/for/ecc.)
-                        is_top_level_assign = True
-                        break
-                        
-                # Se è un'assegnazione a livello di modulo E il valore assegnato è un dizionario...
-                if is_top_level_assign and isinstance(node.value, ast.Dict) and node.targets and isinstance(node.targets[0], ast.Name):
-                    
-                    # --- FINE NUOVO SCOPE CHECK ---
-                    
-                    var_name = node.targets[0].id
-                    
-                    # Estraggo il codice sorgente del dizionario
-                    dict_code = ast.get_source_segment(source_code, node.value)
-                    
-                    # Ottiene il valore effettivo
-                    var_value = None
-                    try:
-                        # Tenta di valutare il nodo AST per ottenere il dizionario Python
-                        var_value = ast.literal_eval(node.value)
-                    except (ValueError, TypeError) as e:
-                        var_value = f"Evaluation Error: {type(e).__name__}"
-                    
-                    info = {
-                        "type": type(node.value).__name__,
-                        "lineno": node.lineno,
-                        "value": var_value,
-                    }
-                    structure[var_name] = info
-            elif isinstance(node, ast.ClassDef):
-                # Un'analisi Classi completa richiederebbe di analizzare anche i
-                # membri interni (metodi, variabili di classe), ma per una 
-                # struttura di base:
-
-                class_info = {
-                    "type": "class",
-                    "data": {
-                        "lineno": node.lineno,
-                        "docstring": ast.get_docstring(node),
-                        # Le classi base (ereditarietà)
-                        "bases": [
-                            ast.get_source_segment(source_code, base)
-                            for base in node.bases
-                            if ast.get_source_segment(source_code, base) is not None
-                        ],
-                        # Analisi incompleta: Questo non include i metodi/variabili,
-                        # ma ne ottiene solo i metadati di base della classe.
-                    }
-                }
-                structure[node.name] = class_info
-    except Exception as e:
-        structure["parsing_error"] = f"Errore nell'analisi AST: {type(e).__name__} - {str(e)}"
-
-    return structure
-
 def analyze_module(source_code: str, module_name: str) -> Dict[str, Any]:
     """Analizza il codice sorgente (AST) per ricavare la struttura del modulo,
     annidando i metodi all'interno della loro classe.
@@ -1087,6 +1176,7 @@ def analyze_module(source_code: str, module_name: str) -> Dict[str, Any]:
                         "data": {
                             "lineno": node.lineno,
                             "end_lineno": node.end_lineno,
+                            #"code": asyncio.run(convert(ast.get_source_segment(source_code, node), str, 'hash')),
                             "code": ast.get_source_segment(source_code, node),
                             "docstring": ast.get_docstring(node),
                             "args": [a.arg for a in node.args.posonlyargs + node.args.args + [node.args.vararg] if a],

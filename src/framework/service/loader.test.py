@@ -7,7 +7,8 @@ imports = {
 }
 
 exports = {
-    'bootstrap':'bootstrap'
+    'bootstrap':'bootstrap',
+    'bootstrap_core':'bootstrap_core',
 }
 
 class TestModule(contract.Contract):
