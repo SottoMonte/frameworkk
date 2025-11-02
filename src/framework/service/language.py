@@ -855,9 +855,6 @@ async def _validate_and_filter_module(
             # 4. Filtro di validazione hash
             if current_prod_hash == expected_prod_hash and current_test_hash == expected_test_hash:
                 valid.add(m)
-                print(f"VALIDATO: Membro '{m}' aggiunto a 'valid'.")
-            else:
-                print(f"FALLITO: Membro '{m}' non validato (hash non corrispondenti).")
         
         if valid:
             contract_validated_methods[tgt] = valid
@@ -909,7 +906,6 @@ async def _validate_and_filter_module(
                     if attr_name not in valid_set:
                         try:
                             delattr(FilteredClass, attr_name)
-                            buffered_log("DEBUG", f"Rimosso metodo: {member.__name__}.{attr_name}")
                         except Exception:
                             pass
                     else:
@@ -927,9 +923,7 @@ async def _validate_and_filter_module(
 def resolve_path(resource_path: str | None) -> str:
     """Normalizza e aggiunge il prefisso 'src/' al percorso della risorsa."""
     resource_path = (resource_path or "").lstrip('/')
-    if not resource_path:
-        return 'src'
-    if not resource_path.startswith('src/'):
+    if resource_path.startswith('application/') or resource_path.startswith('framework/') or resource_path.startswith('infrastructure/'):
         return os.path.normpath(os.path.join('src', resource_path))
     return os.path.normpath(resource_path)
 
@@ -979,7 +973,9 @@ async def _load_python_module(name: str, path: str, code: str) -> types.ModuleTy
         dependencies = dependencies.get('imports',{}).get('value',{})
         buffered_log("INFO", f"🔍 Dipendenze trovate in {path}: {dependencies}")
         await _load_dependencies(module,dependencies.copy())
-        exec(code, module.__dict__)
+        # 2. Compila il codice con il nome del file
+        compiled_code = compile(code, module_name, 'exec')
+        exec(compiled_code, module.__dict__)
         # salva nel cache globale per riusi futuri (evita ricaricamenti ripetuti)
         di['module_cache'][path] = module
     except Exception as e:
@@ -1177,7 +1173,8 @@ def analyze_module(source_code: str, module_name: str) -> Dict[str, Any]:
                             "lineno": node.lineno,
                             "end_lineno": node.end_lineno,
                             #"code": asyncio.run(convert(ast.get_source_segment(source_code, node), str, 'hash')),
-                            "code": ast.get_source_segment(source_code, node),
+                            #"code": ast.get_source_segment(source_code, node),
+                            #"code": asyncio.run(generate(ast.get_source_segment(source_code, node), 'hash')),
                             "docstring": ast.get_docstring(node),
                             "args": [a.arg for a in node.args.posonlyargs + node.args.args + [node.args.vararg] if a],
                         }
@@ -1215,6 +1212,44 @@ def analyze_module(source_code: str, module_name: str) -> Dict[str, Any]:
 
     return structure
 
+def truncate_value(key: str, value: Any, max_str_len: int = 256, max_list_len: int = 20) -> Any:
+    """
+    Tronca valori di stringa e collezioni (liste/tuple) troppo grandi
+    per mantenere i log di dimensione ragionevole.
+    """
+    if isinstance(value, str):
+        if len(value) > max_str_len:
+            return f"{value[:max_str_len]}... [TRONCATA, L={len(value)}]"
+        return value
+
+    elif isinstance(value, (list, tuple, set)):
+        # Tronca le collezioni
+        if len(value) > max_list_len:
+            truncated_items = list(value)[:max_list_len]
+            # Assicurati che anche gli elementi troncati siano processati
+            processed_items = [
+                truncate_value("", item, max_str_len=30, max_list_len=5)
+                for item in truncated_items
+            ]
+            
+            return f"{processed_items} ... [TRONCATA, N={len(value)}]"
+        
+        # Processa gli elementi interni della collezione se la collezione è piccola
+        return [
+            truncate_value("", item, max_str_len=30, max_list_len=5)
+            for item in value
+        ]
+        
+    elif isinstance(value, dict):
+        # Recursivamente applica il troncamento ai valori del dizionario
+        return {
+            k: truncate_value(k, v, max_str_len=max_str_len, max_list_len=max_list_len) 
+            for k, v in value.items()
+        }
+
+    # Per tutti gli altri tipi (int, float, bool, oggetti piccoli), restituisci il valore così com'è.
+    return value
+
 def analyze_traceback(tb: Optional[types.TracebackType]) -> List[Dict[str, Any]]:
     """
     Estrae i frame del traceback in un formato strutturato, gestendo in modo robusto
@@ -1238,7 +1273,7 @@ def analyze_traceback(tb: Optional[types.TracebackType]) -> List[Dict[str, Any]]
         # Estrai e sanifica le variabili locali del frame corrente
         local_vars_state = {
             #k: sanitize_variable_value(k, v) 
-            k: v
+            k: truncate_value(k, v)
             for k, v in frame.f_locals.items() 
             if not k.startswith('__') and k not in ['frame', 'frame_summary', 'current_tb', 'tb']
         }
@@ -1325,7 +1360,7 @@ def analyze_exception(source_code: str, custom_filename: str = "<code_in_memory>
     
     final_local_vars = {
          #k: sanitize_variable_value(k, v)
-         k: v
+         k: truncate_value(k, v)
          for k, v in last_frame_object.f_locals.items() 
          if not k.startswith('__') and k not in ['last_traceback', 'last_frame_object', 'raw_lineno', 'tb_list', 'exc_traceback']
     }
@@ -1351,7 +1386,7 @@ def analyze_exception(source_code: str, custom_filename: str = "<code_in_memory>
         "APPLICATION_CONTEXT": app_context or {"VERSION": "N/A", "USER_ID": "anonymous"},
         "EXCEPTION_DETAILS": exception_details,
         "MODULE_STRUCTURE_ANALYSIS": module_structure,
-        "STRUCTURED_TRACEBACK": structured_tb, 
+        "STRUCTURED_TRACEBACK": structured_tb[1:-1],  # Esclude il frame di analyze_exception
         #"FULL_TRACEBACK_TEXT": full_traceback_text 
     }
     

@@ -19,7 +19,7 @@ if sys.platform == 'emscripten':
                 case _: console.log(js_message)
 else:
     
-    async def log_backend(self,level, message):
+    async def log_backend2(self,level, message):
         
         """Logging in ambiente Python nativo."""
 
@@ -30,6 +30,20 @@ else:
             case 'error': self.logger.error(message)
             case 'critical': self.logger.critical(message)
             case _: self.logger.info(message)
+    async def log_backend(self, level, message, stack_level=1):
+        """Logging in ambiente Python nativo."""
+
+        # Il tuo 'adapter.post' chiama 'log_backend'. Il chiamante di 'adapter.post' è quello che ci interessa.
+        # stacklevel=2 salta (1) log_backend e (2) adapter.post, raggiungendo la funzione utente.
+        final_stack_level = stack_level + 1 # Passa stack_level=1 da post, aggiungi 1 qui.
+
+        match level:
+            case 'debug': self.logger.debug(message, stacklevel=final_stack_level) # <-- AGGIUNTO stacklevel
+            case 'info': self.logger.info(message, stacklevel=final_stack_level)     # <-- AGGIUNTO stacklevel
+            case 'warning': self.logger.warning(message, stacklevel=final_stack_level) # <-- AGGIUNTO stacklevel
+            case 'error': self.logger.error(message, stacklevel=final_stack_level)   # <-- AGGIUNTO stacklevel
+            case 'critical': self.logger.critical(message, stacklevel=final_stack_level) # <-- AGGIUNTO stacklevel
+            case _: self.logger.info(message, stacklevel=final_stack_level)
 
 class adapter:
     
@@ -132,7 +146,8 @@ class adapter:
         
         #self.history.get(domain)[1].append()
         
-        await log_backend(self,domain,message)
+        #await log_backend(self,domain,message)
+        await log_backend(self, domain, message, stack_level=4)
 
     async def read(self, *services, **constants):
         domain = constants.get('domain', 'info')

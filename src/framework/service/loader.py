@@ -246,12 +246,11 @@ async def bootstrap() -> None:
         }
     ]
     
-    manager_tasks = [ asyncio.create_task(language.load_di_entry(**mgr), name=f"load_{mgr['name']}") for mgr in manager_loader_path]
+    manager_tasks = [ asyncio.create_task(language.register(**mgr), name=f"load_{mgr['name']}") for mgr in manager_loader_path]
     
     await dependency_messenger.post(domain='debug', message=f"Avvio del caricamento parallelo di {len(manager_tasks)} Manager...")
     await dependency_executor.all_completed(tasks=manager_tasks) 
     await dependency_messenger.post(domain='debug', message="Caricamento Manager completato. System-DI pronto.")
-
     '''dependency_storekeeper = di['storekeeper'](di)
     dependency_defender = di['defender'](di)
     dependency_presenter = di['presenter'](di)
@@ -259,17 +258,17 @@ async def bootstrap() -> None:
     print('DEFEN-',dependency_defender)
     print('PRESEN-',dependency_presenter)'''
 
-    '''# --- FASE DI CARICAMENTO PROVIDER ---
+    # --- FASE DI CARICAMENTO PROVIDER ---
     provider_tasks: List[asyncio.Task] = []
     MODULI_PRINCIPALI = ["presentation", "persistence", "message", "authentication", "actuator"]
     await dependency_messenger.post(domain='debug', message="Preparazione al caricamento dei Provider d'Infrastruttura...")
     
     for module_name in MODULI_PRINCIPALI:
-        if module_name in config and isinstance(config.get(module_name), dict):
+        if module_name in config and isinstance(config,dict) and isinstance(config.get(module_name), dict):
             for driver_name, setting_data in config[module_name].items():
                 adapter_name = setting_data.get("adapter")
                 if not adapter_name:
-                    logger.error(f"Configurazione incompleta per '{module_name}/{driver_name}': Manca 'adapter'.")
+                    await dependency_messenger.post(domain='error', message=f"Configurazione incompleta per '{module_name}/{driver_name}': Manca 'adapter'.")
                     continue
                 
                 payload_data = {**setting_data, "profile": driver_name, "project": config.get("project", "default")}
@@ -279,29 +278,34 @@ async def bootstrap() -> None:
                     name=f"load_provider_{module_name}_{driver_name}"
                 )
                 provider_tasks.append(task)
-                logger.debug(f"Task creata: Provider {module_name} / Adattatore {adapter_name} ('{driver_name}').")
+                await dependency_messenger.post(domain='debug', message=f"Task creata: Provider {module_name} / Adattatore {adapter_name} ('{driver_name}').")
         else:
-            logger.debug(f"Modulo '{module_name}' non configurato o non è un dizionario. Saltato.")
+            await dependency_messenger.post(domain='warning', message=f"Nessuna configurazione trovata per i Provider del modulo '{module_name}'. Saltato.")
+        await dependency_messenger.post(domain='debug', message=f"Totale Provider da caricare: {len(provider_tasks)}. Avvio processo...")
 
-    logger.info(f"Avvio del caricamento parallelo di {len(provider_tasks)} Provider...")
+    await dependency_messenger.post(domain='debug', message=f"Avvio del caricamento parallelo di {len(provider_tasks)} Provider...")
     await dependency_executor.all_completed(tasks=provider_tasks)
-    logger.info("Caricamento di tutti i Provider completato.")
+    await dependency_messenger.post(domain='debug', message="Caricamento di tutti i Provider completato.")
 
     # --- FASE DI AVVIO DEGLI ELEMENTI DI PRESENTAZIONE ---
     # Uso l'interfaccia DI a dizionario, assumendo sia stata configurata
+    if 'presentation' not in di:
+        await dependency_messenger.post(domain='warning', message="Nessun elemento di 'Presentazione' trovato nel DI. Fase di caricamento saltata.")
+        return
     presentation_elements: List[Any] = di["presentation"] 
     event_loop = asyncio.get_event_loop()
     logger.info(f"Avvio dei caricatori ({len(presentation_elements)}) per gli elementi di Presentazione.")
+    await dependency_messenger.post(domain='debug', message=f"Avvio dei caricatori ({len(presentation_elements)}) per gli elementi di Presentazione.")
 
     for item in presentation_elements:
         item_name = getattr(item, '__class__', item)
         if hasattr(item, "loader"):
             try:
                 item.loader(loop=event_loop)
-                logger.debug(f"Loader eseguito con successo per {item_name}.")
+                await dependency_messenger.post(domain='debug', message=f"Loader eseguito con successo per {item_name}.")
             except Exception as e:
-                logger.error(f"ERRORE GRAVE: Il 'loader' dell'elemento {item_name} ha fallito. Dettaglio: {e}")
+                await dependency_messenger.post(domain='error', message=f"ERRORE GRAVE: Il 'loader' dell'elemento {item_name} ha fallito. Dettaglio: {e}")
         else:
-            logger.debug(f"L'elemento {item_name} non ha un metodo 'loader'. Saltato.")
+            await dependency_messenger.post(domain='debug', message=f"L'elemento {item_name} non ha un metodo 'loader'. Saltato.")
 
-    logger.info("Framework avviato con successo. Sistema pronto e operativo.")'''
+    await dependency_messenger.post(domain='debug', message="Framework avviato con successo. Sistema pronto e operativo.")
