@@ -2,6 +2,7 @@ import sys
 import logging
 import time
 imports = {'flow': 'framework/service/flow2.py'}
+from framework.service.language import get_transaction_id
 # Controllo se il codice sta girando in Pyodide
 
 if sys.platform == 'emscripten':
@@ -37,13 +38,21 @@ else:
         # stacklevel=2 salta (1) log_backend e (2) adapter.post, raggiungendo la funzione utente.
         final_stack_level = stack_level + 1 # Passa stack_level=1 da post, aggiungi 1 qui.
 
+        # Otteniamo il transaction id dal context (se presente) e lo passiamo come 'extra'
+        try:
+            tx = get_transaction_id()
+        except Exception:
+            tx = None
+
+        extra = {'transaction_id': tx if tx else "-"}
+
         match level:
-            case 'debug': self.logger.debug(message, stacklevel=final_stack_level) # <-- AGGIUNTO stacklevel
-            case 'info': self.logger.info(message, stacklevel=final_stack_level)     # <-- AGGIUNTO stacklevel
-            case 'warning': self.logger.warning(message, stacklevel=final_stack_level) # <-- AGGIUNTO stacklevel
-            case 'error': self.logger.error(message, stacklevel=final_stack_level)   # <-- AGGIUNTO stacklevel
-            case 'critical': self.logger.critical(message, stacklevel=final_stack_level) # <-- AGGIUNTO stacklevel
-            case _: self.logger.info(message, stacklevel=final_stack_level)
+            case 'debug': self.logger.debug(message, stacklevel=final_stack_level, extra=extra)
+            case 'info': self.logger.info(message, stacklevel=final_stack_level, extra=extra)
+            case 'warning': self.logger.warning(message, stacklevel=final_stack_level, extra=extra)
+            case 'error': self.logger.error(message, stacklevel=final_stack_level, extra=extra)
+            case 'critical': self.logger.critical(message, stacklevel=final_stack_level, extra=extra)
+            case _: self.logger.info(message, stacklevel=final_stack_level, extra=extra)
 
 class adapter:
     
@@ -72,9 +81,9 @@ class adapter:
 
         
 
-        # 2. Modifica il Formatter per includere il campo 'domain'
+        # 2. Modifica il Formatter per includere il campo 'domain' e transaction_id
         formatter = self.ColoredFormatter(
-            constants.get('format', "%(asctime)s.%(msecs)03d | [T+%(delta_ms)s]ms | [ΔT%(delta_inter_ms)s]ms | %(levelname)-16s | %(filename)s:%(lineno)d | %(funcName)-25s | %(process)d | %(message)s"),
+            constants.get('format', "%(asctime)s.%(msecs)03d | [T+%(delta_ms)s]ms | [ΔT%(delta_inter_ms)s]ms | %(levelname)-16s | %(filename)s:%(lineno)d | %(funcName)-25s | %(process)d | [tx:%(transaction_id)s] | %(message)s"),
             datefmt="%Y-%m-%d %H:%M:%S"
         )
 
@@ -128,7 +137,19 @@ class adapter:
         def format(self, record):
             color = adapter.ANSI_COLORS.get(record.levelname, "")
             record.levelname = f"{color}{record.levelname}{adapter.RESET_COLOR}"
-            record.msg = f"{record.msg}"
+
+            # Se il record ha già 'transaction_id' (passato via extra) lo rispettiamo,
+            # altrimenti proviamo a recuperarlo dal contextvar; fallback a '-'.
+            existing_tx = getattr(record, 'transaction_id', None)
+            if existing_tx not in (None, ""):
+                record.transaction_id = existing_tx
+            else:
+                try:
+                    tx = get_transaction_id()
+                except Exception:
+                    tx = None
+                record.transaction_id = tx if tx else "-"
+
             return super().format(record)
 
     async def can(self, *services, **constants):
@@ -138,16 +159,18 @@ class adapter:
         """Registra un messaggio di log con il colore corrispondente al livello."""
         domain = constants.get('domain', 'info')
         message = constants.get('message', '')
-        #print(f"POSTING {domain} {message}")
-        #if domain not in self.history:
-        #self.history.setdefault(domain,[0,[]])[1].append(message)
-        self.history.setdefault(domain,[0,[]])[1].append(message)
+        # Non pre-iniettiamo più [tx:...] direttamente nel testo (lo fa il formatter tramite extra)
+        try:
+            tx = get_transaction_id()
+        except Exception:
+            tx = None
 
-        
-        #self.history.get(domain)[1].append()
-        
-        #await log_backend(self,domain,message)
-        await log_backend(self, domain, message, stack_level=4)
+        stored_message = message  # mantiene il messaggio pulito in history
+        # se vuoi salvare anche l'ID in history, puoi farlo come metadato separato
+        self.history.setdefault(domain,[0,[]])[1].append(stored_message)
+
+        # Passiamo il message al backend; log_backend recupera il transaction id e lo passa come extra
+        await log_backend(self, domain, stored_message, stack_level=4)
 
     async def read(self, *services, **constants):
         domain = constants.get('domain', 'info')

@@ -1,0 +1,12 @@
+{
+    "defender": {
+        "authenticate": {
+            "test": "d32e94550da96a2a8f9764e0a1b57223de400e401da2c92444ac93f827a86110",
+            "production": "052ab91d88cf6c2dc04859cd4c33d2c76841f09a93b9f402c9a32d4f3586a039"
+        },
+        "registration": {
+            "test": "63e74817d26c8ad1c8b61daf010cb7e26d93d5202a6186868c238ecf5d118a3a",
+            "production": "e9deef11e7e477abef643b345812d3d68661177994abce971e9d3394516d0561"
+        }
+    }
+}

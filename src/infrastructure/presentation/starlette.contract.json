@@ -1,0 +1,32 @@
+{
+    "adapter": {
+        "mount_route": {
+            "test": "76a39fb1c49188cfe7b04e467cacb041bea719c145cbd27310b2d9de1f714a98",
+            "production": "fb4e12abffd594bbb7882c2e8e1f80103070101dd3d5a95c4ae5a2b41a8123f4"
+        },
+        "starlette_view": {
+            "test": "7ef1d5a36113dbca430d239c07033eeda765e7c01266ba6bf89f94ad1dfe3a85",
+            "production": "f185a3b74c7121a5167cf34955c8a1f92a3ed567cf6f45a5ca0ac1400c61ffed"
+        },
+        "login": {
+            "test": "373cf606fe85a4710cd2fc13742fccef2b18ec9d8f3b6ce815376eb48adf237b",
+            "production": "cb4befc3eb0bac0d462b2d29ee5bf33e0dcfa5166bc7b56cb40aa2cc72a4b06a"
+        },
+        "logout": {
+            "test": "fe5fca39fe4bd4b1a8de5fdc0ef8b99f2954cdc46ed9f4d70514c7cc4adb6341",
+            "production": "d41cb1213458f43babdb6262f916e70c9042f55ada66bab1a9d475b1193812c1"
+        },
+        "action": {
+            "test": "2648d1c933261d82e4f0f4970ef5eb63085f11a605c208c58d9f25c647b6a8d8",
+            "production": "a2dade0653bd654136c74fdb359e767f91a4c5466054b425da0703d8d960cb51"
+        },
+        "set_attribute": {
+            "test": "369ec4f72ff70a90cc30a6a239b952ebf1e4ff07c5f2c4933d319a97ae37a173",
+            "production": "7cb12ba490f443972b6ffac07dc49e66c46e2a6e34c3a107c2a1c27d4691e799"
+        },
+        "get_attribute": {
+            "test": "02dbf174d1e2ce20c0304020b0beb3e26a401dbeca9dba83bd48d4fc007b0ab0",
+            "production": "bb68873d668905efc6c361f52ac353bfa067f7891627ae01519f99ea2f792c75"
+        }
+    }
+}

@@ -9,9 +9,13 @@ import re
 
 import itertools
 
-resources = {
+imports = {
     'flow': 'framework/service/flow.py',
     'tags': 'framework/schema/tags.json',
+}
+
+exports = {
+    'port': 'port',
 }
 
 class port(ABC):

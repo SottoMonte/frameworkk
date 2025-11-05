@@ -1,11 +1,16 @@
-resources = {
+imports = {
     'starlette': 'infrastructure/presentation/starlette.py',
     'flow': 'framework/service/flow.py',
-    'test': 'framework/service/test.py',
+    'contract': 'framework/service/contract.py',
+
     #'model': 'framework/schema/model.json',
 }
 
-class AdapterTest(test.test):
+exports = {
+    'adapter': 'adapter',
+}
+
+class Testadapter(contract.Contract):
 
     def setUp(self):
         """
@@ -43,6 +48,25 @@ class AdapterTest(test.test):
 
     async def test_render_widget(self):
         pass
+
+    async def test_mount_route(self):
+        pass 
+    
+    async def test_starlette_view(self):
+        pass 
+       
+    async def test_login(self):
+        pass 
+
+    async def test_logout(self):
+        pass 
+
+    async def test_action(self):
+        pass 
+
+    async def test_loader(self):
+        pass 
+
 
     async def test_mount_widget(self):
         

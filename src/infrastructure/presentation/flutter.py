@@ -5,7 +5,7 @@ import asyncio
 import tinycss2
 import urllib.parse
 
-modules = {'flow': 'framework.service.flow','presentation': 'framework.port.presentation'}
+imports = {'flow': 'framework/service/flow.py','presentation': 'framework/port/presentation.py'}
 
 
 CSS_TO_FLET = {

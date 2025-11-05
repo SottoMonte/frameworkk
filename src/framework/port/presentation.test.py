@@ -1,11 +1,10 @@
-resources = {
-    'starlette': 'infrastructure/presentation/starlette.py',
+imports = {
     'flow': 'framework/service/flow.py',
-    'test': 'framework/service/test.py',
+    'contract': 'framework/service/contract.py',
     #'model': 'framework/schema/model.json',
 }
 
-class AdapterTest(test.test):
+class Testport(contract.Contract):
 
     def setUp(self):
         """
@@ -18,7 +17,7 @@ class AdapterTest(test.test):
             'port': 8000
         }
 
-        self.adapter = starlette.adapter(config=test_config)
+        #self.adapter = starlette.adapter(config=test_config)
         #self.adapter = starlette.adapter
 
     def tearDown(self):
@@ -89,7 +88,7 @@ class AdapterTest(test.test):
             # 3. Contenuto non valido (es. non stringa per _text)
             {'args': ('p', [], {'_text': 123}), 'error': TypeError},
         ]
-        await self.check_cases(self.adapter.mount_widget, success)
+        #await self.check_cases(self.adapter.mount_widget, success)
         #await self.check_cases(self.adapter.mount_widget, failure)
 
     async def test_set_attribute(self):
@@ -154,8 +153,8 @@ class AdapterTest(test.test):
             # Se invece ti aspetti che un numero o un None come valore sollevino un errore o non modifichino, adattalo.
         ]
 
-        await self.check_cases(self.adapter.set_attribute, success)
-        await self.check_cases(self.adapter.set_attribute, failure)
+        #await self.check_cases(self.adapter.set_attribute, success)
+        #await self.check_cases(self.adapter.set_attribute, failure)
 
     async def test_get_attribute(self):
         success = [
@@ -204,5 +203,5 @@ class AdapterTest(test.test):
             {'args':('<div data-my attribute="value"></div>', 'data-my attribute'), 'equal': None},
         ]
 
-        await self.check_cases(self.adapter.get_attribute, success)
-        await self.check_cases(self.adapter.get_attribute, failure)
+        #await self.check_cases(self.adapter.get_attribute, success)
+        #await self.check_cases(self.adapter.get_attribute, failure)

@@ -4,13 +4,17 @@
             "test": "afb854fd58ebcbea51f606b9c8b8005632154cfd35abb46854a588141b40bc95",
             "production": "c517eb231a93463d9d092c9e49ff73198cf947ae778a1c1e329aca2f77035b93"
         },
+        "route": {
+            "test": "fc45ce7e3422fd39540888bb63ad235cb670b41b028320f6f2e7355ebe5db043",
+            "production": "7a7d2f7da4d39138695110055cb4252b4973a5d4833fe76e8ad41ddcaf712e01"
+        },
         "asynchronous": {
             "test": "04852c350ccbc650ed6163dae362594037c43129b6147cd879e12ff0fb94aee3",
-            "production": "f7390c03d7a89c3c03f9c8d0c3a9c46daeaaefc3f0e7feec4ee89168e275d688"
+            "production": "ecc242118363bb5e72abf6200b6c26549a1ea91cc3fbfc2c9e3fa189c033678b"
         },
         "synchronous": {
             "test": "fce4373a51afc6fe6396a125b184f4892c6ff02b6e4588023b5f3b2ded5e58dc",
-            "production": "82409232508b66bded3b7eb0790533c309c1d1530086076ea5f7676aef121b6f"
+            "production": "3c4e792744412291c751d10dd84cb215ff5d56a88f1ee951f08234bd97cf09b4"
         },
         "load_di_entry": {
             "test": "7606f09c8428f82d3ac96586a41ccb77d4a7741e5d29c095aac55a476d8a4629",

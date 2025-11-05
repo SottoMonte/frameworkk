@@ -1,0 +1,36 @@
+{
+    "port": {
+        "builder": {
+            "test": "f1fb74a3015b979facf26c02cedadcaefc39b705036defd32962224eacad4f75",
+            "production": "dc8c18c235f9caced03be2c51683c8b4cbfe5510828290beb7aa250b27ce4ff6"
+        },
+        "rebuild": {
+            "test": "6756a184ab4b9b4a64a2d19eb02f0cd6221602d4381a6d8122c4bcdc0bacde57",
+            "production": "a19fec8e21429d25266a406f74354260a64b2a462c52093506099ec2b12d3f66"
+        },
+        "render_view": {
+            "test": "e62fac89dbc887140bd40f9f85ae4b0d36d9d4af4006147a16301a7d82b20691",
+            "production": "447fb22d4ea9ce1cafdab89c40e31744ced670a2e3c8fa4b76f2a8d1db430c03"
+        },
+        "render_css": {
+            "test": "f417bbd657418b843bc1173821adbf7170e795deecba89e7baa5c18aa34423ac",
+            "production": "9c726fe9b5dc110f1a74d6f8f183439685259667d5b1432973c5b1374dd734c0"
+        },
+        "render_widget": {
+            "test": "e42f95a0a4a6a6a3382f3c7267d3ae17e3751615949b4aa9c56bf70a8eea3ffb",
+            "production": "ed7ff9fea57c2a6d7e1b7ef407141676e6860f0ff79f4566f80be2ea0d7c006c"
+        },
+        "mount_widget": {
+            "test": "89ab02cd39cd0d920cf59d8cf36baff47c7527618b32867477634cb0835fcecc",
+            "production": "2a44c5df9a192b171dd790a8fb4db9cb19a7ea6b2119c2dba4d24962200ec5ce"
+        },
+        "set_attribute": {
+            "test": "e46d1e6753e23f52bf986ead9c27675acb93d731ace4386351b5522a2add098f",
+            "production": "ddd48ada173e2edcbd5064b07060236efd404392e17fb6d022982f2087175308"
+        },
+        "get_attribute": {
+            "test": "7c4e09c9523f484c71922a6fe15cca4b2083a585ef063215f030d992402d3836",
+            "production": "76de31ebec6c161462f3d87ecfe8913f68e47fc2255ed4448bd1b57fbec63221"
+        }
+    }
+}

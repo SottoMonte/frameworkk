@@ -1,7 +1,7 @@
 import asyncio
 from typing import List, Dict, Any, Callable
 import re
-
+import traceback
 
 imports = {
     'flow': 'framework/service/flow.py',
@@ -166,9 +166,8 @@ class executor:
     @flow.asynchronous(managers=('messenger',))
     async def all_completed(self, messenger, **constants) -> Dict[str, Any]:
         """Esegue tutti i task in parallelo e attende il completamento di tutti."""
-        tasks = constants.get('tasks', [])
+        '''tasks = constants.get('tasks', [])
         
-
         try:
             
             results = await asyncio.gather(*tasks, return_exceptions=True)
@@ -179,7 +178,62 @@ class executor:
         except Exception as e:
             error_msg = f"❌ Errore in all_completed: {str(e)}"
             #await messenger.post(domain='debug',message=error_msg)
-            return {"state": False, "result": None, "error": error_msg}
+            return {"state": False, "result": None, "error": error_msg}'''
+        tasks: List[asyncio.Future] = constants.get('tasks', [])
+    
+        # Lista per raccogliere i dettagli degli errori da ogni task
+        detailed_errors = []
+        
+        try:
+            # return_exceptions=True: le eccezioni sono restituite come risultati
+            results = await asyncio.gather(*tasks, return_exceptions=True)
+            
+            # 1. Analisi dei Risultati Dettagliata
+            for result in results:
+                if isinstance(result, Exception):
+                    # 🔥 STAMPA IMMEDIATA DEL TRACEBACK COMPLETO
+                    print(f"--- ❌ ERRORE DETTAGLIATO TASK ---")
+                    
+                    # Questa funzione stampa il traceback completo sul tuo log/console
+                    traceback.print_exception(type(result), result, result.__traceback__)
+                    
+                    print("---------------------------------------")
+                    # Un task è fallito. Registra il traceback completo.
+                    
+                    # Ottieni il traceback completo (come stringa)
+                    error_trace = traceback.format_exception(type(result), result, result.__traceback__)
+                    full_error_log = "".join(error_trace)
+                    
+                    # Aggiungi il dettaglio all'elenco degli errori
+                    detailed_errors.append(full_error_log)
+
+                    # Opzionale: invia il log completo del singolo errore al messenger (disattivato per default)
+                    # await messenger.post(domain='error', message=f"Task fallito: {full_error_log}")
+                else:
+                    # Il task è stato completato con successo
+                    detailed_errors.append(None) # Usa None se il task ha avuto successo
+            
+            # Se ci sono errori dettagliati, il risultato complessivo è un fallimento logico
+            if any(err is not None for err in detailed_errors):
+                error_summary = f"❌ Completamento parallelo con {sum(1 for err in detailed_errors if err is not None)} errori rilevati. Dettagli in 'result'."
+                # Opzionale: logga un riepilogo
+                # await messenger.post(domain='error', message=error_summary)
+                
+                return {"state": False, "result": results, "error": error_summary}
+            
+            # Se non ci sono eccezioni in 'results'
+            # await messenger.post(domain='debug', message="✅ Tutte le operazioni completate con successo.")
+            return {"state": True, "result": results, "error": None}
+
+        except Exception as e:
+            # Questo blocco cattura solo gli errori che si verificano DURANTE asyncio.gather stesso
+            error_msg = f"❌ Errore critico di sistema in all_completed (non un errore di task): {str(e)}"
+            # Opzionale: logga l'errore critico
+            # await messenger.post(domain='critical', message=error_msg)
+            
+            # Restituisce il traceback per l'errore critico di sistema
+            full_traceback = "".join(traceback.format_exc())
+            return {"state": False, "result": full_traceback, "error": error_msg}
 
     @flow.asynchronous(managers=('messenger',))
     async def chain_completed(self, messenger, **constants) -> Dict[str, Any]:

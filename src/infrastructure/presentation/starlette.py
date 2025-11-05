@@ -6,7 +6,7 @@ import json
 from datetime import datetime
 from urllib.parse import urlparse, urlunparse, ParseResult,parse_qs
 
-resources = {
+imports = {
     'flow': 'framework/service/flow.py',
     'presentation': 'framework/port/presentation.py',
     'scheme_url' : 'framework/schema/url.json',
@@ -695,8 +695,8 @@ class adapter(presentation.port):
             Mount('/framework', app=StaticFiles(directory=f'{cwd}/src/framework'), name="y"),
             Mount('/application', app=StaticFiles(directory=f'{cwd}/src/application'), name="z"),
             Mount('/infrastructure', app=StaticFiles(directory=f'{cwd}/src/infrastructure'), name="x"),
-            WebSocketRoute("/messenger", self.websocket, name="messenger"),
-            WebSocketRoute("/ssh", self.websocketssh, name="ssh"),
+            #WebSocketRoute("/messenger", self.websocket, name="messenger"),
+            #WebSocketRoute("/ssh", self.websocketssh, name="ssh"),
         ]
 
         middleware = [

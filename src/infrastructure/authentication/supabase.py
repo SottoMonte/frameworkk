@@ -1,12 +1,11 @@
-import json
 import sys
 
-resources = {
+imports = {
     'flow': 'framework/service/flow.py',
     'user': 'framework/schema/user.py',
 }
     
-if sys.platform == 'emscripten':
+'''if sys.platform == 'emscripten':
     import js
     from js import supabase
     import pyodide
@@ -74,7 +73,9 @@ else:
             #"auth_time": datetime.utcnow().isoformat(),
         }
 
-        return session
+        return session'''
+
+import supabase
 
 class adapter:
     def __init__(self, **constants):
@@ -88,7 +89,8 @@ class adapter:
             self.supabase =  supabase.createClient(self.url, self.key)
             print("Supabase client created",dir(self.supabase),dir(self.supabase.auth))
         else:
-            self.supabase = supabase.create_client(self.url, self.key)
+            #self.supabase = supabase.create_client(self.url, self.key)
+            pass
             
     @flow.asynchronous(outputs='transaction',managers=('messenger',))
     async def whoami(self, messenger, **data):

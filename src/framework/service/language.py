@@ -16,6 +16,7 @@ from urllib.parse import parse_qs,urlencode,urlparse
 import traceback
 import types # Importato per la gestione dinamica dei moduli
 import inspect
+import contextvars
 from cerberus import Validator, TypeDefinition, errors
 import hashlib
 import functools
@@ -34,6 +35,22 @@ if 'loading_stack' not in di:
 if 'log_buffer' not in di:
     di['log_buffer'] = []
 
+# Context var per propagare il transaction id nei flussi asincroni
+_transaction_id: contextvars.ContextVar[Optional[str]] = contextvars.ContextVar('transaction_id', default=None)
+
+def get_transaction_id() -> Optional[str]:
+    """Restituisce il transaction id corrente dal contextvar, se presente."""
+    return _transaction_id.get()
+
+
+def set_transaction_id(tx: Optional[str]) -> None:
+    """Imposta il transaction id corrente nel contextvar (pubblica API)."""
+    if tx is None:
+        # reset to None by setting None
+        _transaction_id.set(None)
+    else:
+        _transaction_id.set(str(tx))
+
 def buffered_log(level: str, message: str, emoji: str = ""):
     """Logger rudimentale che bufferizza i messaggi iniziali"""
     formatted = f"{emoji} {message}"
@@ -41,7 +58,8 @@ def buffered_log(level: str, message: str, emoji: str = ""):
         'level': level,
         'message': message,
         'emoji': emoji,
-        'timestamp': datetime.now(timezone.utc).isoformat()
+        'timestamp': datetime.now(timezone.utc).isoformat(),
+        'transaction_id': get_transaction_id()
     })
     #print(formatted)  # Mantiene output semplice durante il bootstrap
 
@@ -52,6 +70,16 @@ def asynchronous(custom_filename: str = __file__, app_context: Optional[Dict[str
     def decorator(func):
         @functools.wraps(func)
         async def wrapper(*args, **kwargs):
+            # Stabilisce/propaga un transaction id nel contesto asincrono
+            tx = None
+            if 'transaction_id' in kwargs and kwargs.get('transaction_id'):
+                tx = kwargs.get('transaction_id')
+            elif app_context and isinstance(app_context, dict) and app_context.get('transaction_id'):
+                tx = app_context.get('transaction_id')
+            else:
+                tx = str(uuid.uuid4())
+
+            token = _transaction_id.set(tx)
             try:
                 return await func(*args, **kwargs)
             except Exception:
@@ -72,13 +100,24 @@ def asynchronous(custom_filename: str = __file__, app_context: Optional[Dict[str
                     custom_filename=custom_filename,
                     app_context=app_context
                 )
+                # Inietta il transaction id nel report per correlazione
+                report['TRANSACTION_ID'] = tx
                 
                 ok = await convert(report, str, 'json')
+
+                # Buffera anche il log strutturato con il transaction id
+                buffered_log("ERROR", ok, emoji="❌")
 
                 print(ok)
 
                 # Rilancia l'eccezione
                 #raise
+
+            finally:
+                try:
+                    _transaction_id.reset(token)
+                except Exception:
+                    pass
 
         return wrapper
     return decorator
@@ -90,6 +129,25 @@ def synchronous(custom_filename: str = __file__, app_context: Optional[Dict[str,
     def decorator(func):
         @functools.wraps(func)
         def wrapper(*args, **kwargs):
+            # Imposta temporaneamente il transaction id se fornito (propagazione ai task creati)
+            tx = None
+            if 'transaction_id' in kwargs and kwargs.get('transaction_id'):
+                tx = kwargs.get('transaction_id')
+            elif app_context and isinstance(app_context, dict) and app_context.get('transaction_id'):
+                tx = app_context.get('transaction_id')
+            elif app_context and isinstance(app_context, dict) and app_context.get('REQUEST_ID'):
+                tx = app_context.get('REQUEST_ID')
+            else:
+                # non forziamo la generazione qui; lasciare None mantiene il comportamento attuale
+                tx = None
+
+            token = None
+            if tx is not None:
+                try:
+                    token = _transaction_id.set(str(tx))
+                except Exception:
+                    token = None
+
             try:
                 return func(*args, **kwargs)
             except Exception:
@@ -118,6 +176,13 @@ def synchronous(custom_filename: str = __file__, app_context: Optional[Dict[str,
 
                 # Rilancia l'eccezione
                 #raise
+            finally:
+                # Reset del contextvar se era stato impostato
+                if token is not None:
+                    try:
+                        _transaction_id.reset(token)
+                    except Exception:
+                        pass
 
         return wrapper
     return decorator
@@ -181,6 +246,8 @@ mappa = {
     (str,dict,'json'): lambda v: json.loads(v) if isinstance(v, str) else {},
     (dict,str,'json'): lambda v: json.dumps(v,indent=4,cls=LogReportEncoder) if isinstance(v, dict) else '',
     (str,str,'hash'): lambda v: hashlib.sha256(v.encode('utf-8')).hexdigest() if isinstance(v, str) else '',
+    (str,dict,'toml'): lambda content: tomli.loads(content) if isinstance(content, str) else {},
+    (dict,str,'toml'): lambda data: tomli.dumps(data) if isinstance(data, dict) else '',
 }
 
 async def convert(target, output,input=''):
@@ -418,6 +485,103 @@ def put(data: dict, path: str, value: any, schema: dict) -> dict:
 
     return result
 
+def route(url: dict, new_part: str) -> str:
+    """
+    Updates the URL's path and/or adds query parameters based on the input string.
+    New values overwrite existing ones with the same name.
+
+    Args:
+        url: A dict containing parts of the URL (protocol, host, port, path, query, fragment).
+        new_part: The new path string (e.g., '/nuova/pagina') or a query string (e.g., '?id=100'),
+                  or a combination of both (e.g., '/nuova/pagina?page=2&category=tech').
+
+    Returns:
+        The updated full URL as a string.
+    """
+    # Copia i dati dal dizionario URL per sicurezza
+    #url = url.copy()
+    url = copy.deepcopy(url)
+    protocol = url.get("protocol", "http")
+    host = url.get("host", "localhost")
+    port = url.get("port")
+    path = url.get("path", [])
+    query_params = url.get('query', {})
+    fragment = url.get("fragment", "")
+
+    # Usa un dizionario per i segnaposto, mappando le stringhe speciali a token unici
+    '''placeholders = {
+        '${this.value}': '__PLACEHOLDER_THIS_VALUE__',
+    }'''
+    
+    # Sostituisci i caratteri speciali con i segnaposto prima di decodificare
+    
+    #for special_string, placeholder in placeholders.items():
+    #    new_part = new_part.replace(special_string, placeholder)
+
+    # Analizza la stringa di input per separare il percorso dalla query
+    parsed_new_part = urlparse(new_part)
+
+    # Aggiorna il percorso se la stringa di input contiene un percorso
+    if parsed_new_part.path:
+        path = [p for p in parsed_new_part.path.split('/') if p]
+
+    # Aggiorna i parametri di query se la stringa di input contiene una query
+    '''if parsed_new_part.query:
+        query_params = {}
+        [query_params.setdefault(k, []).append(v) for k, v in (param.split('=', 1) for param in parsed_new_part.query.split('&') if '=' in param)]
+        #new_params = parse_qs(parsed_new_part.query, keep_blank_values=True)
+        # Unisce e sovrascrive i parametri esistenti con i nuovi
+        for key, value in query_params.items():
+            query_params.setdefault(key, []).append(value)
+            #query[key] = [value[-1]]'''
+    
+    if parsed_new_part.query:
+        [query_params.setdefault(k, []).append(v) for k, v in (param.split('=', 1) for param in parsed_new_part.query.split('&') if '=' in param)]
+        for key, value in query_params.items():
+            # ?org=colosso&org=${this.value}
+            # ?org=${this.value}&org=colosso
+            # ?org=${this.value}
+            #query_params.setdefault(key, [])
+            #query_params[key].reverse()
+            
+            #query_params[key] = [query_params[key][-1]]
+            #if "${" in query_params[key][-1]:
+            #    query_params[key].reverse()
+            #query[key] = [value[-1]]
+            pass
+    else:
+        #query_params = query_
+        pass
+
+    # Ricostruisci la query string con SOLO l'ultimo valore per ogni chiave
+    query_parts = []
+    query_string = ""
+    for key, values in query_params.items():
+        if values:  # prendi solo l'ultimo elemento
+            query_parts.append(f"{key}={values[-1]}")
+    query_string = "&".join(query_parts)
+
+    base_url = ""
+    '''# Ricostruisce l'URL completo
+    base_url = f"{protocol}://{host}"
+    if port:
+        base_url += f":{port}"'''
+    if path:
+        base_url += "/" + "/".join(path)
+
+    # Codifica i parametri di query
+    if query_string:
+        #encoded_query = urlencode(query, doseq=True)
+        #base_url += f"?{encoded_query}"
+        base_url += f"?{query_string}"
+    
+    if fragment:
+        base_url += f"#{fragment}"
+
+    #for key, value in placeholders.items():
+    #    base_url = base_url.replace(value,key)
+
+    return base_url
 
 # =====================================================================
 # --- Funzioni di Generazione ---
@@ -876,6 +1040,19 @@ async def _validate_and_filter_module(
     filtered_module = types.ModuleType(f"filtered:{main_module.__name__}")
     if hasattr(main_module, '__file__'):
         filtered_module.__file__ = main_module.__file__
+
+    '''buffered_log("DEBUG", f"🔗 Copia dei moduli importati per il contesto di {path}...")
+    for name, member in inspect.getmembers(main_module):
+        # Condizione 1: È un modulo importato?
+        if inspect.ismodule(member):
+            # Condizione 2: Non è un modulo interno (built-in) o il modulo genitore stesso?
+            # Questo evita di copiare oggetti interni di Python (es. '__builtins__') 
+            # o il modulo che stiamo filtrando.
+            if name not in sys.builtin_module_names and name not in ['__file__', '__name__', '__package__', '__loader__', '__spec__', main_module.__name__]:
+                # Condizione 3: Non inizia con un underscore nascosto (se non vuoi copiare importazioni "private")
+                if not name.startswith('_'): 
+                    setattr(filtered_module, name, member)
+                    buffered_log("DEBUG", f"   > Copiato modulo di dipendenza: {name}")'''
 
     if exports_map:
         for public_name, private_spec in exports_map.items():

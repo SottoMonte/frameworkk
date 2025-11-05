@@ -124,6 +124,46 @@ async def bootstrap_core() -> None:
             },
             'dependency_keys': ['actuator'], # Dipendenze da risolvere dal DI
             'messenger': 'executor' # Nome della chiave nel DI per la dipendenza
+        },
+        {
+            'path': 'framework/manager/presenter.py',
+            'name': 'presenter',
+            'config': {
+                'cache_enabled': True, 
+                'log_level': 'INFO'
+            },
+            'dependency_keys': ['messenger'], # Dipendenze da risolvere dal DI
+            'messenger': 'presenter' # Nome della chiave nel DI per la dipendenza
+        },
+        {
+            'path': 'framework/manager/defender.py',
+            'name': 'defender',
+            'config': {
+                'cache_enabled': True, 
+                'log_level': 'INFO'
+            },
+            'dependency_keys': ['messenger','persistence'], # Dipendenze da risolvere dal DI
+            'messenger': 'defender' # Nome della chiave nel DI per la dipendenza
+        },
+        {
+            'path': 'framework/manager/storekeeper.py',
+            'name': 'storekeeper',
+            'config': {
+                'cache_enabled': True, 
+                'log_level': 'INFO'
+            },
+            'dependency_keys': ['messenger'], # Dipendenze da risolvere dal DI
+            'messenger': 'storekeeper' # Nome della chiave nel DI per la dipendenza
+        },
+        {
+            'path': 'framework/manager/tester.py',
+            'name': 'tester',
+            'config': {
+                'cache_enabled': True, 
+                'log_level': 'INFO'
+            },
+            'dependency_keys': ['messenger','persistence'], # Dipendenze da risolvere dal DI
+            'messenger': 'tester' # Nome della chiave nel DI per la dipendenza
         }
     ]
 
@@ -187,6 +227,7 @@ async def bootstrap() -> None:
     
     text = await language.resource(path="pyproject.toml")
     config = await language.format(text,**config_params)
+    config = await language.convert(config, dict, 'toml')
     await dependency_messenger.post(domain='debug', message=f"Configurazione caricata con successo (Ambiente: {platform_type}).")
     
     # LOGGING MIGLIORATO (Stato DI)
@@ -203,7 +244,7 @@ async def bootstrap() -> None:
         'secure': True
     }"""
 
-    manager_loader_path = [
+    '''manager_loader_path = [
         {
             'path': 'framework/manager/presenter.py',
             'name': 'presenter',
@@ -250,7 +291,8 @@ async def bootstrap() -> None:
     
     await dependency_messenger.post(domain='debug', message=f"Avvio del caricamento parallelo di {len(manager_tasks)} Manager...")
     await dependency_executor.all_completed(tasks=manager_tasks) 
-    await dependency_messenger.post(domain='debug', message="Caricamento Manager completato. System-DI pronto.")
+    await dependency_messenger.post(domain='debug', message="Caricamento Manager completato. System-DI pronto.")'''
+
     '''dependency_storekeeper = di['storekeeper'](di)
     dependency_defender = di['defender'](di)
     dependency_presenter = di['presenter'](di)
@@ -262,7 +304,7 @@ async def bootstrap() -> None:
     provider_tasks: List[asyncio.Task] = []
     MODULI_PRINCIPALI = ["presentation", "persistence", "message", "authentication", "actuator"]
     await dependency_messenger.post(domain='debug', message="Preparazione al caricamento dei Provider d'Infrastruttura...")
-    
+
     for module_name in MODULI_PRINCIPALI:
         if module_name in config and isinstance(config,dict) and isinstance(config.get(module_name), dict):
             for driver_name, setting_data in config[module_name].items():
@@ -272,10 +314,14 @@ async def bootstrap() -> None:
                     continue
                 
                 payload_data = {**setting_data, "profile": driver_name, "project": config.get("project", "default")}
-                
+                ppp = {'path': f"infrastructure/{module_name}/{adapter_name}.py", # Percorso per resource
+                'service': module_name, # Chiave nel DI per la lista dei provider
+                'adapter': 'adapter', # Nome della classe da estrarre dal modulo
+                'payload': payload_data,
+                }
                 task = asyncio.create_task(
-                    language.load_provider(language, path=f"infrastructure/{module_name}/{adapter_name}.py", area="infrastructure", service=module_name, adapter=adapter_name, payload=payload_data),
-                    name=f"load_provider_{module_name}_{driver_name}"
+                    language.register(**ppp),
+                    name=f"{module_name}:{driver_name}"
                 )
                 provider_tasks.append(task)
                 await dependency_messenger.post(domain='debug', message=f"Task creata: Provider {module_name} / Adattatore {adapter_name} ('{driver_name}').")
@@ -284,7 +330,10 @@ async def bootstrap() -> None:
         await dependency_messenger.post(domain='debug', message=f"Totale Provider da caricare: {len(provider_tasks)}. Avvio processo...")
 
     await dependency_messenger.post(domain='debug', message=f"Avvio del caricamento parallelo di {len(provider_tasks)} Provider...")
-    await dependency_executor.all_completed(tasks=provider_tasks)
+    ok = await dependency_executor.all_completed(tasks=provider_tasks)
+
+    print('PROV-',ok)
+    
     await dependency_messenger.post(domain='debug', message="Caricamento di tutti i Provider completato.")
 
     # --- FASE DI AVVIO DEGLI ELEMENTI DI PRESENTAZIONE ---
@@ -294,9 +343,7 @@ async def bootstrap() -> None:
         return
     presentation_elements: List[Any] = di["presentation"] 
     event_loop = asyncio.get_event_loop()
-    logger.info(f"Avvio dei caricatori ({len(presentation_elements)}) per gli elementi di Presentazione.")
     await dependency_messenger.post(domain='debug', message=f"Avvio dei caricatori ({len(presentation_elements)}) per gli elementi di Presentazione.")
-
     for item in presentation_elements:
         item_name = getattr(item, '__class__', item)
         if hasattr(item, "loader"):

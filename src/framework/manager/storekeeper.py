@@ -1,7 +1,7 @@
 import asyncio
 import importlib
 
-resources = {
+imports = {
     'flow': 'framework/service/flow.py',
 }
 

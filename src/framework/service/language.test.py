@@ -13,6 +13,7 @@ exports = {
     'format':'format',
     'generate':'generate',
     'convert':'convert',
+    'route':'route',
 }
 
 class TestModule(contract.Contract):
@@ -35,6 +36,9 @@ class TestModule(contract.Contract):
         await self.check_cases(language.resource, success)
         await self.check_cases(language.resource, failure)'''
     
+    async def test_route(self):
+        pass
+
     async def test_asynchronous(self):
         pass
 
