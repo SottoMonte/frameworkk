@@ -1,5 +1,4 @@
 imports = {
-    'flow': 'framework/service/flow.py',
     'contract': 'framework/service/contract.py',
     'model': 'framework/schema/model.json',
 }
@@ -14,6 +13,7 @@ exports = {
     'generate':'generate',
     'convert':'convert',
     'route':'route',
+    'normalize':'normalize',
 }
 
 class TestModule(contract.Contract):
@@ -55,6 +55,9 @@ class TestModule(contract.Contract):
         pass
 
     async def test_convert(self):
+        pass
+
+    async def test_normalize(self):
         pass
 
     '''async def test_model(self):

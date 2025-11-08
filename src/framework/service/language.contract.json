@@ -31,6 +31,10 @@
         "convert": {
             "test": "be6ec092cddef3c04236d6280fdbd8ad789c617476064fcff413a2e6240e30fb",
             "production": "ab32a2c27f46d4de4d2d7ad65d9e2b4107aa389421157e5b6ac6bc28e24a0424"
+        },
+        "normalize": {
+            "test": "88926acbb1b3ed6e19c5267e181ebe3ec52dc7717e3f3599a99fcbf64213b7e7",
+            "production": "862f84cbad6c978eb685907f5c5f9eb702b7e115a4e257d1ef90f29f160ee7c3"
         }
     }
 }

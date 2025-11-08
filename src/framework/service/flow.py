@@ -5,6 +5,31 @@ import inspect
 import traceback
 import functools
 
+
+def asynchronous2(custom_filename: str = __file__, app_context = None,**constants):
+    inject = [di[manager] for manager in constants.get('managers', [])]
+    output = constants.get('outputs', [])
+    input = constants.get('inputs', [])
+    
+    def decorator(function):
+        @functools.wraps(function)
+        @language.asynchronous()
+        async def wrapper(*args, **kwargs):
+            print(di['language'])
+            args_inject = list(args) + inject
+            if 'inputs' in constants:
+                    #kwargs_builder = await language.model(input, kwargs, 'filtered', language)
+                outcome = await function(*args_inject, **kwargs)
+            else:
+                outcome = await function(*args_inject, **kwargs)
+            if 'outputs' in constants:
+                    #return await language.model(output, outcome, 'full', language)
+                return outcome
+            else:
+                return outcome
+        return wrapper
+    return decorator
+
 def asynchronous(custom_filename: str = __file__, app_context = None,**constants):
     inject = [di[manager] for manager in constants.get('managers', [])]
     output = constants.get('outputs', [])
@@ -27,17 +52,21 @@ def asynchronous(custom_filename: str = __file__, app_context = None,**constants
                     return outcome
 
             except Exception as e:
+                print(dir(language),'LANGUAGE NEL DECORATORE')
+                print("Eccezione catturata nel decoratore asynchronous:", str(e))
                 source_code = None
+                
                 fff = "src/"+custom_filename
                 source_code = await language.resource(path=fff)
 
                 # Genera il rapporto usando l'eccezione attiva
                 report = language.analyze_exception(source_code=source_code,custom_filename=fff,app_context=app_context)
-                dependency_messenger = di['messenger']()
+                #dependency_messenger = di['messenger']()
                 
                 ok = await language.convert(report, str, 'json')
-                await dependency_messenger.post(domain='debug', message=ok)
-                print(ok)
+                #await dependency_messenger.post(domain='debug', message=ok)
+                #print(ok.replace(' ',''))
+                pass
         return wrapper
     return decorator
 

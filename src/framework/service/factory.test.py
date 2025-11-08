@@ -6,6 +6,8 @@ imports = {
     'model': 'framework/schema/model.json',
 }
 
+
+
 class Testrepository(contract.Contract):
     def setUp(self):
         self.repo = factory.repository(

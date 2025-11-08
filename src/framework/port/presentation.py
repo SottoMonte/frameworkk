@@ -121,7 +121,8 @@ class port(ABC):
             ppp = await self.mount_widget('Text', ['aaa'], {'type':'text'})
             constants['inner'] = placeholder
 
-        constants['user'] = await defender.whoami()
+        #constants['user'] = await defender.whoami()
+        constants['user'] = {}
         print(constants)
 
         content = template.render(constants)
@@ -265,7 +266,7 @@ class port(ABC):
         if tag in tags:
             schema = tags[tag]
 
-            schema_data = await language.model({tag:schema.copy()},{tag:attributes})
+            schema_data = await language.normalize({tag:attributes},{tag:schema.copy()})
             attributes |= schema_data.get(tag,{})
             #print('Schema:',tttt)
             #print('Rendering tag:',tag,attributes,schema)

@@ -11,24 +11,24 @@ async def main():
         cwd = os.getcwd()
         sys.path.insert(1, cwd+'/src')
         import framework.service.language as language
-        
+
+        # Seed the DI cache with the imported module so dynamically loaded
+        # modules that ask for `language` during their own import don't see None.
+
         try:
             lang = await language.resource(path="framework/service/language.py")
+            language.di['module_cache']['framework/service/language.py'] = lang
+            # If loading succeeded, replace cache entry with the filtered module
         except Exception as e:
-            print("Errore durante il caricamento del modulo language:", e)
-            
-        #language.di['module_cache']['language'] = language
-        language.di['module_cache']['language'] = lang
-        #print(dir(lang))
-        #loader = await language.load_module(language, path="framework.service.loader", area="framework", service='service', adapter='loader')
-        #await loader.bootstrap()
+            #run = await language.resource(path="framework/service/run.py")
+            pass
         try:
             run = await lang.resource(path="framework/service/run.py")
         except Exception as e:
-            language.di['module_cache']['language'] = language
             run = await language.resource(path="framework/service/run.py")
+            pass
             
-        
+        print(dir(lang),'PRIMA DI RUN')
     
     return run
 if __name__ == "__main__":

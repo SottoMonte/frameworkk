@@ -37,6 +37,15 @@ class Testadapter(contract.Contract):
     async def test_builder(self):
         pass
 
+    async def test_code(self):
+        pass
+
+    async def test_att(self):
+        pass
+
+    async def test_code_update(self):
+        pass
+
     async def test_rebuild(self):
         pass
 
@@ -65,8 +74,10 @@ class Testadapter(contract.Contract):
         pass 
 
     async def test_loader(self):
-        pass 
+        pass
 
+    async def test_mount_view(self):
+        pass
 
     async def test_mount_widget(self):
         

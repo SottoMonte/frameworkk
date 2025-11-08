@@ -1,5 +1,13 @@
 {
     "adapter": {
+        "code": {
+            "test": "9130e192dae67c7e0d07269a26fb17a9e05e9d6c23ab760f5bd8fbec6dd49a2c",
+            "production": "a01e48f7dfa15021efde98799d0ea97bd56effd934612d7b8a09edfc3002c3ae"
+        },
+        "att": {
+            "test": "a35a130931c4f4d3335b686159f4ddc7421ee9ff268dd9f25a5f3f3337b10447",
+            "production": "067e9638d360d113d30e6287f33a3d2797eb25024924c2d4904666ac0a05d9da"
+        },
         "mount_route": {
             "test": "76a39fb1c49188cfe7b04e467cacb041bea719c145cbd27310b2d9de1f714a98",
             "production": "fb4e12abffd594bbb7882c2e8e1f80103070101dd3d5a95c4ae5a2b41a8123f4"
@@ -19,6 +27,10 @@
         "action": {
             "test": "2648d1c933261d82e4f0f4970ef5eb63085f11a605c208c58d9f25c647b6a8d8",
             "production": "a2dade0653bd654136c74fdb359e767f91a4c5466054b425da0703d8d960cb51"
+        },
+        "mount_view": {
+            "test": "3b4f2222bcad68f18894c6787c38c289d86e0839f836ff52dea65ede7bbeed71",
+            "production": "1993752fb60690ad5825549e968295ffc5832da1e4823433f5db8b227a804ee1"
         },
         "set_attribute": {
             "test": "369ec4f72ff70a90cc30a6a239b952ebf1e4ff07c5f2c4933d319a97ae37a173",

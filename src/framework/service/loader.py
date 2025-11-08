@@ -166,7 +166,7 @@ async def bootstrap_core() -> None:
             'messenger': 'tester' # Nome della chiave nel DI per la dipendenza
         }
     ]
-
+    print(dir(language),'BOOTSTRAP CORE language')
     await language.register(**{
         'path': 'infrastructure/message/console.py', # Percorso per resource
         'service': 'message', # Chiave nel DI per la lista dei provider

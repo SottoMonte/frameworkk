@@ -1,5 +1,9 @@
 import unittest
 
+exports = {
+    'Contract':'Contract',
+}
+
 class TestContract(unittest.IsolatedAsyncioTestCase):
 
     def setUp(self):

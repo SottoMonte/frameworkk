@@ -24,11 +24,12 @@ import platform
 from typing import Dict, Any, Optional, List, Callable
 import psutil
 import socket
-
+import asyncio
 # Cache e stack per prevenire loop e ricaricamenti ripetuti
 # Ora registrati in DI per poterli sovrascrivere / mockare facilmente.
 if 'module_cache' not in di:
     di['module_cache'] = {}
+    di['module_cache_lock'] = asyncio.Lock()
 if 'loading_stack' not in di:
     di['loading_stack'] = set()
 
@@ -61,7 +62,7 @@ def buffered_log(level: str, message: str, emoji: str = ""):
         'timestamp': datetime.now(timezone.utc).isoformat(),
         'transaction_id': get_transaction_id()
     })
-    #print(formatted)  # Mantiene output semplice durante il bootstrap
+    print(formatted)  # Mantiene output semplice durante il bootstrap
 
 def asynchronous(custom_filename: str = __file__, app_context: Optional[Dict[str, Any]] = None):
     """
@@ -293,7 +294,7 @@ async def format(target ,**constants):
     except Exception as e:
         raise ValueError(f"Errore formattazione: {e}")
 
-async def normalize(schema, value=None, mode='full'):
+async def normalize(value,schema, mode='full'):
     """
     Convalida, popola, trasforma e struttura i dati utilizzando uno schema Cerberus.
 
@@ -932,7 +933,7 @@ async def _validate_and_filter_module(
     solo i membri che hanno un contratto valido e presente nel file .contract.json.
     """
     validated_members: List[str] = []
-
+    print(f"🔍 Avvio validazione contratto per il modulo: {path}",dir(main_module))
     contract_json_path = path.replace('.py', '.contract.json')
     try:
         json_content = await _load_resource(path=contract_json_path)
@@ -995,7 +996,7 @@ async def _validate_and_filter_module(
             if prod_func is None or test_func is None:
                 print(f"DEBUG: Membro '{m}' non trovato in prod o test. Saltato.")
                 continue
-            
+
             # Estrai gli hash di riferimento
             expected_prod_hash = hashes['production']
             expected_test_hash = hashes['test']
@@ -1035,6 +1036,8 @@ async def _validate_and_filter_module(
             (inspect.isfunction(getattr(main_module, candidate)) and (candidate in contract_methods_by_name.get('__module__', {}) and candidate in contract_validated_methods.get('__module__', {})))
         )
     }
+    allowed_exports  = allowed_exports.union(set({'language'}))
+    exports_map['language'] = 'language'
     buffered_log("DEBUG", f"🔍 Avvio filtro: membri mantenuti se presenti in {allowed_exports} e/o testati.")
     # Create filtered module and populate only allowed exports
     filtered_module = types.ModuleType(f"filtered:{main_module.__name__}")
@@ -1046,10 +1049,10 @@ async def _validate_and_filter_module(
         # Condizione 1: È un modulo importato?
         if inspect.ismodule(member):
             # Condizione 2: Non è un modulo interno (built-in) o il modulo genitore stesso?
-            # Questo evita di copiare oggetti interni di Python (es. '__builtins__') 
+            # Questo evita di coprire oggetti interni di Python (es. '__builtins__') 
             # o il modulo che stiamo filtrando.
             if name not in sys.builtin_module_names and name not in ['__file__', '__name__', '__package__', '__loader__', '__spec__', main_module.__name__]:
-                # Condizione 3: Non inizia con un underscore nascosto (se non vuoi copiare importazioni "private")
+                # Condizione 3: Non inizia con un underscore nascosto (se non vuoi coprire importazioni "private")
                 if not name.startswith('_'): 
                     setattr(filtered_module, name, member)
                     buffered_log("DEBUG", f"   > Copiato modulo di dipendenza: {name}")'''
@@ -1091,6 +1094,9 @@ async def _validate_and_filter_module(
             elif inspect.isfunction(member) or not inspect.isclass(member):
                 setattr(filtered_module, public_name, member)
                 validated_members.append(public_name)
+            elif inspect.ismodule(member):
+                setattr(filtered_module, public_name, member)
+                validated_members.append(public_name)
     else:
         buffered_log("WARNING", "⚠️ Nessun 'exports' dichiarato: nessun membro sarà esposto dal modulo filtrato.")
 
@@ -1113,11 +1119,15 @@ async def _load_dependencies(module: types.ModuleType,dependencies) -> None:
         # Se è già nel cache, riutilizza (DEBUG)
         if import_path.endswith(".py") and cache_key in di['module_cache']:
             value = di['module_cache'][cache_key]
+            buffered_log("DEBUG", f"♻️ {cache_key} Cache hit modulo Python da {dir(value)}")
             setattr(module, key, value)
             buffered_log("DEBUG", f"♻️ Cache hit per dipendenza '{key}' da {cache_key}")
             continue
+        else:
+            buffered_log("DEBUG", f"⏳ Caricamento dipendenza '{key}' da {import_path}...")
 
-        try:
+
+        '''try:
             imported_content = await _load_resource(path='src/'+import_path)
         except FileNotFoundError:
             buffered_log("WARNING", f"⚠️ Dipendenza non trovata: {import_path}")
@@ -1132,8 +1142,11 @@ async def _load_dependencies(module: types.ModuleType,dependencies) -> None:
             # carica come modulo dinamico (salvato nella cache dentro _load_python_module)
             value = await _load_python_module(key, import_path, imported_content)
         else:
-            value = imported_content
+            value = imported_content'''
+        value = await resource(path=import_path)
+        print(import_path,dir(value),"<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< DIPENDENZA")
         setattr(module, key, value)
+        di['module_cache'][import_path] = value
         buffered_log("DEBUG", f"📦 Dipendenza '{key}' caricata da {import_path}")
 
 async def _load_python_module(name: str, path: str, code: str) -> types.ModuleType:
@@ -1142,12 +1155,18 @@ async def _load_python_module(name: str, path: str, code: str) -> types.ModuleTy
     module = types.ModuleType(module_name)
     module.__file__ = path
     module.__source__ = code
-    module.__dict__['language'] = di['module_cache'].get('language')
+    module.__dict__['language'] = di['module_cache'].get('framework/service/language.py')
+
+    if module.__dict__['language'] is None and path not in ['src/framework/service/contract.test.py','src/framework/service/contract.py','src/framework/service/language.test.py','src/framework/service/language.py','framework/service/language.py']:
+        buffered_log("WARNING", "⚠️ Modulo di lingua non caricato prima delle dipendenze.",path)
+        raise ImportError("Modulo di lingua mancante per le dipendenze.")
+    
     
     try:
         dependencies = analyze_module(code, path)
-        
         dependencies = dependencies.get('imports',{}).get('value',{})
+        #if path != 'framework/service/language.py':
+        #    dependencies['language'] = 'framework/service/language.py'
         buffered_log("INFO", f"🔍 Dipendenze trovate in {path}: {dependencies}")
         await _load_dependencies(module,dependencies.copy())
         # 2. Compila il codice con il nome del file

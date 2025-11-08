@@ -988,7 +988,7 @@ class adapter(presentation.port):
             else:
                 pppath = parsed_url.path
             url = {'url':self.url,'protocol':parsed_url.scheme,'host':parsed_url.hostname,'port':parsed_url.port,'path':pppath.split('/'),'query':query_params,'fragment':frag_params}
-            url = await language.model(scheme_url,url,'full',language)
+            url = await language.normalize(url,scheme_url)
             return await self.builder(file=matched_route['view'],url=url,mode=['main'],**kargs)
         else:
             # Nessuna rotta corrispondente, gestiamo l'errore (ad esempio, un 404).
@@ -1073,7 +1073,7 @@ class adapter(presentation.port):
         }
 
         # chiama il modello / builder come nel tuo flusso
-        url_payload = await language.model(scheme_url, url_payload, 'full', language)
+        url_payload = await language.normalize(url_payload,scheme_url)
         return await self.builder(file=matched_route['view'], url=url_payload, mode=['main'], **kargs)
 
     async def starlette_view(self,request):
