@@ -112,7 +112,7 @@ class port(ABC):
 
         #constants['user'] = await defender.whoami()
         constants['user'] = {}
-        print(constants)
+        #print(constants)
 
         content = template.render(constants)
         #print('Content:---------------------------*******************',content)
@@ -125,7 +125,7 @@ class port(ABC):
             if isinstance(inner, list):
                 inner = ''.join(str(x) for x in inner)
             view = view.replace(ppp,inner)
-        print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!2",view,constants)
+        #print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!2",view,constants)
         return view
 
     async def rebuild(self, id, tag, **data):
@@ -133,7 +133,7 @@ class port(ABC):
               #url = f"application/view/component/{tag}.xml"
               url = tag
               #new_component = await self.builder(url=url, **{'component':self.components.get(id,{})}|data)
-              print('BOOM',self.components.get(id,{}))
+              #print('BOOM',self.components.get(id,{}))
               new_component = await self.builder(url=url, component=self.components.get(id,{}) , **data)
               old_component = self.document.getElementById(id)
               #old_component.innerHTML = new_component.innerHTML
@@ -151,7 +151,8 @@ class port(ABC):
               parent.replaceChild(new_component, old_component)
 
           except Exception as e:
-              print(f"Errore durante la ricostruzione del componente '{id}': {e}")
+              #print(f"Errore durante la ricostruzione del componente '{id}': {e}")
+              pass
     
     async def render_widget(self, tag, inner, attributes, **context):
 
@@ -180,7 +181,7 @@ class port(ABC):
         try:
             tree = untangle.parse(file)
             if not tree or not tree.get_elements() or not tree.get_elements()[0].get_elements():
-                print("Errore: Il file XML è vuoto o malformato.")
+                #print("Errore: Il file XML è vuoto o malformato.")
                 return
 
             for setting in tree.get_elements()[0].get_elements():
@@ -229,11 +230,8 @@ class port(ABC):
                     }
 
         except Exception as e:
-            print(f"Si è verificato un errore durante il parsing del file: {e}")
-
-        print(self.routes)
-
-
+            #print(f"Si è verificato un errore durante il parsing del file: {e}")
+            pass
 
     @flow.asynchronous(managers=('storekeeper','messenger'))
     async def render_view(self,root,data,storekeeper,messenger):
@@ -288,7 +286,7 @@ class port(ABC):
                         #print('Rendering widget:',data)
                         if attributes.get('filter'):
                             filtro = language.convert(attributes.get('filter',''),'dict')
-                            print(filtro)
+                            #print(filtro)
                         else:
                             filtro = {}
                         
@@ -296,14 +294,14 @@ class port(ABC):
                         
                         #exit(10) 'eq': {'id':'10'}
                         #return await self.render_widget(*schema['_return'].get('args',[]), inner, attributes, **{'url':data.get('url',''),'storekeeper':transaction})
-                        print(inner)
+                        #print(inner)
                         inner = []
                         if len(elements) > 0:
                             for element in elements:
                                 mounted = await self.render_view(element, data|{'storekeeper':transaction})
                                 inner.append(mounted)
                         ok= await self.builder(file="src/application/view/component/Tiat.xml",text='<Row>{{inner|safe}}</Row>',**{'inner':inner,'url':data.get('url',''),'storekeeper':transaction})
-                        print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!",ok)
+                        #print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!",ok)
                         #exit(10)
                         return ok              
             if '_type' in schema:
@@ -321,13 +319,14 @@ class port(ABC):
                     elif input_type == 'mixed':
                         return await self.render_widget(schema_type, inner, attributes, **{'url':data.get('url',''),'storekeeper':data.get('storekeeper',{})})
                     else:
-                        print('Unknown input type:',input_type)
+                        #print('Unknown input type:',input_type)
+                        pass
                 #print('Mounting widget:',schema_type,tag,attributes.get('type',''))
         else:
             return await self.render_widget(tag, inner, attributes, **{'url':data.get('url',''),'mode':['component'],'storekeeper':data.get('storekeeper',{})})
 
     async def mount_widget(self, tag, children, user_attrs, **context):
-        print(tag,'!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!',context)
+        #print(tag,'!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!',context)
         """Mounts a widget using data-driven config."""
         user_attrs = user_attrs or {}
         widget_name = tag.lower()
@@ -343,7 +342,7 @@ class port(ABC):
         # Merge attributi: unisci config + user, con gestione speciale della classe
         default_attrs = widget_config.get('attributes', {})
         #merged_attrs = {**default_attrs, **user_attrs}
-        print("USERS",user_attrs)
+        #print("USERS",user_attrs)
 
         element_tag = widget_config.get('tag')
         
@@ -385,7 +384,7 @@ class port(ABC):
                     hook_result = hook(self, element_attrs, children)
                 case 2:
                     hook_result = hook(self, element_attrs, children, user_attrs)
-                    print("HOOK RESULT:",user_attrs)
+                    #print("HOOK RESULT:",user_attrs)
                 case 5:
                     hook_result = hook
                     pass
@@ -452,7 +451,7 @@ class port(ABC):
                             #inner.append(ggg)
                             #children = await self.builder(file=overwrite_attrs,inner=ggg,mode=['layout'])
                 case 'component':
-                    print('Component#############################################################11111#111#111#:',hook_result,element_attrs,children)
+                    #print('Component#############################################################11111#111#111#:',hook_result,element_attrs,children)
                     #exit(1)
                     def elements_to_xml_string(elements):
                         # Crea un elemento root temporaneo
@@ -477,7 +476,7 @@ class port(ABC):
                     
                     #xml_string = elements_to_xml_string(elements)
                     url = f'application/view/component/{hook_result}.xml'
-                    print('Component#############################################################11111#111#111#:',url,element_attrs,children)
+                    #print('Component#############################################################11111#111#111#:',url,element_attrs,children)
                     #attrii = ''.join(x.outerHTML for x in att)
                     id = element_attrs['id'] if 'id' in element_attrs else str(uuid.uuid1())
                     if id not in self.components:
@@ -534,9 +533,9 @@ class port(ABC):
         # Ottieni il form e i dati
         
         form = await presenter.selector(id=target)
-        print(type(form))
+        #print(type(form))
         elements = await presenter.get_attribute(widget=form[-1],field="elements")
-        print('form:',form,target,elements)
+        #print('form:',form,target,elements)
         for input in elements:
             name = await presenter.get_attribute(widget=input,field="name")
             if name:
@@ -545,7 +544,7 @@ class port(ABC):
                     form_data.setdefault(key, []).append(input.value)
                 else:
                     form_data[name] = input.value
-        print(form_data)
+        #print(form_data)
 
         max_len = max((len(v) for v in form_data.values() if isinstance(v, list)), default=1)
         items = []
@@ -559,11 +558,11 @@ class port(ABC):
                     item[key] = value
             items.append(item)
 
-        print('items:', items,form_data)
+        #print('items:', items,form_data)
         #await executor.act(action=action,**form_data|{'items':items})
         
         if not any(isinstance(v, list) for v in form_data.values()):
-            print('Single item submission')
+            #print('Single item submission')
             await executor.act(action=action, **form_data)
         else:
             for item in items:

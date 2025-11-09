@@ -2,11 +2,11 @@
     "__module__": {
         "bootstrap_core": {
             "test": "d683b01a043ec54c4081835db4187e9f54206e1580563e29bb07fb977ef4b999",
-            "production": "6b54ecbf58ea403cdf2ccca8d543e825cabc5c49ee4d5343ed526fd8ef8b03e6"
+            "production": "64191eec3fde3a6918441ccfa57f31322f27e4d9a7a8f654ac233314a43541c8"
         },
         "bootstrap": {
             "test": "038ee4e822716fb257c55af8dc60aa05a5efb4f112fcc251edb8a4110ccbcbb5",
-            "production": "d665c57864dddd9740846574debc202ff9f85e70ad87f0e74abf8c7ee54a803b"
+            "production": "1f414934fea3a3e72485f6e28aab1079eda4ac775a22171fc32184b386a29815"
         }
     }
 }

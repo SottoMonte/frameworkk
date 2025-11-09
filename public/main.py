@@ -27,8 +27,6 @@ async def main():
         except Exception as e:
             run = await language.resource(path="framework/service/run.py")
             pass
-            
-        print(dir(lang),'PRIMA DI RUN')
     
     return run
 if __name__ == "__main__":

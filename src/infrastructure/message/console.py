@@ -177,7 +177,7 @@ class adapter:
         identity = constants.get('identity', '')
         results = []
         matching_domains = language.wildcard_match(self.history.keys(), domain)
-        print(f"Matching domains2: {matching_domains}",self.history.keys(),domain,self.history)
+        #print(f"Matching domains2: {matching_domains}",self.history.keys(),domain,self.history)
         for dom in matching_domains:
             last, messages = self.history.get(dom, [0, []])
             if last < len(messages):

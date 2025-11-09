@@ -14,7 +14,7 @@
         },
         "synchronous": {
             "test": "fce4373a51afc6fe6396a125b184f4892c6ff02b6e4588023b5f3b2ded5e58dc",
-            "production": "3c4e792744412291c751d10dd84cb215ff5d56a88f1ee951f08234bd97cf09b4"
+            "production": "2d618c17a02934286d306ffd544b88ffd5cca8f586f85c984a3c2207d9179503"
         },
         "load_di_entry": {
             "test": "7606f09c8428f82d3ac96586a41ccb77d4a7741e5d29c095aac55a476d8a4629",
@@ -34,7 +34,7 @@
         },
         "normalize": {
             "test": "88926acbb1b3ed6e19c5267e181ebe3ec52dc7717e3f3599a99fcbf64213b7e7",
-            "production": "862f84cbad6c978eb685907f5c5f9eb702b7e115a4e257d1ef90f29f160ee7c3"
+            "production": "019b17ce60b9409c55fece1178fc20743541b5fd061067ece606d4e2916f3b89"
         }
     }
 }

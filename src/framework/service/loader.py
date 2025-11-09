@@ -166,7 +166,7 @@ async def bootstrap_core() -> None:
             'messenger': 'tester' # Nome della chiave nel DI per la dipendenza
         }
     ]
-    print(dir(language),'BOOTSTRAP CORE language')
+    
     await language.register(**{
         'path': 'infrastructure/message/console.py', # Percorso per resource
         'service': 'message', # Chiave nel DI per la lista dei provider
@@ -233,73 +233,6 @@ async def bootstrap() -> None:
     # LOGGING MIGLIORATO (Stato DI)
     await dependency_messenger.post(domain='debug', message=f"Container DI 'kink' inizializzato. Tentativo di caricamento manager essenziali...")
     
-    # Manager principali (Caricamento Parallelo)
-
-    """'path': 'infrastructure/email/smtp_adapter.py', # Percorso per resource
-    'service': 'email_providers', # Chiave nel DI per la lista dei provider
-    'adapter': 'EmailAdapter', # Nome della classe da estrarre dal modulo
-    'payload': { # Argomenti del costruttore (__init__)
-        'host': 'smtp.corp.com', 
-        'port': 587, 
-        'secure': True
-    }"""
-
-    '''manager_loader_path = [
-        {
-            'path': 'framework/manager/presenter.py',
-            'name': 'presenter',
-            'config': {
-                'cache_enabled': True, 
-                'log_level': 'INFO'
-            },
-            'dependency_keys': ['messenger'], # Dipendenze da risolvere dal DI
-            'messenger': 'presenter' # Nome della chiave nel DI per la dipendenza
-        },
-        {
-            'path': 'framework/manager/defender.py',
-            'name': 'defender',
-            'config': {
-                'cache_enabled': True, 
-                'log_level': 'INFO'
-            },
-            'dependency_keys': ['messenger','persistence'], # Dipendenze da risolvere dal DI
-            'messenger': 'defender' # Nome della chiave nel DI per la dipendenza
-        },
-        {
-            'path': 'framework/manager/storekeeper.py',
-            'name': 'storekeeper',
-            'config': {
-                'cache_enabled': True, 
-                'log_level': 'INFO'
-            },
-            'dependency_keys': ['messenger'], # Dipendenze da risolvere dal DI
-            'messenger': 'storekeeper' # Nome della chiave nel DI per la dipendenza
-        },
-        {
-            'path': 'framework/manager/tester.py',
-            'name': 'tester',
-            'config': {
-                'cache_enabled': True, 
-                'log_level': 'INFO'
-            },
-            'dependency_keys': ['messenger','persistence'], # Dipendenze da risolvere dal DI
-            'messenger': 'tester' # Nome della chiave nel DI per la dipendenza
-        }
-    ]
-    
-    manager_tasks = [ asyncio.create_task(language.register(**mgr), name=f"load_{mgr['name']}") for mgr in manager_loader_path]
-    
-    await dependency_messenger.post(domain='debug', message=f"Avvio del caricamento parallelo di {len(manager_tasks)} Manager...")
-    await dependency_executor.all_completed(tasks=manager_tasks) 
-    await dependency_messenger.post(domain='debug', message="Caricamento Manager completato. System-DI pronto.")'''
-
-    '''dependency_storekeeper = di['storekeeper'](di)
-    dependency_defender = di['defender'](di)
-    dependency_presenter = di['presenter'](di)
-    print('STORE-',dependency_storekeeper)
-    print('DEFEN-',dependency_defender)
-    print('PRESEN-',dependency_presenter)'''
-
     # --- FASE DI CARICAMENTO PROVIDER ---
     provider_tasks: List[asyncio.Task] = []
     MODULI_PRINCIPALI = ["presentation", "persistence", "message", "authentication", "actuator"]
@@ -331,8 +264,6 @@ async def bootstrap() -> None:
 
     await dependency_messenger.post(domain='debug', message=f"Avvio del caricamento parallelo di {len(provider_tasks)} Provider...")
     ok = await dependency_executor.all_completed(tasks=provider_tasks)
-
-    print('PROV-',ok)
     
     await dependency_messenger.post(domain='debug', message="Caricamento di tutti i Provider completato.")
 

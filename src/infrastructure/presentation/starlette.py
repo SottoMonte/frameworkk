@@ -682,8 +682,8 @@ class adapter(presentation.port):
         },
     }
 
-    @flow.synchronous(managers=('defender',))
-    def __init__(self,defender,**constants):
+    @language.synchronous(managers=('defender','messenger'))
+    def __init__(self,defender,messenger,**constants):
         self.config = constants.get('config', {})
         self.initialize()
         self.views = dict({})
@@ -713,7 +713,7 @@ class adapter(presentation.port):
             # Costruisce l'URL per il fetch, gestendo il caso di percorso vuoto
             route_path = self.config.get('route', '')
             resource_url = f"application/policy/presentation/{route_path}"
-            print(f"Caricamento delle rotte da: {resource_url}")
+            await messenger.post(domain='info', message=f"Caricamento delle rotte da: {resource_url}")
             file = await language.fetch(path=resource_url)
             self.parse_route(file)
             self.mount_route(routes) # 'routes' deve essere accessibile qui
@@ -733,11 +733,11 @@ class adapter(presentation.port):
 
             # Aggiunge i parametri SSL se presenti
             if 'ssl_keyfile' in self.config and 'ssl_certfile' in self.config:
-                print("SSL abilitato.")
+                await messenger.post(domain='debug', message="SSL abilitato.")
                 uvicorn_config_params['ssl_keyfile'] = self.config['ssl_keyfile']
                 uvicorn_config_params['ssl_certfile'] = self.config['ssl_certfile']
             else:
-                print("SSL disabilitato.")
+                await messenger.post(domain='debug', message="SSL disabilitato.")
 
             # Costruisci la stringa della porta
             port_str = ""
@@ -752,10 +752,10 @@ class adapter(presentation.port):
                 config = Config(**uvicorn_config_params)
                 server = Server(config)
                 loop.create_task(server.serve())
-                print(f"Server avviato su {uvicorn_config_params['host']}:{uvicorn_config_params['port']}")
+                await messenger.post(domain='debug', message=f"Server avviato su {uvicorn_config_params['host']}:{uvicorn_config_params['port']}")
             except Exception as e:
                 # Logga errori critici all'avvio del server
-                print(f"Errore critico durante l'avvio del server Uvicorn: {e}")
+                await messenger.post(domain='error', message=f"Errore critico durante l'avvio del server Uvicorn: {e}")
         loop.create_task(main())
     
     async def mount_css(self,constants):
@@ -788,7 +788,6 @@ class adapter(presentation.port):
 
         # Autenticazione tramite defender
         session = await defender.authenticate(ip=client_ip, identifier=session_identifier, **credentials)
-        print(session,credentials,'session.defender')
         provider = credentials.get('provider', 'undefined')
 
         
@@ -813,7 +812,7 @@ class adapter(presentation.port):
     async def websocket(self, websocket, messenger):
         ip = websocket.client.host
         await websocket.accept()
-        print(f"🔌 Connessione WebSocket da {ip}")
+        await messenger.post(domain='info', message=f"🔌 Connessione WebSocket da {ip}")
 
         #ws_queue = asyncio.Queue()  # Coda per i messaggi WebSocket
         #messenger_queue = asyncio.Queue()  # Coda per i messaggi di Messenger
@@ -823,7 +822,7 @@ class adapter(presentation.port):
             try:
                 while not stop_event.is_set():
                     msg = await websocket.receive_text()
-                    print(f"📥 Messaggio dal client: {msg}")
+                    await messenger.post(domain='debug', message=f"📥 Messaggio dal client: {msg}")
                     await websocket.send_text(msg)
             except Exception:
                 stop_event.set()  # Ferma il ciclo se il WebSocket si chiude
@@ -831,12 +830,12 @@ class adapter(presentation.port):
         async def listen_for_updates():
             while not stop_event.is_set():
                 msg = await messenger.read(domain='*',identity=ip)
-                print(f"📨 Messaggio dal server: {msg}")
+                await messenger.post(domain='debug', message=f"📨 Messaggio dal server: {msg}")
                 #await messenger_queue.put(msg)
                 await websocket.send_text(msg)
     
-    @flow.asynchronous(managers=('defender',))
-    async def websocketssh(self, websocket, defender):
+    @language.asynchronous(managers=('defender','messenger'))
+    async def websocketssh(self, websocket, defender,messenger):
         ip = websocket.client.host
 
         # Sessione di autenticazione
@@ -846,7 +845,7 @@ class adapter(presentation.port):
         try:
             # Riceve parametri iniziali
             initial_message = await websocket.receive_text()
-            print(f"Sessione {session} con messaggio iniziale: {initial_message}")
+            await messenger.post(domain='debug', message=f"Sessione {session} con messaggio iniziale: {initial_message}")
             params = json.loads(initial_message)
             username = params.get("username")
             password = params.get("password")
@@ -883,7 +882,7 @@ class adapter(presentation.port):
             await asyncio.gather(read_from_channel(), read_from_websocket())
 
         except Exception as e:
-            print(f"Errore durante la sessione SSH-WebSocket: {e}")
+            await messenger.post(domain='error', message=f"Errore durante la sessione SSH-WebSocket: {e}")
             
         finally:
             try:
@@ -891,11 +890,11 @@ class adapter(presentation.port):
                     channel.close()
                 if ssh:
                     ssh.close()
-                print(f"Sessione SSH chiusa per {session}")
+                await messenger.post(domain='debug', message=f"Sessione SSH chiusa per {session}")
             except Exception as close_err:
-                print(f"Errore durante la chiusura SSH: {close_err}")
+                await messenger.post(domain='error', message=f"Errore durante la chiusura SSH: {close_err}")
     
-    @flow.asynchronous(managers=('storekeeper','messenger'))
+    @language.asynchronous(managers=('storekeeper','messenger'))
     async def action(self, request, storekeeper, messenger, **constants):
         #print(request.cookies.get('user'))
         match request.method:
@@ -916,81 +915,8 @@ class adapter(presentation.port):
                 #await messenger.post(name=request.url.path[1:],value={'model':data['model'],'value':data})
                 return RedirectResponse('/', status_code=303)
 
-
-    async def mount_view2(self, url,**kargs):
-        # Dati per un'eventuale rotta corrispondente.
-        def process_url(url, default):
-            deffault_url = urlparse(default)
-            parsed_url = urlparse(url)
-
-            # Crea un dizionario dei campi da unire.
-            # Usa il dizionario di _parsed_url come base.
-            # Nota: urlparse restituisce un namedtuple, quindi usiamo _asdict().
-            merged_dict = parsed_url._asdict()
-
-            # Cicla sui campi dell'URL base e aggiorna solo quelli vuoti nell'URL di destinazione.
-            for field in deffault_url._fields:
-                if not merged_dict[field]: # Se il campo è vuoto
-                    merged_dict[field] = getattr(deffault_url, field)
-
-            # Ricrea l'oggetto parsed_url usando i dati del dizionario unito.
-            # Si usa ** per espandere il dizionario come argomenti keyword.
-            return ParseResult(**merged_dict)
-        #parsed_url = urlparse(url)
-        parsed_url = process_url(url,self.url)
-
-        matched_route = None
-
-        # Iteriamo su tutte le rotte registrate per trovare una corrispondenza.
-        for route_path, route_data in self.routes.items():
-            # Creiamo un pattern regex a partire dal percorso della rotta.
-            # Ad esempio, da '/inventory/{id}' otteniamo r'^/inventory/([^/]+)$'.
-            regex_pattern = re.sub(r'\{([^/]+)\}', r'([^/]+)', route_path)
-            regex_pattern = f'^{regex_pattern}$'
-
-            # Cerchiamo una corrispondenza tra l'URL richiesto e il nostro pattern.
-            match = re.search(regex_pattern, parsed_url.path)
-
-            if match:
-                # Trovata una corrispondenza!
-                matched_route = {
-                    'view': route_data.get('view'),
-                    'params': {},
-                    'layout': route_data.get('layout')
-                }
-
-                # Estraiamo i nomi delle variabili dal percorso originale (es. 'id' da '{id}').
-                param_names = re.findall(r'\{([^/]+)\}', route_path)
-
-                # Mappiamo i valori catturati con i nomi delle variabili.
-                # Ad esempio, se l'URL è '/inventory/123', 'id' corrisponderà a '123'.
-                for i, name in enumerate(param_names):
-                    matched_route['params'][name] = match.group(i + 1)
-                
-                break # Usciamo dal ciclo una volta trovata la prima corrispondenza.
-        
-        # Se abbiamo trovato una rotta, eseguiamo l'azione.
-        if matched_route:
-            print(f"Percorso trovato: {matched_route['view']} per l'URL: {url}",parsed_url)
-            print(f"Parametri estratti: {matched_route['params']}")
-            #query_params = dict({key: query_params.setdefault(key, []) + [value] for param in parsed_url.query.split('&') if '=' in param for key, value in [param.split('=', 1)]})
-            query_params = {}
-            [query_params.setdefault(k, []).append(v) for k, v in (param.split('=', 1) for param in parsed_url.query.split('&') if '=' in param)]
-            frag_params = {}
-            [frag_params.setdefault(k, []).append(v) for k, v in (param.split('=', 1) for param in parsed_url.fragment.split('&') if '=' in param)]
-            if parsed_url.path.startswith('/'):
-                pppath = parsed_url.path[1:]
-            else:
-                pppath = parsed_url.path
-            url = {'url':self.url,'protocol':parsed_url.scheme,'host':parsed_url.hostname,'port':parsed_url.port,'path':pppath.split('/'),'query':query_params,'fragment':frag_params}
-            url = await language.normalize(url,scheme_url)
-            return await self.builder(file=matched_route['view'],url=url,mode=['main'],**kargs)
-        else:
-            # Nessuna rotta corrispondente, gestiamo l'errore (ad esempio, un 404).
-            print(f"Nessuna rotta corrispondente per l'URL: {url}")
-            return None
-    
-    async def mount_view(self, url,**kargs):
+    @language.asynchronous(managers=('messenger',))
+    async def mount_view(self, url,messenger,**kargs):
         def process_url(url, default_base_url):
             """
             Unisce raw_url con default_base_url per completare scheme/netloc/etc. usa _replace()
@@ -1042,12 +968,12 @@ class adapter(presentation.port):
                 break  # prima corrispondenza -> esci
 
         if not matched_route:
-            print(f"Nessuna rotta corrispondente per l'URL: {url}")
+            await messenger.post(domain='debug', message=f"Nessuna rotta corrispondente per l'URL: {url}")
             return None
 
         # log (opzionale)
-        print(f"Percorso trovato: {matched_route['view']} per l'URL: {url}", parsed_url)
-        print(f"Parametri estratti: {matched_route['params']}")
+        await messenger.post(domain='debug', message=f"Percorso trovato: {matched_route['view']} per l'URL: {url}")
+        await messenger.post(domain='debug', message=f"Parametri estratti: {matched_route['params']}")
 
         # parametri query e fragment come dict di liste
         query_params = parse_qs(parsed_url.query, keep_blank_values=True)
@@ -1071,10 +997,10 @@ class adapter(presentation.port):
         url_payload = await language.normalize(url_payload,scheme_url)
         return await self.builder(file=matched_route['view'], url=url_payload, mode=['main'], **kargs)
 
+    @language.asynchronous()
     async def starlette_view(self,request):
         request.session["url_precedente"] = str(request.url)
         html = await self.mount_view(str(request.url))
-        print(html, "html_body**********************",str(request.url))
         '''layout = 'application/view/layout/base.html'
         file = await self.fetch_resource({'url':layout})
         css = await self.fetch_resource({'url':layout.replace('.html','.css').replace('.xml','.css')})
@@ -1118,7 +1044,7 @@ class adapter(presentation.port):
                 map = self.attributes.get(key)
                 if map is None:
                     output = self.set_attribute(output, key, value)
-                    print(key, 'key not in attributes################################@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@',attributes)
+                    #print(key, 'key not in attributes################################@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@',attributes)
                     continue
                 for yyy in ['style','attr','task','class','attrs']:
                     if yyy not in map : continue
@@ -1129,7 +1055,7 @@ class adapter(presentation.port):
                         value = fff(attributes.get(key)) if callable(fff) else fff
                     elif key in attributes:
                         value = attributes.get(key)
-                    print(f"key:{key} | yyy:{yyy} | map:{map} | value:{value} | attributes:{attributes}")
+                    #print(f"key:{key} | yyy:{yyy} | map:{map} | value:{value} | attributes:{attributes}")
                     match yyy:
                         case 'style':
                             #output = self.set_attributes  set_style(value, output)

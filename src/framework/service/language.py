@@ -111,99 +111,31 @@ def asynchronous(custom_filename: str = __file__, app_context = None,**constants
         return wrapper
     return decorator
 
-
-def asynchronous22(custom_filename: str = __file__, app_context: Optional[Dict[str, Any]] = None):
-    """
-    Decoratore per catturare eccezioni, generare un rapporto di debug dettagliato e loggarlo usando il logger configurato.
-    """
-    def decorator(func):
-        @functools.wraps(func)
-        async def wrapper(*args, **kwargs):
-            # Stabilisce/propaga un transaction id nel contesto asincrono
-            tx = None
-            if 'transaction_id' in kwargs and kwargs.get('transaction_id'):
-                tx = kwargs.get('transaction_id')
-            elif app_context and isinstance(app_context, dict) and app_context.get('transaction_id'):
-                tx = app_context.get('transaction_id')
-            else:
-                tx = str(uuid.uuid4())
-
-            token = _transaction_id.set(tx)
-            try:
-                return await func(*args, **kwargs)
-            except Exception:
-                # Recupera il codice sorgente del modulo della funzione
-                source_code = None
-                '''try:
-                    source_code = inspect.getsource(func)
-                except KeyboardInterrupt:
-                    print("Interruzione da tastiera (Ctrl + C).")
-                except (OSError, TypeError):
-                    source_code = ""'''
-
-                source_code = await _load_resource(path="/"+custom_filename)
-
-                # Genera il rapporto usando l'eccezione attiva
-                report = analyze_exception(
-                    source_code=source_code,
-                    custom_filename=custom_filename,
-                    app_context=app_context
-                )
-                # Inietta il transaction id nel report per correlazione
-                report['TRANSACTION_ID'] = tx
-                
-                ok = await convert(report, str, 'json')
-
-                # Buffera anche il log strutturato con il transaction id
-                buffered_log("ERROR", ok, emoji="❌")
-
-                print(ok)
-
-                # Rilancia l'eccezione
-                #raise
-
-            finally:
-                try:
-                    _transaction_id.reset(token)
-                except Exception:
-                    pass
-
-        return wrapper
-    return decorator
-
-def synchronous(custom_filename: str = __file__, app_context: Optional[Dict[str, Any]] = None):
-    """
-    Decoratore per catturare eccezioni, generare un rapporto di debug dettagliato e loggarlo usando il logger configurato.
-    """
-    def decorator(func):
-        @functools.wraps(func)
+def synchronous(custom_filename: str = __file__, app_context = None,**constants):
+    inject = [di[manager] for manager in constants.get('managers', [])]
+    output = constants.get('outputs', [])
+    input = constants.get('inputs', [])
+    
+    def decorator(function):
+        @functools.wraps(function)
         def wrapper(*args, **kwargs):
-            # Imposta temporaneamente il transaction id se fornito (propagazione ai task creati)
-            tx = None
-            if 'transaction_id' in kwargs and kwargs.get('transaction_id'):
-                tx = kwargs.get('transaction_id')
-            elif app_context and isinstance(app_context, dict) and app_context.get('transaction_id'):
-                tx = app_context.get('transaction_id')
-            elif app_context and isinstance(app_context, dict) and app_context.get('REQUEST_ID'):
-                tx = app_context.get('REQUEST_ID')
-            else:
-                # non forziamo la generazione qui; lasciare None mantiene il comportamento attuale
-                tx = None
-
-            token = None
-            if tx is not None:
-                try:
-                    token = _transaction_id.set(str(tx))
-                except Exception:
-                    token = None
-
             try:
-                return func(*args, **kwargs)
+                args_inject = list(args) + inject
+                if 'inputs' in constants:
+                        #kwargs_builder = await language.model(input, kwargs, 'filtered', language)
+                    outcome = function(*args_inject, **kwargs)
+                else:
+                    outcome = function(*args_inject, **kwargs)
+                if 'outputs' in constants:
+                        #return await language.model(output, outcome, 'full', language)
+                    return outcome
+                else:
+                    return outcome
             except Exception:
-                # Recupera il codice sorgente del modulo della funzione
+                
                 source_code = None
                 try:
-                    source_code = inspect.getsource(func)
+                    source_code = inspect.getsource(function)
                 except KeyboardInterrupt:
                     print("Interruzione da tastiera (Ctrl + C).")
                 except (OSError, TypeError):
@@ -223,16 +155,8 @@ def synchronous(custom_filename: str = __file__, app_context: Optional[Dict[str,
 
                 print(ok)
 
-                # Rilancia l'eccezione
-                #raise
             finally:
-                # Reset del contextvar se era stato impostato
-                if token is not None:
-                    try:
-                        _transaction_id.reset(token)
-                    except Exception:
-                        pass
-
+                pass
         return wrapper
     return decorator
 
@@ -401,7 +325,7 @@ async def normalize(value,schema, mode='full'):
 
     # Cerberus Validation (Convalida, Tipi, Required, Regex, Default)
     # Crea un validatore Cerberus con lo schema fornito
-    print("##################",schema)
+    #print("##################",schema)
     v = Validator(schema,allow_unknown=True)
 
     # Permetti a Cerberus di gestire i valori di default durante la validazione
