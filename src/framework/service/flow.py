@@ -57,7 +57,7 @@ def asynchronous(custom_filename: str = __file__, app_context = None,**constants
                 source_code = None
                 
                 fff = "src/"+custom_filename
-                source_code = await language.resource(path=fff)
+                source_code = await language.fetch(path=fff)
 
                 # Genera il rapporto usando l'eccezione attiva
                 report = language.analyze_exception(source_code=source_code,custom_filename=fff,app_context=app_context)

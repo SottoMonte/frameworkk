@@ -2,7 +2,15 @@
     "port": {
         "builder": {
             "test": "f1fb74a3015b979facf26c02cedadcaefc39b705036defd32962224eacad4f75",
-            "production": "648a3e4481ef3f2d17549a667e11c4118005f572bd67055b98ff170182ad3cef"
+            "production": "bdaaed097e0755dc0a8d21d3dd601c0e42df4aedc096662c5984b4c0fd743b28"
+        },
+        "parse_route": {
+            "test": "bf36999104450b2948972e172eb9f0994522e65b7d791a0802ff32fa0f8829ce",
+            "production": "f9076fe6421c77d0e4f51a6a88e0790c4727f639ce7cdbdc380ea61d8398ee8c"
+        },
+        "initialize": {
+            "test": "d045fab95e37f23eb8c9f3074675fad9fd6cbd44e32a18c81cc15fac1d9159f6",
+            "production": "7edc726be794135caffe72e19ffbe73f8165121bd8be8107b932c5ef08fc4022"
         },
         "rebuild": {
             "test": "6756a184ab4b9b4a64a2d19eb02f0cd6221602d4381a6d8122c4bcdc0bacde57",

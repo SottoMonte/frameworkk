@@ -204,12 +204,11 @@ APP_CONTEXT = {
     "REQUEST_ID": "req_xyz987"
 }
 
-@language.asynchronous(
-    #custom_filename=__file__,
-    app_context=APP_CONTEXT)
+#@language.asynchronous(#custom_filename=__file__,app_context=APP_CONTEXT)
 async def discover_and_run_tests():
     import unittest
     import json
+    import framework.service.language as language
     # Pattern personalizzato per i test
     test_dir = './src'
     test_suite = unittest.TestSuite()
@@ -369,7 +368,7 @@ def test():
     # Aggiungi le tue importazioni qui (os, asyncio, unittest, language, loader)
     
     # Esegui il bootstrap del framework (se necessario)
-    asyncio.run(loader.bootstrap_core())
+    #asyncio.run(loader.bootstrap_core())
 
     # Scopri e genera i contratti, poi esegui i test
     all_contract_hashes, suite_test = asyncio.run(discover_and_run_tests())
@@ -402,9 +401,7 @@ def test():
 print(dir(language),'RUN PY')
 
 #@flow.asynchronous(managers=('tester',))
-@language.synchronous(
-    #custom_filename=__file__,
-    app_context=APP_CONTEXT)
+#@language.synchronous(custom_filename=__file__,app_context=APP_CONTEXT)
 def application(tester=None,**constants):
     if '--update' in constants.get('args',[]):
         sync_github_repo("src", "colosso-cloud", "framework", "main")

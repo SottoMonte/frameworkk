@@ -5,7 +5,7 @@ imports = {
 
 exports = {
     #Pubblico/privato
-    'resource':'resource',
+    'fetch':'resource',
     'asynchronous':'asynchronous',
     'synchronous':'synchronous',
     'register':'load_di_entry',

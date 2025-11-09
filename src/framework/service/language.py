@@ -64,7 +64,55 @@ def buffered_log(level: str, message: str, emoji: str = ""):
     })
     print(formatted)  # Mantiene output semplice durante il bootstrap
 
-def asynchronous(custom_filename: str = __file__, app_context: Optional[Dict[str, Any]] = None):
+def asynchronous(custom_filename: str = __file__, app_context = None,**constants):
+    inject = [di[manager] for manager in constants.get('managers', [])]
+    output = constants.get('outputs', [])
+    input = constants.get('inputs', [])
+    
+    def decorator(function):
+        @functools.wraps(function)
+        async def wrapper(*args, **kwargs):
+            try:
+                args_inject = list(args) + inject
+                if 'inputs' in constants:
+                        #kwargs_builder = await language.model(input, kwargs, 'filtered', language)
+                    outcome = await function(*args_inject, **kwargs)
+                else:
+                    outcome = await function(*args_inject, **kwargs)
+                if 'outputs' in constants:
+                        #return await language.model(output, outcome, 'full', language)
+                    return outcome
+                else:
+                    return outcome
+            except Exception:
+                source_code = await _load_resource(path="/"+custom_filename)
+
+                # Genera il rapporto usando l'eccezione attiva
+                report = analyze_exception(
+                    source_code=source_code,
+                    custom_filename=custom_filename,
+                    app_context=app_context
+                )
+                # Inietta il transaction id nel report per correlazione
+                #report['TRANSACTION_ID'] = tx
+                
+                ok = await convert(report, str, 'json')
+
+                # Buffera anche il log strutturato con il transaction id
+                buffered_log("ERROR", ok, emoji="❌")
+
+                print(ok)
+
+                # Rilancia l'eccezione
+                #raise
+
+            finally:
+                pass
+        return wrapper
+    return decorator
+
+
+def asynchronous22(custom_filename: str = __file__, app_context: Optional[Dict[str, Any]] = None):
     """
     Decoratore per catturare eccezioni, generare un rapporto di debug dettagliato e loggarlo usando il logger configurato.
     """
@@ -190,15 +238,23 @@ def synchronous(custom_filename: str = __file__, app_context: Optional[Dict[str,
 
 # Backend (sync file read wrapped in async for tests)
 if sys.platform != 'emscripten':
+
     async def _load_resource(**kwargs) -> str:
         path = kwargs.get("path", "")
         if path.startswith('/'):
             path = path[1:]
+
+        if path.startswith('application/') or path.startswith('framework/') or path.startswith('infrastructure/'):
+            path = 'src/'+path
+
         try:
             with open(f"{path}", "r") as f:
                 return f.read()
         except FileNotFoundError:
             raise FileNotFoundError(f"File non trovato: {path}")
+        except Exception as e:
+            print(f"Errore caricamento file {path}: {e}",kwargs)
+            raise e
 else:
     import js
     async def _load_resource(**kwargs) -> str:
@@ -1103,28 +1159,30 @@ async def _validate_and_filter_module(
     buffered_log("INFO", f"✅ Validazione e filtro riusciti per {path}. Membri esposti: {validated_members}")
     return filtered_module
 
-def resolve_path(resource_path: str | None) -> str:
-    """Normalizza e aggiunge il prefisso 'src/' al percorso della risorsa."""
-    resource_path = (resource_path or "").lstrip('/')
-    if resource_path.startswith('application/') or resource_path.startswith('framework/') or resource_path.startswith('infrastructure/'):
-        return os.path.normpath(os.path.join('src', resource_path))
-    return os.path.normpath(resource_path)
-
 async def _load_dependencies(module: types.ModuleType,dependencies) -> None:
     """Risolve le dipendenze 'imports' definite in un modulo."""
     
     for key, import_path in dependencies.items():
         # Normalizza percorso usato come chiave cache (stesso formato di _load_python_module)
         cache_key = import_path
-        # Se è già nel cache, riutilizza (DEBUG)
-        if import_path.endswith(".py") and cache_key in di['module_cache']:
-            value = di['module_cache'][cache_key]
-            buffered_log("DEBUG", f"♻️ {cache_key} Cache hit modulo Python da {dir(value)}")
-            setattr(module, key, value)
-            buffered_log("DEBUG", f"♻️ Cache hit per dipendenza '{key}' da {cache_key}")
-            continue
-        else:
-            buffered_log("DEBUG", f"⏳ Caricamento dipendenza '{key}' da {import_path}...")
+        # Se è già nel cache, riutilizza (DEBUG). Proviamo anche la forma risolta ('src/...')
+        if isinstance(import_path, str) and import_path.endswith('.py'):
+            if cache_key in di['module_cache']:
+                value = di['module_cache'][cache_key]
+                buffered_log("DEBUG", f"♻️ {cache_key} Cache hit modulo Python da {dir(value)}")
+                setattr(module, key, value)
+                buffered_log("DEBUG", f"♻️ Cache hit per dipendenza '{key}' da {cache_key}")
+                continue
+            # Fallback: risolvi il percorso (es. 'framework/..' -> 'src/framework/...')
+            alt_key = import_path
+            if alt_key in di['module_cache']:
+                value = di['module_cache'][alt_key]
+                buffered_log("DEBUG", f"♻️ {alt_key} Cache hit modulo Python da {dir(value)} (resolved)")
+                setattr(module, key, value)
+                buffered_log("DEBUG", f"♻️ Cache hit per dipendenza '{key}' da {alt_key} (resolved)")
+                continue
+
+        buffered_log("DEBUG", f"⏳ Caricamento dipendenza '{key}' da {import_path}...")
 
 
         '''try:
@@ -1144,7 +1202,6 @@ async def _load_dependencies(module: types.ModuleType,dependencies) -> None:
         else:
             value = imported_content'''
         value = await resource(path=import_path)
-        print(import_path,dir(value),"<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< DIPENDENZA")
         setattr(module, key, value)
         di['module_cache'][import_path] = value
         buffered_log("DEBUG", f"📦 Dipendenza '{key}' caricata da {import_path}")
@@ -1157,6 +1214,18 @@ async def _load_python_module(name: str, path: str, code: str) -> types.ModuleTy
     module.__source__ = code
     module.__dict__['language'] = di['module_cache'].get('framework/service/language.py')
 
+    # Inseriamo un placeholder nella cache PRIMA di risolvere le dipendenze.
+    # Serve a interrompere cicli di importazione: se il .test.py importa il
+    # modulo sotto test, troverà qui un ModuleType (parzialmente inizializzato)
+    # invece di riavviare un caricamento ricorsivo.
+    try:
+        async with di['module_cache_lock']:
+            di['module_cache'][path] = module
+            buffered_log("DEBUG", f"♻️ Placeholder module inserito nella cache per {path} (pre-caricamento)")
+    except Exception:
+        # Fallback non-bloccante se il lock non è disponibile
+        di['module_cache'][path] = module
+
     if module.__dict__['language'] is None and path not in ['src/framework/service/contract.test.py','src/framework/service/contract.py','src/framework/service/language.test.py','src/framework/service/language.py','framework/service/language.py']:
         buffered_log("WARNING", "⚠️ Modulo di lingua non caricato prima delle dipendenze.",path)
         raise ImportError("Modulo di lingua mancante per le dipendenze.")
@@ -1165,7 +1234,8 @@ async def _load_python_module(name: str, path: str, code: str) -> types.ModuleTy
     try:
         dependencies = analyze_module(code, path)
         dependencies = dependencies.get('imports',{}).get('value',{})
-        #if path != 'framework/service/language.py':
+        if path.replace('.test.py','.py',) in dependencies:
+            del dependencies[path.replace('.test.py','.py')]
         #    dependencies['language'] = 'framework/service/language.py'
         buffered_log("INFO", f"🔍 Dipendenze trovate in {path}: {dependencies}")
         await _load_dependencies(module,dependencies.copy())
@@ -1178,7 +1248,10 @@ async def _load_python_module(name: str, path: str, code: str) -> types.ModuleTy
         raise ImportError(f"Esecuzione modulo Python fallita per {path}: {e}") from e
     return module
 
-async def resource(path: str | None = None, **kwargs) -> Any:
+def resolve_path(path: str | None = None) -> str:
+    return path
+
+async def resource(**kwargs) -> Any:
     """
     Carica una risorsa (JSON o modulo Python) e ne valida il contratto.
     
@@ -1186,7 +1259,7 @@ async def resource(path: str | None = None, **kwargs) -> Any:
         lang (str): La lingua da iniettare nei moduli Python.
         path (str | None): Il percorso della risorsa.
     """
-    resource_path = resolve_path(path)
+    resource_path = kwargs.get('path', '')
     content = await _load_resource(path=resource_path)
     if resource_path.endswith(".json"):
         buffered_log("INFO", f"📄 Caricamento e parsing JSON da {resource_path}... type={type(content)}")
@@ -1581,7 +1654,7 @@ def analyze_exception(source_code: str, custom_filename: str = "<code_in_memory>
         },
         "APPLICATION_CONTEXT": app_context or {"VERSION": "N/A", "USER_ID": "anonymous"},
         "EXCEPTION_DETAILS": exception_details,
-        "MODULE_STRUCTURE_ANALYSIS": module_structure,
+        #"MODULE_STRUCTURE_ANALYSIS": module_structure,
         "STRUCTURED_TRACEBACK": structured_tb[1:-1],  # Esclude il frame di analyze_exception
         #"FULL_TRACEBACK_TEXT": full_traceback_text 
     }

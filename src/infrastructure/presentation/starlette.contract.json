@@ -8,6 +8,10 @@
             "test": "a35a130931c4f4d3335b686159f4ddc7421ee9ff268dd9f25a5f3f3337b10447",
             "production": "067e9638d360d113d30e6287f33a3d2797eb25024924c2d4904666ac0a05d9da"
         },
+        "code_update": {
+            "test": "39b146004620568e45dbd56cffc9b91fd42e64ad35c4eeb69430a817baaef38e",
+            "production": "3a376ba89503e0908ce0a73cb90044af5659a6eb97f75dacc821beb03e30b57e"
+        },
         "mount_route": {
             "test": "76a39fb1c49188cfe7b04e467cacb041bea719c145cbd27310b2d9de1f714a98",
             "production": "fb4e12abffd594bbb7882c2e8e1f80103070101dd3d5a95c4ae5a2b41a8123f4"

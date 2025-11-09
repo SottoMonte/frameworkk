@@ -2,7 +2,7 @@
     "__module__": {
         "resource": {
             "test": "afb854fd58ebcbea51f606b9c8b8005632154cfd35abb46854a588141b40bc95",
-            "production": "c517eb231a93463d9d092c9e49ff73198cf947ae778a1c1e329aca2f77035b93"
+            "production": "509bd62bcdc0737e256b293a660000539163231fa4b2682de42aafde9c1032d8"
         },
         "route": {
             "test": "fc45ce7e3422fd39540888bb63ad235cb670b41b028320f6f2e7355ebe5db043",
@@ -10,7 +10,7 @@
         },
         "asynchronous": {
             "test": "04852c350ccbc650ed6163dae362594037c43129b6147cd879e12ff0fb94aee3",
-            "production": "ecc242118363bb5e72abf6200b6c26549a1ea91cc3fbfc2c9e3fa189c033678b"
+            "production": "bcf69005439756c3ec1e13ed0bfa02d910538c9e9442a4f605fe8df9eb54d2c3"
         },
         "synchronous": {
             "test": "fce4373a51afc6fe6396a125b184f4892c6ff02b6e4588023b5f3b2ded5e58dc",

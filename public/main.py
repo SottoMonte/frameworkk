@@ -23,7 +23,7 @@ async def main():
             #run = await language.resource(path="framework/service/run.py")
             pass
         try:
-            run = await lang.resource(path="framework/service/run.py")
+            run = await lang.fetch(path="framework/service/run.py")
         except Exception as e:
             run = await language.resource(path="framework/service/run.py")
             pass

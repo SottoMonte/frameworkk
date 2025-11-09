@@ -225,7 +225,7 @@ async def bootstrap() -> None:
     await dependency_messenger.post(domain='debug', message=f"Configurazione ambiente preparata per: {platform_type}.")
     # Correzione del nome della funzione (get_confi -> get_config)
     
-    text = await language.resource(path="pyproject.toml")
+    text = await language.fetch(path="pyproject.toml")
     config = await language.format(text,**config_params)
     config = await language.convert(config, dict, 'toml')
     await dependency_messenger.post(domain='debug', message=f"Configurazione caricata con successo (Ambiente: {platform_type}).")

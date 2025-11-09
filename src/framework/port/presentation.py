@@ -14,10 +14,6 @@ imports = {
     'tags': 'framework/schema/tags.json',
 }
 
-exports = {
-    'port': 'port',
-}
-
 class port(ABC):
 
     def initialize(self):
@@ -93,20 +89,13 @@ class port(ABC):
     '''@abstractmethod
     async def mount_widget(self, tag, inner, attributes):
         pass'''
-
-    async def fetch_resource(self,**constants):
-        #import os
-        #print(os.getcwd())
-        with open('src/'+constants['url'], 'r', encoding='utf-8') as file:
-            text = file.read()
-            return text
     
-    @flow.asynchronous(managers=('defender',))
+    @language.asynchronous(managers=('defender',))
     async def builder(self, defender,**constants):
         if 'text' in constants:
             text = constants['text']
         else:
-            text = await self.fetch_resource(url=constants.get('file',''))
+            text = await language.fetch(path=constants.get('file',''))
 
         template = self.env.from_string(text)
         if 'data' not in constants:

@@ -4,6 +4,10 @@ imports = {
     #'model': 'framework/schema/model.json',
 }
 
+exports = {
+    'port': 'port',
+}
+
 class Testport(contract.Contract):
 
     def setUp(self):
@@ -29,6 +33,12 @@ class Testport(contract.Contract):
         pass
 
     async def test_builder(self):
+        pass
+
+    async def test_parse_route(self):
+        pass
+
+    async def test_initialize(self):
         pass
 
     async def test_rebuild(self):

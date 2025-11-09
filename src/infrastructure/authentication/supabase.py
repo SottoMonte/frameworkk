@@ -2,7 +2,7 @@ import sys
 
 imports = {
     'flow': 'framework/service/flow.py',
-    'user': 'framework/schema/user.py',
+    'user': 'framework/schema/user.json',
 }
     
 '''if sys.platform == 'emscripten':

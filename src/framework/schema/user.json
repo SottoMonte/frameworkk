@@ -1,0 +1,14 @@
+{
+  "identifier": {
+    "type": "string"
+  },
+  "username": {
+    "type": "string"
+  },
+  "role": {
+    "type": "string"
+  },
+  "avatar": {
+    "type": "string"
+  }
+}

@@ -708,20 +708,15 @@ class adapter(presentation.port):
         ]
 
         loop = asyncio.get_event_loop()
+
         async def main():
-            try:
-                # Costruisce l'URL per il fetch, gestendo il caso di percorso vuoto
-                route_path = self.config.get('route', '')
-                resource_url = f"application/policy/presentation/{route_path}"
-
-                file = await self.fetch_resource(url=resource_url)
-                self.parse_route(file)
-                self.mount_route(routes) # 'routes' deve essere accessibile qui
-
-            except Exception as e:
-                # Logga qualsiasi errore durante il caricamento delle rotte
-                print(f"Errore durante il caricamento delle rotte: {e}")
-                # Considera di sollevare l'eccezione o terminare se l'app non può partire senza rotte
+            # Costruisce l'URL per il fetch, gestendo il caso di percorso vuoto
+            route_path = self.config.get('route', '')
+            resource_url = f"application/policy/presentation/{route_path}"
+            print(f"Caricamento delle rotte da: {resource_url}")
+            file = await language.fetch(path=resource_url)
+            self.parse_route(file)
+            self.mount_route(routes) # 'routes' deve essere accessibile qui
 
             # Inizializza l'applicazione Starlette con rotte e middleware
             self.app = Starlette(debug=True, routes=routes, middleware=middleware)

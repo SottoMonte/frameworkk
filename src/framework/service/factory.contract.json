@@ -1,12 +1,3 @@
 {
-    "repository": {
-        "parameters": {
-            "test": "88f67b0efedbf73d05bec8f81043ba09cf083e89433614fc5a2cef0ab90f4678",
-            "production": "78c52257048c57e42923829e776bcffc9414e562f231ccb8bf8fc8d2809b9985"
-        },
-        "results": {
-            "test": "c80aa97ff4cce7a5489a1d54a36aec15ccb91a1d31648f43d4879f652cdbd169",
-            "production": "610e2cba1239c5489f697bcdda952209c1dacaa6f195d9019e1714b06835657c"
-        }
-    }
+    "repository": {}
 }

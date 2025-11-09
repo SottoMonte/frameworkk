@@ -1,7 +1,7 @@
 import sys
 import logging
 import time
-imports = {'flow': 'framework/service/flow2.py'}
+imports = {}
 from framework.service.language import get_transaction_id
 # Controllo se il codice sta girando in Pyodide
 
