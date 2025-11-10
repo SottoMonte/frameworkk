@@ -398,8 +398,6 @@ def test():
     print("        FINE ESECUZIONE TEST         ")
     print("=====================================")
 
-print(dir(language),'RUN PY')
-
 #@flow.asynchronous(managers=('tester',))
 #@language.synchronous(custom_filename=__file__,app_context=APP_CONTEXT)
 def application(tester=None,**constants):

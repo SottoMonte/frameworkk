@@ -720,7 +720,7 @@ class adapter(presentation.port):
 
             # Inizializza l'applicazione Starlette con rotte e middleware
             self.app = Starlette(debug=True, routes=routes, middleware=middleware)
-
+            #print(di['message'][0].logger,'###########')
             # Parametri di configurazione base per Uvicorn
             uvicorn_config_params = {
                 "app": self.app,
@@ -728,7 +728,9 @@ class adapter(presentation.port):
                 "port": int(self.config.get('port', 8000)),
                 "use_colors": True,
                 "reload": True, # `reload=True` solo per sviluppo
-                "loop": loop
+                "loop": loop,
+                #'log_level':"trace"
+                #'log_config':None
             }
 
             # Aggiunge i parametri SSL se presenti

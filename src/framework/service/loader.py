@@ -103,7 +103,7 @@ async def installa_dipendenze_browser() -> None:
 # ----------------------------------------------------------------------
 
 @language.asynchronous()
-async def bootstrap_core() -> None:
+async def bootstrap_core(config) -> None:
     manager_loader_path = [
         {
             'path': 'framework/manager/messenger.py', # Percorso per resource'name': 'UserManager', # Chiave nel DI E nome della classe da estrarre
@@ -171,11 +171,7 @@ async def bootstrap_core() -> None:
         'path': 'infrastructure/message/console.py', # Percorso per resource
         'service': 'message', # Chiave nel DI per la lista dei provider
         'adapter': 'adapter', # Nome della classe da estrarre dal modulo
-        'payload': { # Argomenti del costruttore (__init__)
-            'host': 'smtp.corp.com', 
-            'port': 587, 
-            'secure': True
-        }
+        'payload': config
     })
 
     # 1. Caricamento sequenziale dei manager essenziali e controllo del risultato
@@ -192,16 +188,6 @@ async def bootstrap() -> None:
     """
     Funzione principale di bootstrap che orchestra il caricamento del framework.
     """
-    await bootstrap_core()
-    
-    dependency_executor = di['executor']
-    dependency_messenger = di['messenger']
-
-    await dependency_messenger.post(domain='debug', message="✅ Manager di base (Messenger, Executor) caricati e pronti.")
-
-    await dependency_messenger.post(domain='debug', message="Avvio del processo di inizializzazione del Framework. Controllo ambiente...")
-    await dependency_messenger.post(domain='debug', message=f"Sistema: Python {sys.version.split()[0]} su {sys.platform}")
-    
     env_config: Dict[str, Any] = dict(os.environ)
     session_data: Dict[str, Any] = {}
     identifier_val: str = 'None'
@@ -222,12 +208,24 @@ async def bootstrap() -> None:
         # Assumiamo che language.get_config sia la funzione corretta
         config_params = env_config | {"session": session_data}
         platform_type = "Server (Standard)"
-    await dependency_messenger.post(domain='debug', message=f"Configurazione ambiente preparata per: {platform_type}.")
-    # Correzione del nome della funzione (get_confi -> get_config)
     
     text = await language.fetch(path="pyproject.toml")
     config = await language.format(text,**config_params)
     config = await language.convert(config, dict, 'toml')
+    
+    await bootstrap_core(config)
+    
+    dependency_executor = di['executor']
+    dependency_messenger = di['messenger']
+
+    await dependency_messenger.post(domain='debug', message="✅ Manager di base (Messenger, Executor) caricati e pronti.")
+
+    await dependency_messenger.post(domain='debug', message="Avvio del processo di inizializzazione del Framework. Controllo ambiente...")
+    await dependency_messenger.post(domain='debug', message=f"Sistema: Python {sys.version.split()[0]} su {sys.platform}")
+    
+    await dependency_messenger.post(domain='debug', message=f"Configurazione ambiente preparata per: {platform_type}.")
+    # Correzione del nome della funzione (get_confi -> get_config)
+    
     await dependency_messenger.post(domain='debug', message=f"Configurazione caricata con successo (Ambiente: {platform_type}).")
     
     # LOGGING MIGLIORATO (Stato DI)

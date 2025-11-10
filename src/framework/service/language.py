@@ -62,7 +62,7 @@ def buffered_log(level: str, message: str, emoji: str = ""):
         'timestamp': datetime.now(timezone.utc).isoformat(),
         'transaction_id': get_transaction_id()
     })
-    print(formatted)  # Mantiene output semplice durante il bootstrap
+    #print(formatted)  # Mantiene output semplice durante il bootstrap
 
 def asynchronous(custom_filename: str = __file__, app_context = None,**constants):
     inject = [di[manager] for manager in constants.get('managers', [])]
@@ -913,7 +913,8 @@ async def _validate_and_filter_module(
     solo i membri che hanno un contratto valido e presente nel file .contract.json.
     """
     validated_members: List[str] = []
-    print(f"🔍 Avvio validazione contratto per il modulo: {path}",dir(main_module))
+    print()
+    buffered_log("DEBUG", f"🔍 Avvio validazione contratto per il modulo: {path}",dir(main_module))
     contract_json_path = path.replace('.py', '.contract.json')
     try:
         json_content = await _load_resource(path=contract_json_path)

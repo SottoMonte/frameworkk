@@ -66,6 +66,7 @@ class adapter:
     RESET_COLOR = "\033[0m"  # Reset colori ANSI
 
     def __init__(self, **constants):
+        
         #self.config = constants['config']
         self.history = dict()
         self.start_time = time.time()
@@ -77,9 +78,10 @@ class adapter:
         
         # Handler per la console
         ch = logging.StreamHandler()
-        ch.setLevel(logging.DEBUG)
-
-        
+        if constants['config']['project'].get('mode') == 'production':
+            ch.setLevel(logging.INFO)  # In produzione, solo INFO e superiori (esclude DEBUG)
+        else:
+            ch.setLevel(logging.DEBUG)
 
         # 2. Modifica il Formatter per includere il campo 'domain' e transaction_id
         formatter = self.ColoredFormatter(
