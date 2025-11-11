@@ -2,7 +2,6 @@ import sys
 import asyncio
 
 imports = {
-    'flow': 'framework/service/flow.py',
 }
 
 class messenger():
@@ -12,7 +11,7 @@ class messenger():
         self.providers = constants['providers']['message']
         pass
 
-    @flow.asynchronous(inputs='messenger',outputs='transaction')
+    @language.asynchronous(inputs='messenger',outputs='transaction')
     async def post(self,**constants):
         '''operations = []
         map_tasks = dict()

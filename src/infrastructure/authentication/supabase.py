@@ -1,7 +1,6 @@
 import sys
 
 imports = {
-    'flow': 'framework/service/flow.py',
     'user': 'framework/schema/user.json',
 }
     
@@ -80,7 +79,6 @@ import supabase
 class adapter:
     def __init__(self, **constants):
         self.config = constants['config']
-        print(self.config,"config")
         self.url = self.config['url']
         self.key = self.config['key']
         
@@ -92,7 +90,7 @@ class adapter:
             #self.supabase = supabase.create_client(self.url, self.key)
             pass
             
-    @flow.asynchronous(outputs='transaction',managers=('messenger',))
+    @language.asynchronous(outputs='transaction',managers=('messenger',))
     async def whoami(self, messenger, **data):
         print("Autenticazione con Supabase",user.user)
         result = await self.supabase.auth.getUser()

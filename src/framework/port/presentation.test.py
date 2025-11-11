@@ -1,5 +1,4 @@
 imports = {
-    'flow': 'framework/service/flow.py',
     'contract': 'framework/service/contract.py',
     #'model': 'framework/schema/model.json',
 }

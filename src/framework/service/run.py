@@ -2,7 +2,6 @@ import asyncio
 import sys
 
 imports = {
-    'flow': 'framework/service/flow.py',
     'loader': 'framework/service/loader.py'
 }
 

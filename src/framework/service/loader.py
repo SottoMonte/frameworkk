@@ -102,7 +102,6 @@ async def installa_dipendenze_browser() -> None:
 # FUNZIONE PRINCIPALE DI BOOTSTRAP (Orchestratore)
 # ----------------------------------------------------------------------
 
-@language.asynchronous()
 async def bootstrap_core(config) -> None:
     manager_loader_path = [
         {
@@ -183,7 +182,6 @@ async def bootstrap_core(config) -> None:
     for log in di['log_buffer']:
         await dependency_messenger.post(domain=log.get('level','DEBUG').lower(), message=log.get('message'))
 
-@language.asynchronous()
 async def bootstrap() -> None:
     """
     Funzione principale di bootstrap che orchestra il caricamento del framework.

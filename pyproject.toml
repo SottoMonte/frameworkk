@@ -5,7 +5,7 @@ description = "Un'app di esempio"        # Descrizione del progetto
 readme = "README.md"                     # File di documentazione
 requires-python = ">=3.9"                # Versione minima di Python richiesta
 key = "my-secret-key"                    # Chiave segreta dell'app
-mode = "production"                     # Modalita applicazione
+mode = "development"                     # Modalita applicazione development/production
 
 # Configurazione della messaggistica
 [amessage.log]

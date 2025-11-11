@@ -3,9 +3,7 @@ from typing import List, Dict, Any, Callable
 import re
 import traceback
 
-imports = {
-    'flow': 'framework/service/flow.py',
-}
+imports = {}
 
 class executor:
     def __init__(self, **constants):
@@ -15,7 +13,7 @@ class executor:
         #print('EXE-',self.providers)
         #asyncio.create_task(self.action(case="github.invite-collaborator"))
     
-    @flow.asynchronous(managers=('messenger',))
+    @language.asynchronous(managers=('messenger',))
     async def action2(self, messenger, **constants):
         await asyncio.sleep(5)
         #print('EXE2-',self.providers)
@@ -25,7 +23,7 @@ class executor:
         await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
         #await self.all_completed(tasks=tasks)
     
-    @flow.asynchronous(managers=('messenger',))
+    @language.asynchronous(managers=('messenger',))
     async def action(self, messenger, **constants):
         #await asyncio.sleep(5)
 
@@ -36,7 +34,7 @@ class executor:
 
         
 
-    '''@flow.asynchronous(managers=('messenger',))
+    '''@language.asynchronous(managers=('messenger',))
     async def act(self, messenger, **constants) -> Dict[str, Any]:
         """Esegue un'azione specifica caricando dinamicamente il modulo corrispondente."""
         action = constants.get('action', '')
@@ -54,7 +52,7 @@ class executor:
 
         await messenger.post(domain='debug',message=f"✅ Azione '{action}' eseguita con successo.")
         return {"state": True, "result": result, "error": None}'''
-    @flow.asynchronous(managers=('messenger',))
+    @language.asynchronous(managers=('messenger',))
     async def act2(self, messenger, **constants) -> Dict[str, Any]:
         """Esegue un'azione specifica caricando dinamicamente il modulo corrispondente."""
         action = constants.get('action', '')
@@ -79,7 +77,7 @@ class executor:
         await messenger.post(domain='debug', message=f"✅ Azione '{action}' eseguita con successo.")
         return {"state": True, "result": result, "error": None}
 
-    @flow.asynchronous(managers=('messenger',))
+    @language.asynchronous(managers=('messenger',))
     async def act(self, messenger, **constants) -> Dict[str, Any]:
         """
         Esegue una o più azioni (separate da '|') caricando dinamicamente i moduli corrispondenti.
@@ -126,7 +124,7 @@ class executor:
 
         return {"state": True, "result": results, "error": None}
 
-    @flow.asynchronous(managers=('messenger',))
+    @language.asynchronous(managers=('messenger',))
     async def first_completed(self, messenger, **constants):
         """Attende il primo task completato e restituisce il suo risultato."""
         operations = constants.get('operations', [])
@@ -163,7 +161,7 @@ class executor:
             await messenger.post(domain='debug',message=error_msg)
             return {"state": False, "result": None, "error": error_msg}
 
-    @flow.asynchronous(managers=('messenger',))
+    @language.asynchronous(managers=('messenger',))
     async def all_completed(self, messenger, **constants) -> Dict[str, Any]:
         """Esegue tutti i task in parallelo e attende il completamento di tutti."""
         '''tasks = constants.get('tasks', [])
@@ -235,7 +233,7 @@ class executor:
             full_traceback = "".join(traceback.format_exc())
             return {"state": False, "result": full_traceback, "error": error_msg}
 
-    @flow.asynchronous(managers=('messenger',))
+    @language.asynchronous(managers=('messenger',))
     async def chain_completed(self, messenger, **constants) -> Dict[str, Any]:
         """Esegue i task in sequenza, aspettando il completamento di ciascuno prima di passare al successivo."""
         tasks = constants.get('tasks', [])
@@ -259,7 +257,7 @@ class executor:
             await messenger.post(domain='debug', message=error_msg)
             return {"state": False, "result": None, "error": error_msg}
 
-    @flow.asynchronous(managers=('messenger',))
+    @language.asynchronous(managers=('messenger',))
     async def together_completed(self, messenger, **constants) -> Dict[str, Any]:
         """Esegue tutti i task contemporaneamente senza attendere il completamento di tutti."""
         tasks = constants.get('tasks', [])

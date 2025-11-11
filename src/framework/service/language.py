@@ -60,7 +60,7 @@ def buffered_log(level: str, message: str, emoji: str = ""):
         'message': message,
         'emoji': emoji,
         'timestamp': datetime.now(timezone.utc).isoformat(),
-        'transaction_id': get_transaction_id()
+        #'transaction_id': get_transaction_id()
     })
     #print(formatted)  # Mantiene output semplice durante il bootstrap
 
@@ -72,7 +72,17 @@ def asynchronous(custom_filename: str = __file__, app_context = None,**constants
     def decorator(function):
         @functools.wraps(function)
         async def wrapper(*args, **kwargs):
+            wrapper._is_decorated = True
+            #tx_token = get_transaction_id()
+            
             try:
+                # 1. Ottieni l'ID dal contesto (Task locale)
+                
+                # 2. Se non esiste, genera un nuovo ID
+                #if tx_token is None:
+                #    set_transaction_id(uuid.uuid4())
+                set_transaction_id(uuid.uuid4())
+                
                 args_inject = list(args) + inject
                 if 'inputs' in constants:
                         #kwargs_builder = await language.model(input, kwargs, 'filtered', language)
@@ -84,8 +94,10 @@ def asynchronous(custom_filename: str = __file__, app_context = None,**constants
                     return outcome
                 else:
                     return outcome
-            except Exception:
-                source_code = await _load_resource(path="/"+custom_filename)
+            except Exception as e:
+                tx_token = get_transaction_id()
+                #current_tx = TRANSACTION_ID_VAR.get()
+                '''source_code = await _load_resource(path="/"+custom_filename)
 
                 # Genera il rapporto usando l'eccezione attiva
                 report = analyze_exception(
@@ -97,21 +109,28 @@ def asynchronous(custom_filename: str = __file__, app_context = None,**constants
                 #report['TRANSACTION_ID'] = tx
                 
                 ok = await convert(report, str, 'json')
-
+                print(ok)'''
                 # Buffera anche il log strutturato con il transaction id
-                buffered_log("ERROR", ok, emoji="❌")
+                if 'messenger' in di:
+                    await di['messenger'].post(domain='error', message=e)
+                else:
+                    buffered_log("ERROR", e, emoji="❌")
 
-                print(ok)
+                
 
                 # Rilancia l'eccezione
                 #raise
 
             finally:
+                # 5. Ripristina il contesto quando il task termina
+                '''if tx_token is not None:
+                    TRANSACTION_ID_VAR.reset(tx_token)'''
                 pass
         return wrapper
     return decorator
 
 def synchronous(custom_filename: str = __file__, app_context = None,**constants):
+    
     inject = [di[manager] for manager in constants.get('managers', [])]
     output = constants.get('outputs', [])
     input = constants.get('inputs', [])
@@ -119,6 +138,7 @@ def synchronous(custom_filename: str = __file__, app_context = None,**constants)
     def decorator(function):
         @functools.wraps(function)
         def wrapper(*args, **kwargs):
+            wrapper._is_decorated = True
             try:
                 args_inject = list(args) + inject
                 if 'inputs' in constants:
@@ -132,8 +152,6 @@ def synchronous(custom_filename: str = __file__, app_context = None,**constants)
                 else:
                     return outcome
             except Exception:
-                
-                source_code = None
                 try:
                     source_code = inspect.getsource(function)
                 except KeyboardInterrupt:
@@ -142,7 +160,7 @@ def synchronous(custom_filename: str = __file__, app_context = None,**constants)
                     source_code = ""
 
                 # Genera il rapporto usando l'eccezione attiva
-                report = analyze_exception(
+                '''report = analyze_exception(
                     source_code=source_code,
                     custom_filename=custom_filename,
                     app_context=app_context
@@ -153,9 +171,10 @@ def synchronous(custom_filename: str = __file__, app_context = None,**constants)
                 #ok = await convert(report, 'str', 'json')
                 ok = asyncio.run(convert(report, str, 'json'))
 
-                print(ok)
+                print(ok)'''
 
             finally:
+                set_transaction_id(None)
                 pass
         return wrapper
     return decorator
@@ -1073,8 +1092,45 @@ async def _validate_and_filter_module(
                         validated_members.append(f"{public_name}.{attr_name}")
 
             elif inspect.isfunction(member) or not inspect.isclass(member):
-                setattr(filtered_module, public_name, member)
+                if not hasattr(member, '_is_decorated'):
+                    setattr(filtered_module, public_name, member)
+                    validated_members.append(public_name)
+                    pass
+                if inspect.iscoroutinefunction(member):
+                    try:
+                        # Chiama il decoratore (asynchronous(...)) e poi applicalo alla funzione (member)
+                        decorator_factory = asynchronous(
+                            custom_filename=main_module.__file__ if hasattr(main_module, '__file__') else path,
+                            app_context=None 
+                        )
+                        new_member = decorator_factory(member)
+                        buffered_log("DEBUG", f"Decoratore 'asynchronous' applicato a funzione sincrona: {private_name}")
+                    
+                    except Exception as ex:
+                        buffered_log("ERROR", f"Impossibile applicare decoratore a {private_name}: {ex}")
+                        new_member = member # Fallback: usa la funzione originale
+                else:
+                    # Caso 2: È sincrona. Applica il decoratore.
+                    
+                    try:
+                        # Chiama il decoratore SYNCHRONOUS con i parametri necessari
+                        decorator_factory = synchronous(
+                            custom_filename=main_module.__file__ if hasattr(main_module, '__file__') else path,
+                            app_context=None # Usa il contesto appropriato
+                        )
+                        
+                        # Applica il decoratore
+                        new_member = decorator_factory(member)
+                        buffered_log("DEBUG", f"Decoratore 'synchronous' applicato a funzione: {private_name}")
+                    
+                    except Exception as ex:
+                        buffered_log("ERROR", f"Impossibile applicare decoratore SYNC a {private_name}: {ex}")
+                        new_member = member # Fallback alla funzione originale
+                
+                setattr(filtered_module, public_name, new_member)
                 validated_members.append(public_name)
+                #setattr(filtered_module, public_name, member)
+                #validated_members.append(public_name)
             elif inspect.ismodule(member):
                 setattr(filtered_module, public_name, member)
                 validated_members.append(public_name)

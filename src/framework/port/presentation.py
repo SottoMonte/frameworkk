@@ -10,7 +10,6 @@ import re
 import itertools
 
 imports = {
-    'flow': 'framework/service/flow.py',
     'tags': 'framework/schema/tags.json',
 }
 
@@ -233,7 +232,7 @@ class port(ABC):
             #print(f"Si è verificato un errore durante il parsing del file: {e}")
             pass
 
-    @flow.asynchronous(managers=('storekeeper','messenger'))
+    @language.asynchronous(managers=('storekeeper','messenger'))
     async def render_view(self,root,data,storekeeper,messenger):
         inner = []
 
@@ -525,7 +524,7 @@ class port(ABC):
 
 
     @staticmethod
-    @flow.asynchronous(managers=('messenger','presenter','executor'))
+    @language.asynchronous(managers=('messenger','presenter','executor'))
     async def action_form(messenger,presenter,executor,**constants):
         target = constants.get('id','')
         action = constants.get('action','')

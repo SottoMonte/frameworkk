@@ -7,7 +7,6 @@ from datetime import datetime
 from urllib.parse import urlparse, urlunparse, ParseResult,parse_qs
 
 imports = {
-    'flow': 'framework/service/flow.py',
     'presentation': 'framework/port/presentation.py',
     'scheme_url' : 'framework/schema/url.json',
 }
@@ -709,6 +708,7 @@ class adapter(presentation.port):
 
         loop = asyncio.get_event_loop()
 
+        @language.asynchronous()
         async def main():
             # Costruisce l'URL per il fetch, gestendo il caso di percorso vuoto
             route_path = self.config.get('route', '')
@@ -763,7 +763,7 @@ class adapter(presentation.port):
     async def mount_css(self,constants):
         pass
         
-    @flow.asynchronous(managers=('defender',))
+    @language.asynchronous(managers=('defender',))
     async def logout(self,request,defender) -> None:
         assert request.scope.get("app") is not None, "Invalid Starlette app"
         request.session.clear()
@@ -771,7 +771,7 @@ class adapter(presentation.port):
         response.delete_cookie("session_token")
         return response
 
-    @flow.asynchronous(managers=('storekeeper', 'messenger','defender'))
+    @language.asynchronous(managers=('storekeeper', 'messenger','defender'))
     async def login(self, request, storekeeper,messenger, defender):
         """Gestisce il login dell'utente con autenticazione basata su IP e sessione."""
         
@@ -810,7 +810,7 @@ class adapter(presentation.port):
 
         return response
 
-    @flow.asynchronous(managers=('messenger',))
+    @language.asynchronous(managers=('messenger',))
     async def websocket(self, websocket, messenger):
         ip = websocket.client.host
         await websocket.accept()

@@ -1,6 +1,5 @@
 imports = {
     'starlette': 'infrastructure/presentation/starlette.py',
-    'flow': 'framework/service/flow.py',
     'contract': 'framework/service/contract.py',
     #'port': 'framework/port/presentation.test.py',
 
