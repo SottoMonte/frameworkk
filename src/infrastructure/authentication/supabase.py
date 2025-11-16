@@ -1,10 +1,11 @@
 import sys
 
 imports = {
-    'user': 'framework/schema/user.json',
+    'user': 'framework/scheme/user.json',
+    'scheme_session':'framework/scheme/session.json'
 }
     
-'''if sys.platform == 'emscripten':
+if sys.platform == 'emscripten':
     import js
     from js import supabase
     import pyodide
@@ -72,9 +73,7 @@ else:
             #"auth_time": datetime.utcnow().isoformat(),
         }
 
-        return session'''
-
-import supabase
+        return session
 
 class adapter:
     def __init__(self, **constants):
@@ -87,7 +86,7 @@ class adapter:
             self.supabase =  supabase.createClient(self.url, self.key)
             print("Supabase client created",dir(self.supabase),dir(self.supabase.auth))
         else:
-            #self.supabase = supabase.create_client(self.url, self.key)
+            self.supabase = supabase.create_client(self.url, self.key)
             pass
             
     @language.asynchronous(outputs='transaction',managers=('messenger',))
@@ -118,7 +117,6 @@ class adapter:
             print(f"Errore di autenticazione: {e}")
 
     async def authenticate(self, **data):
-        print("Autenticazione con Supabase",user.user)
         email = data.get("email", "").strip()
         password = data.get("password", "").strip()
 
@@ -127,8 +125,9 @@ class adapter:
         #    return None
 
         try:
+            profile = self.config['profile']
             result = await backend_login(self.supabase, **data)
-            #print(dir(result),result)
+            result = await language.normalize({'user':result['user'],'tokens':{profile:result['tokens']}},scheme_session)
             return result
         except Exception as e:
             print(f"Errore di autenticazione: {e}")

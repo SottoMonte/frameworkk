@@ -141,7 +141,7 @@ async def bootstrap_core(config) -> None:
                 'cache_enabled': True, 
                 'log_level': 'INFO'
             },
-            'dependency_keys': ['messenger','persistence'], # Dipendenze da risolvere dal DI
+            'dependency_keys': ['authentication'], # Dipendenze da risolvere dal DI
             'messenger': 'defender' # Nome della chiave nel DI per la dipendenza
         },
         {
@@ -206,7 +206,7 @@ async def bootstrap() -> None:
         # Assumiamo che language.get_config sia la funzione corretta
         config_params = env_config | {"session": session_data}
         platform_type = "Server (Standard)"
-    
+    print(dir(language))
     text = await language.fetch(path="pyproject.toml")
     config = await language.format(text,**config_params)
     config = await language.convert(config, dict, 'toml')
@@ -252,6 +252,7 @@ async def bootstrap() -> None:
                     language.register(**ppp),
                     name=f"{module_name}:{driver_name}"
                 )
+                print(f"{module_name}:{driver_name}","BOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO")
                 provider_tasks.append(task)
                 await dependency_messenger.post(domain='debug', message=f"Task creata: Provider {module_name} / Adattatore {adapter_name} ('{driver_name}').")
         else:

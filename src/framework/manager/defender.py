@@ -1,6 +1,10 @@
 from secrets import token_urlsafe
 from typing import Dict, Any
 
+imports = {
+    
+}
+
 class defender:
     def __init__(self, **constants):
         """
@@ -8,76 +12,8 @@ class defender:
 
         :param constants: Configurazioni iniziali, deve includere 'providers'.
         """
-        self.sessions = {}
-        self.providers = constants.get('providers', [])
-        self.session = {'user':{},'metadata':{},'tokens':{},"ip": "192.168.1.1",'identifier':'asdasdasd'}
-        example = {
-        "user": {
-            "id": "...",                     # ID univoco utente
-            "email": "...",                  # Email principale
-            "email_verified": True,         # Stato verifica
-            "provider": "email",            # email / github / google
-            "created_at": "...",            # Quando è stato creato
-            "last_sign_in_at": "...",       # Ultimo accesso
-            "is_anonymous": False,          # Guest?
-            "role": "authenticated",        # Ruolo (può essere utile per autorizzazioni)
-            "metadata": {                   # Qualsiasi dato extra custom
-            ...
-            }
-        },
-        "tokens": {
-            "access_token": "...",          # Per autenticare richieste API
-            "refresh_token": "...",         # Per ottenere nuovo token
-            "expires_at": 1234567890,       # Unix timestamp di scadenza
-            "token_type": "bearer"
-        },
-        "provider": "supabase",           # Sistema che ha generato il login
-        "session_id": "...",              # Opzionale: id della sessione
-        "ip": "...",                      # Opzionale: IP per logging o sicurezza
-        "ua": "...",                      # Opzionale: User-agent
-        "auth_time": "2025-06-13T12:34"   # Quando è stato autenticato
-        }
+        self.providers = constants.get('providers', dict())
     
-    async def authenticate2(self, **constants):
-        """
-        Autentica un utente utilizzando i provider configurati.
-
-        :param constants: Deve includere 'identifier', 'ip' e credenziali.
-        :return: Dizionario di sessione aggiornato se l'autenticazione ha successo, altrimenti None.
-        """
-        #identifier = constants.get('identifier')
-        #ip = constants.get('ip')
-
-        #if not identifier or not ip:
-        #    print("Errore: 'identifier' e 'ip' sono obbligatori per l'autenticazione.")
-        #    return None
-
-        # Inizializza la sessione se non esiste
-        #session = self.sessions.setdefault(identifier, {'ip': ip})
-        session = self.sessions.setdefault(identifier, {'ip': ip})
-
-        authenticated = False
-        for backend in self.providers:
-            try:
-                backend_session = await backend.authenticate(**constants)
-                print(f"[auth.defender] Risultato: {backend_session} | Provider: {backend}",constants)
-                if backend_session:
-                    profile = backend.config.get('profile', '')
-                    if profile:
-                        session[profile] = backend_session
-                    else:
-                        session.update(backend_session)
-                    authenticated = True
-            except Exception as e:
-                print(f"Errore durante l'autenticazione con {backend}: {e}")
-
-        if authenticated:
-            self.sessions[identifier] = session
-            return session
-        else:
-            print(f"Autenticazione fallita per identifier: {identifier}")
-            return None
-        
     async def authenticate(self, **constants):
         """
         Autentica un utente utilizzando i provider configurati.
@@ -87,39 +23,14 @@ class defender:
         """
 
         # Recupera o inizializza la sessione utente
-        session = self.session
-        authenticated = False
-
-        for backend in self.providers:
+        session = dict()
+        for backend in self.providers.get('authentication'):
+            provider_persistence = backend.config.get('persistence')
             try:
-                backend_session = await backend.authenticate(**constants)
-                print(f"[auth.defender] ✅ Provider: {backend} - Risultato: {backend_session}", constants)
-
-                if backend_session:
-                    profile = backend.config.get("profile", "")
-                    '''if profile:
-                        session[profile] = backend_session
-                    else:
-                        session.update(backend_session)'''
-                    session['tokens'][profile] = backend_session['tokens']
-                    session['metadata'][profile] = backend_session['metadata']
-                    # Salva l'identità se presente
-                    if "user" in backend_session:
-                        session["user"] |= backend_session["user"]
-
-                    authenticated = True
-
+                session |= await backend.authenticate(**constants)
             except Exception as e:
                 print(f"⚠️ Errore durante l'autenticazione con {backend}: {e}")
-
-        if authenticated:
-            #self.sessions[identifier] = session
-            self.session = session  # ✅ salva la sessione corrente attiva
-            #print(f"✅ Autenticazione riuscita per '{identifier}'")
-            return session
-
-        #print(f"❌ Autenticazione fallita per identifier: {identifier}")
-        return None
+        return session
 
     async def registration(self, **constants) -> Any:
         """

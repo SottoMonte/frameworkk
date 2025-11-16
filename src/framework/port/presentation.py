@@ -10,7 +10,8 @@ import re
 import itertools
 
 imports = {
-    'tags': 'framework/schema/tags.json',
+    'tags': 'framework/scheme/tags.json',
+    #'language': 'framework/service/language.py'
 }
 
 class port(ABC):

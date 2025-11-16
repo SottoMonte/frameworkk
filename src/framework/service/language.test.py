@@ -1,6 +1,6 @@
 imports = {
     'contract': 'framework/service/contract.py',
-    'model': 'framework/schema/model.json',
+    #'model': 'framework/schema/model.json',
 }
 
 exports = {
@@ -14,6 +14,7 @@ exports = {
     'convert':'convert',
     'route':'route',
     'normalize':'normalize',
+    'put':'put',
 }
 
 class TestModule(contract.Contract):
@@ -37,6 +38,9 @@ class TestModule(contract.Contract):
         await self.check_cases(language.resource, failure)'''
     
     async def test_route(self):
+        pass
+
+    async def test_put(self):
         pass
 
     async def test_asynchronous(self):

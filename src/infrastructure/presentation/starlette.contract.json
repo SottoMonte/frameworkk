@@ -22,7 +22,7 @@
         },
         "login": {
             "test": "373cf606fe85a4710cd2fc13742fccef2b18ec9d8f3b6ce815376eb48adf237b",
-            "production": "0252e54066f74eea2d9b58bc3938237449a8079b33dda309b574ddd356f81508"
+            "production": "465e309c1ce7c51cb21c6f7483f5192d6aed016fee78820b687cbb2cadc56749"
         },
         "logout": {
             "test": "fe5fca39fe4bd4b1a8de5fdc0ef8b99f2954cdc46ed9f4d70514c7cc4adb6341",

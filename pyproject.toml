@@ -72,6 +72,7 @@ route = "route.xml"
 adapter = "supabase"
 url = "https://ljeowpqmovaavxghpsne.supabase.co"
 key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxqZW93cHFtb3ZhYXZ4Z2hwc25lIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDEzNDI3NDEsImV4cCI6MjA1NjkxODc0MX0.IAIJo8-x2WIa9tk7HQwLxgmAX1JTX0aK3kLTb7FQTG8"
+persistence = "session"
 
 [aauthentication.github]
 adapter = "oauth"
@@ -89,13 +90,13 @@ installation_id = "{{ GITHUB_COLOSSO_APP }}"
 key = "public/colosso-cloud.2024-11-24.private-key.pem"
 autologin = "true"
 
-[apersistence.backend]
+[persistence.session]
 adapter = "redis"
-host = "redis-18721.c339.eu-west-3-1.ec2.redns.redis-cloud.com"
-port = "18721"
-database = "Projects-free-db"
+host = "redis-13589.c339.eu-west-3-1.ec2.cloud.redislabs.com"
+port = "13589"
+database = "database-MHZA09YW"
 username = "default"
-password = ""
+password = "m5pNpmvF8dmOdFwOACTmpRs5l6PdoIQs"
 
 [persistence.supabase]
 adapter = "supabase"

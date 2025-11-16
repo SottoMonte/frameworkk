@@ -2,7 +2,6 @@ import asyncio
 import importlib
 
 imports = {
-    'flow': 'framework/service/flow.py',
 }
 
 class storekeeper():
@@ -59,31 +58,31 @@ class storekeeper():
         return repository, operations
     
     # overview/view/get
-    @flow.asynchronous(inputs='storekeeper',outputs='transaction',managers=('executor',))
+    @language.asynchronous(inputs='storekeeper',outputs='transaction',managers=('executor',))
     async def overview(self, executor, **constants):
         repository,operations = await self.preparation(**constants|{'operation':'view'})
         return await executor.first_completed(operations=operations,success=repository.results)
 
     # gather/read/get
-    @flow.asynchronous(inputs='storekeeper',outputs='transaction',managers=('executor',))
+    @language.asynchronous(inputs='storekeeper',outputs='transaction',managers=('executor',))
     async def gather(self, executor, **constants):
         repository,operations = await self.preparation(**constants|{'operation':'read'})
         return await executor.first_completed(operations=operations,success=repository.results)
     
     # store/create/put
-    @flow.asynchronous(inputs='storekeeper',outputs='transaction',managers=('executor',))
+    @language.asynchronous(inputs='storekeeper',outputs='transaction',managers=('executor',))
     async def store(self, executor, **constants):
         repository,operations = await self.preparation(**constants|{'operation':'create'})
         return await executor.first_completed(operations=operations,success=repository.results)
     
     # remove/delete/delete
-    @flow.asynchronous(inputs='storekeeper',outputs='transaction',managers=('executor',))
+    @language.asynchronous(inputs='storekeeper',outputs='transaction',managers=('executor',))
     async def remove(self, executor, **constants):
         repository,operations = await self.preparation(**constants|{'operation':'delete'})
         return await executor.first_completed(operations=operations,success=repository.results)
     
     # change/update/patch
-    @flow.asynchronous(inputs='storekeeper',outputs='transaction',managers=('executor',))
+    @language.asynchronous(inputs='storekeeper',outputs='transaction',managers=('executor',))
     async def change(self,executor,**constants):
         repository,operations = await self.preparation(**constants|{'operation':'update'})
         return await executor.first_completed(operations=operations,success=repository.results)

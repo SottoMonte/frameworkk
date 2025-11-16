@@ -3,11 +3,11 @@ imports = {
 }
 
 exports = {
-    'presenter': 'presenter',
+    'storekeeper': 'storekeeper',
 }
 
 import asyncio
-class Testpresenter(contract.Contract):
+class Teststorekeeper(contract.Contract):
 
     def setUp(self):
         '''asyncio.run(language.load_di_entry(**{
@@ -22,7 +22,7 @@ class Testpresenter(contract.Contract):
         }))'''
         print("Setting up the test environment...")
 
-    async def test_selector(self):
+    async def test_change(self):
         '''"""Verifica che language.get recuperi correttamente i valori da percorsi validi."""
         success = [
             {'args':(language),'kwargs':{'path':"framework/service/run.py"},'type':types.ModuleType},
@@ -35,4 +35,16 @@ class Testpresenter(contract.Contract):
 
         await self.check_cases(language.resource, success)
         await self.check_cases(language.resource, failure)'''
+        pass
+
+    async def test_remove(self):
+        pass
+
+    async def test_store(self):
+        pass
+
+    async def test_gather(self):
+        pass
+
+    async def test_overview(self):
         pass

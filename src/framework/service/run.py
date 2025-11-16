@@ -208,10 +208,18 @@ async def discover_and_run_tests():
     import unittest
     import json
     import framework.service.language as language
+    
     # Pattern personalizzato per i test
     test_dir = './src'
     test_suite = unittest.TestSuite()
     all_contract_hashes: dict[str, any] = {}
+
+    #di['module_cache']['framework/service/language.py'] = language
+    text = await language.resource(path="pyproject.toml")
+    #config = await language.format(text,**{})
+    config = await language.convert(text, dict, 'toml')
+
+    await loader.bootstrap_core(config)
     
     # 1. FASE DI SCOPERTA E GENERAZIONE HASH
     for root, dirs, files in os.walk(test_dir):
@@ -249,7 +257,9 @@ async def discover_and_run_tests():
                     # Aggiungi i test dal modulo filtrato
                     test_suite.addTest(unittest.defaultTestLoader.loadTestsFromModule(module))
                 except Exception as e:
+                    import traceback
                     print(f"Errore nell'importazione/filtro del modulo: {main_path_rel}, {e}")
+                    traceback.print_exc()
     
     checking = estrai_test_da_suite(test_suite)
     def filtra_contratti_test_compattato(
@@ -367,7 +377,6 @@ def test():
     # Aggiungi le tue importazioni qui (os, asyncio, unittest, language, loader)
     
     # Esegui il bootstrap del framework (se necessario)
-    asyncio.run(loader.bootstrap_core())
 
     # Scopri e genera i contratti, poi esegui i test
     all_contract_hashes, suite_test = asyncio.run(discover_and_run_tests())

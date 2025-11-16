@@ -1,0 +1,75 @@
+{
+  "tokens": {
+    "type": "dict",
+    "required": false,
+    "valueschema": {
+      "type": "dict",
+      "required": true,
+      "schema": {
+        "access_token": {
+          "type": "string",
+          "required": true
+        },
+        "refresh_token": {
+          "type": "string",
+          "nullable": true
+        },
+        "token_type": {
+          "type": "string",
+          "required": true,
+          "allowed": [
+            "bearer"
+          ]
+        },
+        "expires_at": {
+          "type": "integer",
+          "required": true,
+          "min": 1
+        }
+      }
+    },
+    "nullable": true
+  },
+  "user": {
+    "type": "dict",
+    "required": false,
+    "schema": {
+        "id": {
+          "type": "string",
+          "required": true,
+          "default": "anon_default_id"
+        },
+        "email": {
+          "type": "string",
+          "required": true,
+          "default": "anonymous@placeholder.com"
+        },
+        "user_metadata": {
+          "type": "dict",
+          "default": {}
+        },
+        "app_metadata": {
+          "type": "dict",
+          "default": {
+            "role": "anonymous"
+          }
+        },
+        "created_at": {
+          "type": "string",
+          "nullable": true
+        },
+        "provider": {
+          "type": "string",
+          "nullable": true
+        },
+        "aud": {
+          "type": "string",
+          "nullable": true
+        },
+        "role": {
+          "type": "string",
+          "default": "anonymous"
+        }
+      }
+  }
+}

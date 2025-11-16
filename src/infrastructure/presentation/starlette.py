@@ -8,7 +8,7 @@ from urllib.parse import urlparse, urlunparse, ParseResult,parse_qs
 
 imports = {
     'presentation': 'framework/port/presentation.py',
-    'scheme_url' : 'framework/schema/url.json',
+    'scheme_url' : 'framework/scheme/url.json',
 }
 
 try:
@@ -771,13 +771,12 @@ class adapter(presentation.port):
         response.delete_cookie("session_token")
         return response
 
-    @language.asynchronous(managers=('storekeeper', 'messenger','defender'))
-    async def login(self, request, storekeeper,messenger, defender):
+    @language.asynchronous(managers=('messenger','defender'))
+    async def login(self, request,messenger, defender):
         """Gestisce il login dell'utente con autenticazione basata su IP e sessione."""
         
         client_ip = request.client.host
         session_identifier = request.cookies.get('session_identifier', secrets.token_urlsafe(16))
-        # Recupera l'URL dalla sessione
         url_precedente = request.session.get("url_precedente",request.url)
         
         # Determina le credenziali in base al metodo HTTP
@@ -786,12 +785,11 @@ class adapter(presentation.port):
         elif request.method == 'POST':
             credentials = dict(await request.form())
         else:
-            return RedirectResponse('/', status_code=400)  # Metodo non supportato
+            return RedirectResponse('/', status_code=405)
 
         # Autenticazione tramite defender
         session = await defender.authenticate(ip=client_ip, identifier=session_identifier, **credentials)
         provider = credentials.get('provider', 'undefined')
-
         
         # Aggiorna la sessione se l'autenticazione ha avuto successo
         #if session:

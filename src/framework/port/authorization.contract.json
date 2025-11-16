@@ -1,0 +1,8 @@
+{
+    "port": {
+        "authorized": {
+            "test": "67108bf8141f558238ee77c8c2e82df1171c624376f2ca09071308cfe02c4803",
+            "production": "62bb140cbe446179ddbfc7b5863297710370f8e1f15ac2ba6837004aaa589e8c"
+        }
+    }
+}

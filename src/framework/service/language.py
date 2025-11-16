@@ -62,7 +62,7 @@ def buffered_log(level: str, message: str, emoji: str = ""):
         'timestamp': datetime.now(timezone.utc).isoformat(),
         #'transaction_id': get_transaction_id()
     })
-    #print(formatted)  # Mantiene output semplice durante il bootstrap
+    print(formatted)  # Mantiene output semplice durante il bootstrap
 
 def asynchronous(custom_filename: str = __file__, app_context = None,**constants):
     inject = [di[manager] for manager in constants.get('managers', [])]
@@ -74,14 +74,14 @@ def asynchronous(custom_filename: str = __file__, app_context = None,**constants
         async def wrapper(*args, **kwargs):
             wrapper._is_decorated = True
             #tx_token = get_transaction_id()
-            
+            #set_transaction_id(uuid.uuid4())
             try:
                 # 1. Ottieni l'ID dal contesto (Task locale)
                 
                 # 2. Se non esiste, genera un nuovo ID
                 #if tx_token is None:
                 #    set_transaction_id(uuid.uuid4())
-                set_transaction_id(uuid.uuid4())
+                #set_transaction_id(uuid.uuid4())
                 
                 args_inject = list(args) + inject
                 if 'inputs' in constants:
@@ -125,6 +125,8 @@ def asynchronous(custom_filename: str = __file__, app_context = None,**constants
                 # 5. Ripristina il contesto quando il task termina
                 '''if tx_token is not None:
                     TRANSACTION_ID_VAR.reset(tx_token)'''
+                #set_transaction_id(None)
+                set_transaction_id(uuid.uuid4())
                 pass
         return wrapper
     return decorator
@@ -1195,6 +1197,10 @@ async def _load_python_module(name: str, path: str, code: str) -> types.ModuleTy
     module.__source__ = code
     module.__dict__['language'] = di['module_cache'].get('framework/service/language.py')
 
+    #if di['module_cache'].get('framework/service/language.py') is None:
+    #    raise('errore modulo language = None')
+
+
     # Inseriamo un placeholder nella cache PRIMA di risolvere le dipendenze.
     # Serve a interrompere cicli di importazione: se il .test.py importa il
     # modulo sotto test, troverà qui un ModuleType (parzialmente inizializzato)
@@ -1258,6 +1264,7 @@ async def resource(**kwargs) -> Any:
     buffered_log("WARNING", f"⚠️ Tipo di risorsa non supportato per {resource_path}. Restituito contenuto grezzo.")
     return content
 
+#@asynchronous()
 async def load_di_entry(**constants: Any) -> None:
     """
     Carica una risorsa specificata in 'constants' e la registra nel container DI globale.
@@ -1269,6 +1276,7 @@ async def load_di_entry(**constants: Any) -> None:
     :param lang: La lingua da iniettare nella funzione 'resource'.
     :param constants: La configurazione della risorsa da caricare.
     """
+    print(constants,'=================')
     # 1. Estrazione dei parametri di configurazione
     path: str = constants.get('path', '')
     service_name: str = constants.get('service', constants.get('name', '')) 
@@ -1290,7 +1298,9 @@ async def load_di_entry(**constants: Any) -> None:
 
     
         # 4. Caricamento del Modulo/Risorsa (Usando il path fornito)
+        print('################################',constants)
         module = await resource(**constants)
+        print('------------------>',module)
         resource_class: Callable = getattr(module, attribute_name)
 
         # 5. Definizione della Factory/Resolver
@@ -1305,20 +1315,54 @@ async def load_di_entry(**constants: Any) -> None:
                     
                 # Salva il resolver della dipendenza
                 dependencies[dep_key] = di[dep_key]
+            
             #print(f"⏳ Caricamento Manager: '{service_name}' ({log_info}) con dipendenze {dependencies}",dependency_keys)
             di[service_name] = lambda _di: resource_class(**init_args|{'providers': dependencies})
-            buffered_log("INFO", f"✅ Registrato Factory: '{service_name}' ({log_info})")
+            buffered_log("INFO", f"✅✅✅✅ Registrato Factory: '{service_name}' ({log_info})")
 
         else:
             # --- CASO: PROVIDER/SINGLETON (Istanziamento eager in una lista) ---
             if service_name not in di:
                 di[service_name] = lambda di: list([])
-
+            print(constants,resource_class)
             #provider = getattr(module, 'adapter')
             di[service_name].append(resource_class(config=init_args))
             
-            buffered_log("INFO", f"✅ Aggiunto Provider a lista: '{service_name}' ({log_info})")
+            buffered_log("INFO", f"✅✅✅✅ Aggiunto Provider a lista: '{service_name}' ({log_info})")
+    else:
+        print(service_name,'===============  in di')
+        # 4. Caricamento del Modulo/Risorsa (Usando il path fornito)
+        print('################################',constants)
+        module = await resource(**constants)
+        print('------------------>',module)
+        resource_class: Callable = getattr(module, attribute_name)
 
+        # 5. Definizione della Factory/Resolver
+        
+        if dependency_keys:
+            # --- CASO: MANAGER/FACTORY (Istanziamento lazy con dipendenze) ---
+            
+            dependencies: Dict[str, Any] = {}
+            for dep_key in dependency_keys:
+                if dep_key not in di:
+                    di[dep_key] = lambda _di: []
+                    
+                # Salva il resolver della dipendenza
+                dependencies[dep_key] = di[dep_key]
+            
+            #print(f"⏳ Caricamento Manager: '{service_name}' ({log_info}) con dipendenze {dependencies}",dependency_keys)
+            di[service_name] = lambda _di: resource_class(**init_args|{'providers': dependencies})
+            buffered_log("INFO", f"✅✅✅✅ Registrato Factory: '{service_name}' ({log_info})")
+
+        else:
+            # --- CASO: PROVIDER/SINGLETON (Istanziamento eager in una lista) ---
+            if service_name not in di:
+                di[service_name] = lambda di: list([])
+            print(constants,resource_class)
+            #provider = getattr(module, 'adapter')
+            di[service_name].append(resource_class(config=init_args))
+            
+            buffered_log("INFO", f"✅✅✅✅ Aggiunto Provider a lista: '{service_name}' ({log_info})")
 # =====================================================================
 # --- Funzioni Principali di Analisi ---
 # =====================================================================
