@@ -6,7 +6,7 @@
         },
         "authenticate": {
             "test": "449fa1ca9b7bd6a24dd7e7a6afc626e4045a86b9d82a3f068775f7d914a65d5e",
-            "production": "f8999fab16539c7bb5a30caf9a66b87e2c0a8065fddf9f08eec4c939af45a8c2"
+            "production": "db6b869e0fe3f5941ca77c7d0628526c26748c9bc6ebcfd984c9c4fa286b850a"
         }
     }
 }

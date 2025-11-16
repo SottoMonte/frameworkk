@@ -127,7 +127,7 @@ class adapter:
         try:
             profile = self.config['profile']
             result = await backend_login(self.supabase, **data)
-            result = await language.normalize({'user':result['user'],'tokens':{profile:result['tokens']}},scheme_session)
+            result = await language.normalize({'identifier':data['identifier'],'ip':data['ip'],'user':result['user'],'tokens':{profile:result['tokens']}},scheme_session)
             return result
         except Exception as e:
             print(f"Errore di autenticazione: {e}")

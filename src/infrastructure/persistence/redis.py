@@ -1,4 +1,4 @@
-import redis.asyncio as r
+import redis.asyncio as redis
 import json
 
 imports = {
@@ -10,27 +10,35 @@ class adapter(persistence.port):
     engine = None
     def __init__(self,**constants):
         self.config = constants['config'] 
-        self.conn = r.from_url(f"redis://{self.config['host']}:{self.config['port']}")
+        #self.conn = r.from_url(f"redis://{self.config['host']}:{self.config['port']}")
+        self.conn = redis.Redis(
+                host=self.config.get('host'),
+                port=self.config.get('port'),
+                username=self.config.get('username'),
+                password=self.config.get('password'),
+                # db=... (Potrebbe essere necessario se usi un indice numerico)
+                decode_responses=True
+            )
     
     async def query(self, *services, **constants):
         pass
 
-    @language.asynchronous(ports=('storekeeper','messenger'))
-    async def read(self, storekeeper, messenger, **constants):
-        identifier = constants['identifier'] if 'identifier' in constants else 'test'
+    @language.asynchronous(managers=('messenger',))
+    async def read(self, messenger, **constants):
+        identifier = constants['location']
         boolean = await self.conn.exists(identifier)
         if boolean:
             typ = await self.conn.type(identifier)
-            match typ.decode('ascii'):
+            match typ:
                 case 'list':
                     value = await self.conn.lrange(identifier, 0, -1)
                     #return VARIABLE(worker,typ.decode('ascii'),identifier,[x.decode('ascii') for x in value])
                     return None
                 case 'string':
                     value = await self.conn.get(identifier)
-                    
-                    #return json.loads(value.decode('utf-8'))
-                    return storekeeper.builder('transaction',{'state': True,'action':'read','result':json.loads(value.decode('utf-8'))})
+                    aaa =  await language.convert(value,dict,'json')
+                    return {'state': True,'action':'read','result':[aaa]}
+                    #return storekeeper.builder('transaction',{'state': True,'action':'read','result':json.loads(value.decode('utf-8'))})
                 case 'set':
                     await self.conn.sadd(identifier, value)
                 case 'dict':
@@ -45,12 +53,14 @@ class adapter(persistence.port):
                     return cov_dict
         else:
             typ = await self.conn.type(identifier)
-            return storekeeper.builder('transaction',{'state': False,'action':'read','remark':'not found data'})
+            #return storekeeper.builder('transaction',{'state': False,'action':'read','remark':'not found data'})
+            return None
 
-    @language.asynchronous(ports=('storekeeper','messenger'))
-    async def create(self, storekeeper, messenger, **constants):
-        data = constants['value']
-        identifier = constants['identifier'] if 'identifier' in constants else '#'
+    @language.asynchronous(managers=('messenger',))
+    async def create(self, messenger, **constants):
+        print(constants,'<---------------------create')
+        data = constants['payload']
+        identifier = constants['location']
         boolean = await self.conn.exists(identifier)
         typee = str(type(data))
 
@@ -73,7 +83,8 @@ class adapter(persistence.port):
                         if 'expiry' in self.config:kwarg['ex'] = int(self.config['expiry'])
                         await self.conn.set(identifier, json.dumps(data),**kwarg)
                     except Exception as e:
-                        return storekeeper.builder('transaction',{'state': False,'action':'create','remark':f"{e}"})
+                        #return storekeeper.builder('transaction',{'state': False,'action':'create','remark':f"{e}"})
+                        return None
                 case 'hash':
                     await self.conn.hmset(identifier, data)
                 case _:
@@ -81,13 +92,15 @@ class adapter(persistence.port):
                         await self.conn.set(identifier, json.dumps(data))
                     except Exception as e:
                         print("ERRORE TIPO",typee)
-                        return storekeeper.builder('transaction',{'state': False,'action':'create','remark':f"{e}"})
-            return storekeeper.builder('transaction',{'state': True,'action':'create','remark':f"new identifier:{identifier} created"})
+                        #return storekeeper.builder('transaction',{'state': False,'action':'create','remark':f"{e}"})
+                        return None
+            #return storekeeper.builder('transaction',{'state': True,'action':'create','remark':f"new identifier:{identifier} created"})
+            return None
         else:    
-            return storekeeper.builder('transaction',{'state': False,'action':'create','remark':f"this identifier:{identifier} already exists"})
-
-    @language.asynchronous(ports=('storekeeper',))
-    async def delete(self, storekeeper, **constants):
+            #return storekeeper.builder('transaction',{'state': False,'action':'create','remark':f"this identifier:{identifier} already exists"})
+            return None
+    @language.asynchronous(managers=('messenger',))
+    async def delete(self, messenger, **constants):
         identifier = constants['identifier']
         typ = await self.conn.type(identifier)
         #print(f"REM::{identifier}",typ)
@@ -129,8 +142,8 @@ class adapter(persistence.port):
                     except Exception as e:
                         return storekeeper.builder('transaction',{'state': False,'action':'delete','remark':f"{e}"})
 
-    @language.asynchronous(ports=('storekeeper',))
-    async def write(self, storekeeper, **constants):
+    @language.asynchronous(managers=('messenger',))
+    async def write(self, messenger, **constants):
         identifier = constants['identifier']
         value = constants['value']
         boolean = await self.conn.exists(identifier)

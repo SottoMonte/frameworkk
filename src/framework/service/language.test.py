@@ -1,5 +1,6 @@
 imports = {
     'contract': 'framework/service/contract.py',
+    #'language': 'framework/service/language.py',
     #'model': 'framework/schema/model.json',
 }
 
@@ -10,18 +11,38 @@ exports = {
     'synchronous':'synchronous',
     'register':'load_di_entry',
     'format':'format',
+    'transform':'transform',
     'generate':'generate',
     'convert':'convert',
     'route':'route',
     'normalize':'normalize',
     'put':'put',
+    'get':'get'
 }
 
 class TestModule(contract.Contract):
 
     def setUp(self):
+        self.data = {
+            "nome": "Progetto A",
+            "versioni": [
+                {"id": 1, "status": "completo"},
+                {"id": 2, "status": "in_corso", "dettagli": {"tester": "Mario"}},
+                {"id": 3, "status": "fallito"}
+            ],
+            "config": {
+                "timeout": 30,
+                "log_livello": "DEBUG"
+            }
+        }
+        import framework.service.language as language
+        self.language = language
         
         print("Setting up the test environment...")
+
+
+    async def test_transform(self):
+        pass
 
     async def test_resource(self):
         """Verifica che language.get recuperi correttamente i valori da percorsi validi."""
@@ -42,6 +63,47 @@ class TestModule(contract.Contract):
 
     async def test_put(self):
         pass
+
+    async def test_get(self):
+        # Casi di successo (Output atteso != Valore di default)
+        success = [
+            # 1. Accesso Base
+            {'args': (self.data, "nome"), 'equal': "Progetto A"},
+            
+            # 2. Accesso Nidificato
+            {'args': (self.data, "config.timeout"), 'equal': 30},
+            
+            # 3. Accesso a Lista tramite Indice (primo elemento)
+            {'args': (self.data, "versioni.0.status"), 'equal': "completo"},
+            
+            # 4. Accesso Complesso (indice e nidificazione)
+            {'args': (self.data, "versioni.1.dettagli.tester"), 'equal': "Mario"},
+            
+            # 5. Uso del Carattere Jolly '*' (estrazione di un campo)
+            {'args': (self.data, "versioni.*.status"), 'equal': ["completo", "in_corso", "fallito"]},
+            
+            # 6. Uso del Carattere Jolly '*' (estrazione di un altro campo)
+            {'args': (self.data, "versioni.*.id"), 'equal': [1, 2, 3]},
+        ]
+
+        # Casi di fallimento (Output atteso == Valore di default)
+        # Questi test verificano che venga restituito il valore di default
+        failure = [
+            # 7. Chiave non esistente (default è None)
+            {'args': (self.data, "chiave.sconosciuta"), 'equal': None},
+            
+            # 8. Chiave non esistente (default specificato)
+            {'args': (self.data, "config.porta", 80), 'equal': 80},
+            
+            # 9. Indice fuori limite (default specificato)
+            {'args': (self.data, "versioni.99", "N/A"), 'equal': "N/A"},
+            
+            # 10. Tentativo di accesso a chiave in lista (senza indice o *)
+            # La funzione dovrebbe restituire il default perché 'nome' è una stringa non traversabile
+            {'args': (self.data, "nome.sub_chiave"), 'equal': None},
+        ]
+
+        await self.check_cases(self.language.get, success + failure)
 
     async def test_asynchronous(self):
         pass

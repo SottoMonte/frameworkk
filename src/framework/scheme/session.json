@@ -1,4 +1,12 @@
 {
+  "identifier": {
+    "type": "string",
+    "required": true
+  },
+  "ip": {
+    "type": "string",
+    "required": true
+  },
   "tokens": {
     "type": "dict",
     "required": false,

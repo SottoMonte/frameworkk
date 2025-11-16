@@ -3,14 +3,15 @@ import asyncio
 imports = {
     'factory': 'framework/service/factory.py',
     'contract': 'framework/service/contract.py',
-    'model': 'framework/schema/model.json',
 }
 
-
+exports = {
+    'repository':'repository'
+}
 
 class Testrepository(contract.Contract):
     def setUp(self):
-        self.repo = factory.repository(
+        '''self.repo = factory.repository(
             location={
                 "dev": [
                     "repos/{payload.location}/contents/{payload.path}",
@@ -22,7 +23,7 @@ class Testrepository(contract.Contract):
             payloads={},
             model=model
         )
-        print("Setting up the test environment...",self.repo,__file__)
+        print("Setting up the test environment...",self.repo,__file__)'''
         pass
 
     # === do_format ===
@@ -39,6 +40,15 @@ class Testrepository(contract.Contract):
         self.assertEqual(formatted, "repos/user/repo/contents/src")'''
 
     # === parameters (async) ===
+    async def test_find_first_formattable_template(self):
+        pass
+
+    async def test_can_format(self):
+        pass
+
+    async def test_do_format(self):
+        pass
+
     async def test_parameters(self):
         
         '''payloads = {}

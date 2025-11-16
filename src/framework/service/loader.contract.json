@@ -2,7 +2,7 @@
     "__module__": {
         "bootstrap_core": {
             "test": "d683b01a043ec54c4081835db4187e9f54206e1580563e29bb07fb977ef4b999",
-            "production": "c7a017fa776b7ece9febdeaa43f80bd344ed6fa9c292d679b308a7143b3299b7"
+            "production": "7af398d0b0d174e18020b7e52b8788eaf4b56189629ab874e238e7b3321cdb62"
         },
         "bootstrap": {
             "test": "038ee4e822716fb257c55af8dc60aa05a5efb4f112fcc251edb8a4110ccbcbb5",

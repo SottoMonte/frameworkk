@@ -52,7 +52,7 @@ class Testdefender(contract.Contract):
         await self.check_cases(language.resource, failure)'''
         pass
 
-    async def test_chain_completed(self):
+    async def test_whoami(self):
         '''"""Verifica che language.get recuperi correttamente i valori da percorsi validi."""
         success = [
             {'args':(language),'kwargs':{'path':"framework/service/run.py"},'type':types.ModuleType},

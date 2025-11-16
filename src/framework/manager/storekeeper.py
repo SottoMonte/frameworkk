@@ -15,17 +15,14 @@ class storekeeper():
         repository_name = constants.get('repository', '')
 
         try:
-            repository_module = await language.resource(
-                language,
-                path=f"application/repository/{repository_name}.py"
-            )
-            repository = repository_module.repository
+            repository_module = await language.fetch(path=f"application/repository/{repository_name}.py")
+            repository = repository_module.repository()
         except Exception as e:
             print(f"Errore durante il caricamento del modulo repository '{repository_name}': {e}")
             return None, []
         
-        print(self.providers)
-        for provider in self.providers:
+        
+        for provider in self.providers.get('persistence'):
             print(self.providers,provider)
             try:
                 profile = provider.config.get('profile', '').upper()

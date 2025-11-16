@@ -90,8 +90,8 @@ class port(ABC):
     async def mount_widget(self, tag, inner, attributes):
         pass'''
     
-    @language.asynchronous(managers=('defender',))
-    async def builder(self, defender,**constants):
+    @language.asynchronous(managers=('defender','storekeeper'))
+    async def builder(self, defender, storekeeper, **constants):
         if 'text' in constants:
             text = constants['text']
         else:
@@ -110,15 +110,21 @@ class port(ABC):
             ppp = await self.mount_widget('Text', ['aaa'], {'type':'text'})
             constants['inner'] = placeholder
 
-        #constants['user'] = await defender.whoami()
-        constants['user'] = {}
+        if 'user' not in constants:
+            user = await defender.whoami(storekeeper,identifier=constants.get('identifier'))
+            print('BOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOM',user)
+        
+            #constants['user'] = user
+        else:
+            user = {}
+        
         #print(constants)
 
-        content = template.render(constants)
+        content = template.render(constants|{'user':user})
         #print('Content:---------------------------*******************',content)
         xml = ET.fromstring(content)
         #print(xml)
-        view = await self.render_view(xml,constants)
+        view = await self.render_view(xml,constants|{'user':user})
         #print('View:---------------------------*******************',type(view))
         #await self.render_css(view,view))
         if 'inner' in constants:

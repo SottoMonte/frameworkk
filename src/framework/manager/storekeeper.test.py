@@ -22,6 +22,9 @@ class Teststorekeeper(contract.Contract):
         }))'''
         print("Setting up the test environment...")
 
+    async def test_preparation(self):
+        pass
+
     async def test_change(self):
         '''"""Verifica che language.get recuperi correttamente i valori da percorsi validi."""
         success = [

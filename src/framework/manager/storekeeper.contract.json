@@ -1,5 +1,9 @@
 {
     "storekeeper": {
+        "preparation": {
+            "test": "64da1c21cd472fd4651eee74c965ac1209e89605a6007a8cec6e5d6f04e8c7f0",
+            "production": "841af85e5c941791c1992f96dd27a4b02e3740db2df76d8a3dc269efe8fe4b56"
+        },
         "change": {
             "test": "4af429fa9d12df02dcde3d1789eb39cfe9de15d1a5b272c52261b46934f671ba",
             "production": "e7e7017b4e5156e6f58d8603392dc73f950eccd0d0986a91819a7b8977cc9da3"

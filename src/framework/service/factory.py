@@ -17,7 +17,8 @@ class repository():
                 placeholders = re.findall(r'\{([\w\.]+)\}', template)
                 gg = []
                 for key in placeholders:
-                    a = language.get(key,data)
+                    a = language.get(data,key)
+                    print('=================================',a,key)
                     if a:
                         gg.append(True)
                     else:
@@ -44,7 +45,7 @@ class repository():
                     a = language.get(key,data)
                     print(f"Key: {key}, Value: {a}")
                     if a:
-                        template = template.replace(f'{{{key}}}',str(a))
+                        template = template.replace(f'{key}',str(a))
                 print(f"Template: {template},",data)
                 return template
             except Exception as e:
@@ -89,10 +90,11 @@ class repository():
                 if isinstance(item, dict):
                     try:
                         #(data_dict, mapper, values, input, output)
-                        translated_item = language.translation(
+                        '''translated_item = language.transform(
                             item, self.mapper, self.values, self.schema, self.schema
                         )
-                        r.append(translated_item)
+                        r.append(translated_item)'''
+                        r.append(item)
                     except Exception as e:
                         print(f"Errore durante la traduzione dell'elemento {item}: {e}")
                         continue  # Salta l'elemento corrente in caso di errore
@@ -150,7 +152,11 @@ class repository():
             print("Selected template:", template)
 
             # Format il percorso
-            path = self.do_format(template, combined_parameters)
+            #path = self.do_format(template, combined_parameters)
+
+            path = await language.format(template,**combined_parameters)
+
+            print("BOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO",path)
             
             
             # Restituisci i risultati

@@ -1,0 +1,54 @@
+{
+  "provider": {
+    "type": "string",
+    "required": true,
+    "default": "unknown",
+    "empty": false,
+    "regex": "^[a-zA-Z0-9_-]+$",
+    "comment": "Identifica il sistema di backend (es. Redis, PostgreSQL) o il servizio specifico che gestirà l'operazione."
+  },
+  "location": {
+    "type": "string",
+    "required": false,
+    "default": "",
+    "nullable": true,
+    "comment": "Riferimento a una specifica locazione o area del magazzino (opzionale)."
+  },
+  "operation": {
+    "type": "string",
+    "required": true,
+    "default": "read",
+    "allowed": [
+      "create",
+      "read",
+      "update",
+      "delete",
+      "view"
+    ],
+    "comment": "Tipo di operazione richiesta (CRUD o view)."
+  },
+  "repository": {
+    "type": "string",
+    "required": true,
+    "nullable": false,
+    "empty": false,
+    "comment": "Nome della risorsa o collezione/tabella su cui operare (es. 'products', 'movements')."
+  },
+  "filter": {
+    "type": "dict",
+    "required": false,
+    "default": {},
+    "nullable": true,
+    "comment": "Condizioni di filtro per operazioni READ, UPDATE, DELETE (es. {'sku': 'ABC123'})."
+  },
+  "payload": {
+    "type": "dict",
+    "required": false,
+    "default": {},
+    "nullable": true,
+    "dependencies": [
+      "operation"
+    ],
+    "comment": "Dati effettivi da creare (CREATE) o aggiornare (UPDATE)."
+  }
+}

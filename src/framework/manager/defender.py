@@ -14,7 +14,8 @@ class defender:
         """
         self.providers = constants.get('providers', dict())
     
-    async def authenticate(self, **constants):
+    #@language.asynchronous(managers=('storekeeper',))
+    async def authenticate(self, storekeeper, **constants):
         """
         Autentica un utente utilizzando i provider configurati.
 
@@ -23,11 +24,14 @@ class defender:
         """
 
         # Recupera o inizializza la sessione utente
-        session = dict()
+        session = dict({'ip':constants.get('ip'),'identifier':constants.get('identifier')})
         for backend in self.providers.get('authentication'):
             provider_persistence = backend.config.get('persistence')
             try:
                 session |= await backend.authenticate(**constants)
+                if provider_persistence:
+                    await storekeeper.store(repository='sessions',payload=session)
+                    pass
             except Exception as e:
                 print(f"⚠️ Errore durante l'autenticazione con {backend}: {e}")
         return session
@@ -68,19 +72,14 @@ class defender:
         ip = constants.get('ip', '')
         return any(session.get('ip') == ip for session in self.sessions.values())
 
-    async def whoami(self, **constants) -> Any:
+    async def whoami(self, storekeeper, **constants) -> Any:
         """
         Determina l'identità dell'utente associato a un determinato indirizzo IP.
 
         :param constants: Deve includere 'ip'.
         :return: Identificatore dell'utente se trovato, altrimenti None.
         """
-        return self.session.get('user',None)
-        '''ip = constants.get('ip', '')
-        for identifier, session in self.sessions.items():
-            if session.get('ip') == ip:
-                return identifier
-        return None'''
+        return await storekeeper.gather(repository='sessions',filter=constants)
     
     async def whoami2(self, **constants) -> Any:
         

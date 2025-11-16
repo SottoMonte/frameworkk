@@ -771,8 +771,8 @@ class adapter(presentation.port):
         response.delete_cookie("session_token")
         return response
 
-    @language.asynchronous(managers=('messenger','defender'))
-    async def login(self, request,messenger, defender):
+    @language.asynchronous(managers=('storekeeper','messenger','defender'))
+    async def login(self, request,storekeeper,messenger, defender):
         """Gestisce il login dell'utente con autenticazione basata su IP e sessione."""
         
         client_ip = request.client.host
@@ -788,7 +788,7 @@ class adapter(presentation.port):
             return RedirectResponse('/', status_code=405)
 
         # Autenticazione tramite defender
-        session = await defender.authenticate(ip=client_ip, identifier=session_identifier, **credentials)
+        session = await defender.authenticate(storekeeper,ip=client_ip, identifier=session_identifier, **credentials)
         provider = credentials.get('provider', 'undefined')
         
         # Aggiorna la sessione se l'autenticazione ha avuto successo
@@ -995,12 +995,12 @@ class adapter(presentation.port):
 
         # chiama il modello / builder come nel tuo flusso
         url_payload = await language.normalize(url_payload,scheme_url)
-        return await self.builder(file=matched_route['view'], url=url_payload, mode=['main'], **kargs)
+        return await self.builder(file=matched_route['view'], url=url_payload, mode=['main'], identifier=kargs.get('identifier'))
 
     @language.asynchronous()
     async def starlette_view(self,request):
         request.session["url_precedente"] = str(request.url)
-        html = await self.mount_view(str(request.url))
+        html = await self.mount_view(str(request.url),identifier = request.cookies.get('session_identifier', secrets.token_urlsafe(16)))
         '''layout = 'application/view/layout/base.html'
         file = await self.fetch_resource({'url':layout})
         css = await self.fetch_resource({'url':layout.replace('.html','.css').replace('.xml','.css')})

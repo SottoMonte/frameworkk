@@ -1,0 +1,64 @@
+{
+  "message": {
+    "type": "string",
+    "required": true,
+    "empty": false,
+    "comment": "Testo del messaggio da inviare."
+  },
+  "domain": {
+    "type": "string",
+    "required": true,
+    "empty": false,
+    "comment": "Topic o canale di destinazione (es. info.server.login).",
+    "regex": "^(info|error|debug|warning|event|alert|critical|fatal|success|notice)(\\..+)?$"
+  },
+  "routing": {
+    "type": "string",
+    "default": "broadcast",
+    "allowed": [
+      "m2m",
+      "p2p",
+      "multicast",
+      "anycast",
+      "unicast",
+      "broadcast"
+    ],
+    "comment": "routing del messaggio."
+  },
+  "sender": {
+    "type": "string",
+    "required": false,
+    "default": "anonym",
+    "comment": "Identificativo del mittente del messaggio (es. servizio, device, utente)."
+  },
+  "receiver": {
+    "type": "string",
+    "required": false,
+    "default": "anonym",
+    "comment": "Identificativo del destinatario (necessario per operazioni p2p/unicast)."
+  },
+  "timestamp": {
+    "type": "string",
+    "required": false,
+    "default": "now",
+    "comment": "Data e ora di invio del messaggio (se non specificato, sarà 'now')."
+  },
+  "identifier": {
+    "type": "string",
+    "required": false,
+    "nullable": true,
+    "comment": "ID univoco del messaggio (es. UUID per tracciabilità)."
+  },
+  "priority": {
+    "type": "string",
+    "required": false,
+    "default": "normal",
+    "allowed": [
+      "low",
+      "normal",
+      "high",
+      "critical"
+    ],
+    "comment": "Priorità del messaggio."
+  }
+}

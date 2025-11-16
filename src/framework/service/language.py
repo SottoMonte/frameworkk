@@ -84,6 +84,7 @@ def asynchronous(custom_filename: str = __file__, app_context = None,**constants
                 #set_transaction_id(uuid.uuid4())
                 
                 args_inject = list(args) + inject
+                
                 if 'inputs' in constants:
                         #kwargs_builder = await language.model(input, kwargs, 'filtered', language)
                     outcome = await function(*args_inject, **kwargs)
@@ -97,7 +98,7 @@ def asynchronous(custom_filename: str = __file__, app_context = None,**constants
             except Exception as e:
                 tx_token = get_transaction_id()
                 #current_tx = TRANSACTION_ID_VAR.get()
-                '''source_code = await _load_resource(path="/"+custom_filename)
+                source_code = await _load_resource(path="/"+custom_filename)
 
                 # Genera il rapporto usando l'eccezione attiva
                 report = analyze_exception(
@@ -109,7 +110,7 @@ def asynchronous(custom_filename: str = __file__, app_context = None,**constants
                 #report['TRANSACTION_ID'] = tx
                 
                 ok = await convert(report, str, 'json')
-                print(ok)'''
+                print(ok)
                 # Buffera anche il log strutturato con il transaction id
                 if 'messenger' in di:
                     await di['messenger'].post(domain='error', message=e)
@@ -348,6 +349,7 @@ async def normalize(value,schema, mode='full'):
     # Crea un validatore Cerberus con lo schema fornito
     #print("##################",schema)
     v = Validator(schema,allow_unknown=True)
+    # allow_unknown={'comment': True}
 
     # Permetti a Cerberus di gestire i valori di default durante la validazione
     # Cerberus gestirà 'type', 'required', 'default' e 'regex' direttamente
@@ -364,7 +366,31 @@ async def normalize(value,schema, mode='full'):
 def transform(data_dict, mapper, values, input, output):
 
     """ Trasforma un set di costanti in un output mappato. """
-
+    def find_matching_keys(mapper, target_dict):
+        """
+        Trova la prima chiave del dizionario 'mapper' che è anche presente
+        come chiave nel 'target_dict' (output o input).
+        
+        Args:
+            mapper (dict): Il dizionario di mappatura.
+            target_dict (dict): Il dizionario con cui confrontare le chiavi (e.g., output/input).
+            
+        Returns:
+            str or None: La prima chiave corrispondente trovata, altrimenti None.
+        """
+        if not isinstance(mapper, dict) or not isinstance(target_dict, dict):
+            # Gestione di base dell'errore se non sono dizionari
+            return None
+            
+        # Crea un set delle chiavi del dizionario target per una ricerca efficiente
+        target_keys = set(target_dict.keys())
+        
+        # Itera sulle chiavi del mapper e cerca la prima corrispondenza nel target
+        for key in mapper.keys():
+            if key in target_keys:
+                return key
+                
+        return None
     translated = {}
 
     if not isinstance(data_dict, dict):
@@ -486,6 +512,50 @@ def put(data: dict, path: str, value: any, schema: dict) -> dict:
             raise IndexError(f"Nodo non indicizzabile al passo '{chunk}' (tipo: {type(node).__name__})")
 
     return result
+
+def get(data, path, default=None):
+    """
+    Accesso sicuro a strutture nidificate (dict/list) tramite notazione a punti.
+    Supporta '*' per iterare su elementi di una lista.
+    """
+    if not path:
+        return data
+
+    parts = path.split('.', 1)
+    key = parts[0]
+    rest = parts[1] if len(parts) > 1 else None
+
+    # Converte la chiave in intero se numerica
+    if key.isnumeric():
+        key = int(key)
+    
+    # --- Gestione carattere jolly '*' ---
+    if key == '*':
+        if not isinstance(data, list):
+            return default
+        
+        # Mappa la chiamata ricorsiva su ogni elemento della lista
+        results = [get(item, rest or '', default) for item in data]
+        return results
+    
+    # --- Accesso a dict/list ---
+    try:
+        if isinstance(data, dict):
+            next_data = data.get(key)
+        elif isinstance(data, list) and isinstance(key, int):
+            next_data = data[key]
+        else:
+            return default # Tipo di dato non supportato per la chiave
+        
+    except (KeyError, IndexError, TypeError):
+        return default
+
+    # --- Ricorsione ---
+    if rest is None:
+        return next_data if next_data is not None else default
+    else:
+        # Continua la ricorsione sul resto del path
+        return get(next_data, rest, default)
 
 def route(url: dict, new_part: str) -> str:
     """

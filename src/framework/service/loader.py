@@ -151,7 +151,7 @@ async def bootstrap_core(config) -> None:
                 'cache_enabled': True, 
                 'log_level': 'INFO'
             },
-            'dependency_keys': ['messenger'], # Dipendenze da risolvere dal DI
+            'dependency_keys': ['persistence'], # Dipendenze da risolvere dal DI
             'messenger': 'storekeeper' # Nome della chiave nel DI per la dipendenza
         },
         {

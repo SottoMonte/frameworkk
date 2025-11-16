@@ -1,5 +1,9 @@
 {
     "__module__": {
+        "transform": {
+            "test": "e7df113e82c8bdf792dd5edeb75e9996c4d505f88394478acfe6ca7292582418",
+            "production": "612a02eeb46cec867a95fcc61574e3facb013a99af1e3e76c6c8937d4d8ac478"
+        },
         "resource": {
             "test": "afb854fd58ebcbea51f606b9c8b8005632154cfd35abb46854a588141b40bc95",
             "production": "509bd62bcdc0737e256b293a660000539163231fa4b2682de42aafde9c1032d8"
@@ -12,9 +16,13 @@
             "test": "c3f87342e6c1eb165835153b12bedec7a9fc83b577c67df5679a8ee1a8095053",
             "production": "cd5d8ac4f0ccf67c6104c6d884e96f926a181e690610143c39d4c389ade4afc2"
         },
+        "get": {
+            "test": "d93d308eb8395fe07ea31f4854c3129eafa105b2e26d63a800aaf04c94e72bae",
+            "production": "d1ee6195e98f765f8f52539806126be80b09a9709abf743bb52a9c0805648e38"
+        },
         "asynchronous": {
             "test": "04852c350ccbc650ed6163dae362594037c43129b6147cd879e12ff0fb94aee3",
-            "production": "afe26f85e48541a99b5dea632c5a7012683ff11c9cf6afd2944e63f450eb7ef4"
+            "production": "c0e48c785bf4e4d4f4c92ee2db65c10284aedbdb5d0941dce42481f74ed2b89a"
         },
         "synchronous": {
             "test": "fce4373a51afc6fe6396a125b184f4892c6ff02b6e4588023b5f3b2ded5e58dc",
@@ -38,7 +46,7 @@
         },
         "normalize": {
             "test": "88926acbb1b3ed6e19c5267e181ebe3ec52dc7717e3f3599a99fcbf64213b7e7",
-            "production": "019b17ce60b9409c55fece1178fc20743541b5fd061067ece606d4e2916f3b89"
+            "production": "4712e9408e4acbd2365e799d530ed626382c69cf2de9eddaf98c6baff02187e7"
         }
     }
 }
