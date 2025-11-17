@@ -91,7 +91,7 @@ class port(ABC):
         pass'''
     
     @language.asynchronous(managers=('defender','storekeeper'))
-    async def builder(self, defender, storekeeper, **constants):
+    async def builder(self, defender, storekeeperr, **constants):
         if 'text' in constants:
             text = constants['text']
         else:
@@ -111,7 +111,7 @@ class port(ABC):
             constants['inner'] = placeholder
 
         if 'user' not in constants:
-            user = await defender.whoami(storekeeper,identifier=constants.get('identifier'))
+            user = await defender.whoami(storekeeperr,identifier=constants.get('identifier'))
             print('BOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOM',user)
         
             #constants['user'] = user
