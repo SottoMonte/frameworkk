@@ -1,0 +1,20 @@
+{
+    "adapter": {
+        "check": {
+            "test": "b582b93c6520cfe5e01c99258744bc9037b3d64b15cd1b8040477602f33d3283",
+            "production": "21f0948d3239aa0ae525f53804409e440139d3377e7f376d9d7932c3b4c8c5e7"
+        },
+        "load_policy": {
+            "test": "5023468c4bc4645349d20ef4a60b204f9adef9a9c866873adda72a1215457e2c",
+            "production": "38bcefe3f4895aad2684d4c5ea2804005c87d18fdfddd863f3aeb3be12aee80b"
+        },
+        "load_data_store": {
+            "test": "98102dd6c58e690516dbaf1a4cb48977448c51b99a4c24b2b12670c8dabaea63",
+            "production": "1c6cbfff3fee0c88e3e4f28b73d24e9c75d1d95c94dfcb1128830fd77868ea7d"
+        },
+        "load_policies": {
+            "test": "d7addbf5379cd0ad8f967be095622c0dc179e75be5d819d93519db8a7a11338c",
+            "production": "038b4b8449a84c549b70ea2875c6557185d54777393897dda38c4b91f1280c0d"
+        }
+    }
+}

@@ -68,6 +68,10 @@ adapter = "flutter"
 route = "route.xml"
 
 # Configurazione dell'autenticazione
+[authorization.supabase]
+adapter = "verdict"
+
+# Configurazione dell'autenticazione
 [authentication.supabase]
 adapter = "supabase"
 url = "https://ljeowpqmovaavxghpsne.supabase.co"

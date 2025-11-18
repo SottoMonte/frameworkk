@@ -231,7 +231,7 @@ async def bootstrap() -> None:
     
     # --- FASE DI CARICAMENTO PROVIDER ---
     provider_tasks: List[asyncio.Task] = []
-    MODULI_PRINCIPALI = ["presentation", "persistence", "message", "authentication", "actuator"]
+    MODULI_PRINCIPALI = ["presentation", "persistence", "message", "authentication", "actuator","authorization"]
     await dependency_messenger.post(domain='debug', message="Preparazione al caricamento dei Provider d'Infrastruttura...")
 
     for module_name in MODULI_PRINCIPALI:
