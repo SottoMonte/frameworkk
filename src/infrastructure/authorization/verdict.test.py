@@ -12,7 +12,7 @@ class Testadapter(contract.Contract):
     async def test_check(self):
         import infrastructure.authorization.verdict as verdict
         engine = verdict.adapter(config={})
-
+        await engine.load_policieee()
         request = {
             "principal": {
                 "id": "user-101",

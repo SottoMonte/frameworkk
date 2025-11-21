@@ -5,7 +5,7 @@ imports = {
 import json
 from typing import Dict, Any
 import mistql # Motore di query sicuro
-
+import asyncio
 # La classe adapter gestisce il caricamento e la valutazione delle policy
 class adapter():
     
@@ -19,6 +19,7 @@ class adapter():
         policy_data = self.load_policies()
         for name, policy in policy_data.items():
             self.load_policy(name, policy)
+
 
     # ------------------------------
     # POLICY COMPILATION & LOADING
@@ -108,7 +109,15 @@ class adapter():
             }
         }
 
+    async def load_policieee(self) -> Dict[str, Dict]:
+        text = await language.fetch(path="application/policy/presentation/web.toml")
+        ok = await language.convert(text,dict,'toml')
+        print(ok)
+        return ok
+        
+
     def load_policies(self) -> Dict[str, Dict]:
+        #language.fetch
         """Definizione delle policy (le condizioni sono stringhe MistQL)."""
         return {
             "document_access": {

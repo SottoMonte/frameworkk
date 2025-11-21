@@ -68,8 +68,9 @@ adapter = "flutter"
 route = "route.xml"
 
 # Configurazione dell'autenticazione
-[authorization.supabase]
+[authorization.verdict]
 adapter = "verdict"
+presentation = "web.toml"
 
 # Configurazione dell'autenticazione
 [authentication.supabase]
