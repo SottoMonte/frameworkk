@@ -120,7 +120,47 @@ class defender:
         if identifier in self.sessions:
             del self.sessions[identifier]
 
-    def cleanup_expired_sessions(self, **constants) -> None:
+    def revoke_session(self, **constants) -> None:
+        """
+        Placeholder per rimuovere sessioni scadute o non più valide.
+
+        Questo metodo potrebbe essere implementato con controlli di scadenza basati su timestamp.
+
+        :param constants: Parametri opzionali per la pulizia.
+        """
+        pass
+
+    def refresh_token(self, **constants) -> None:
+        """
+        Placeholder per rimuovere sessioni scadute o non più valide.
+
+        Questo metodo potrebbe essere implementato con controlli di scadenza basati su timestamp.
+
+        :param constants: Parametri opzionali per la pulizia.
+        """
+        pass
+
+    def validate_token(self, **constants) -> None:
+        """
+        Placeholder per rimuovere sessioni scadute o non più valide.
+
+        Questo metodo potrebbe essere implementato con controlli di scadenza basati su timestamp.
+
+        :param constants: Parametri opzionali per la pulizia.
+        """
+        pass
+
+    def has_role(self, **constants) -> None:
+        """
+        Placeholder per rimuovere sessioni scadute o non più valide.
+
+        Questo metodo potrebbe essere implementato con controlli di scadenza basati su timestamp.
+
+        :param constants: Parametri opzionali per la pulizia.
+        """
+        pass
+
+    def has_permission(self, **constants) -> None:
         """
         Placeholder per rimuovere sessioni scadute o non più valide.
 

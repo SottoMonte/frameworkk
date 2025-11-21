@@ -2,19 +2,19 @@ imports = {
     #'persistence': 'framework/port/authorization.py',
 }
 
-from json_logic import jsonLogic
-from typing import Dict, Any
 import json
+from typing import Dict, Any
+import mistql # Motore di query sicuro
 
-
-#authorization.port
+# La classe adapter gestisce il caricamento e la valutazione delle policy
 class adapter():
+    
     def __init__(self, **constants):
         self.config = constants
         self._policies: Dict[str, Dict] = {}
         self._data_store: Dict[str, Any] = {}
 
-        # Caricamento iniziale
+        # Caricamento iniziale dei dati e delle policy
         self._data_store = self.load_data_store()
         policy_data = self.load_policies()
         for name, policy in policy_data.items():
@@ -26,126 +26,64 @@ class adapter():
 
     def _compile(self, policy_data: Dict[str, Any]) -> Dict[str, Any]:
         """
-        Preprocess policies for faster evaluation.
-        Esempio: normalizzazione campi, precompilazione espressioni, validazione sintattica.
+        Placeholder per la pre-elaborazione delle policy.
         """
-        # Placeholder per trasformazioni: regex pre-compile, caching attr maps, ecc.
         return policy_data
 
     def load_policy(self, name: str, policy_data: Dict[str, Any]):
+        """Carica una policy pre-compilata nella memoria."""
         compiled_policy = self._compile(policy_data)
         self._policies[name] = compiled_policy
 
     # ------------------------------
-    # POLICY EVALUATION
+    # POLICY EVALUATION (MistQL)
     # ------------------------------
-
-    def _evaluate_rule2(self, rule: Dict, context: Dict[str, Any]) -> bool:
-        """
-        Valuta una singola regola usando jsonlogic.
-        La regola deve avere forma:
-
-        {
-          "effect": "allow",
-          "condition": { "==": [ {"var": "input.user.role"}, "admin" ] }
-        }
-        """
-        def normalize(value):
-            if isinstance(value, dict):
-                return {str(k): normalize(v) for k, v in value.items()}
-            if isinstance(value, (list, tuple, set)):
-                return [normalize(v) for v in value]
-            if hasattr(value, "keys") and not isinstance(value, dict):  # dict_keys, dict_values
-                return [normalize(v) for v in list(value)]
-            return value
-        effect = rule.get("effect", "deny")
-        condition = rule.get("condition")
-
-        # Se non c'è condizione, si interpreta come "match sempre"
-        if condition is None:
-            return effect == "allow"
-
-        # Valuta la condizione dinamicamente sul contesto
-        try:
-            result = jsonLogic(condition, normalize(context))
-        except Exception as e:
-            print(f"[POLICY ERROR] Condition evaluation failed: {e}")
-            return False
-        
-        # Restituisce match valido
-        return result and effect == "allow"
 
     def _evaluate_rule(self, rule: Dict, context: Dict[str, Any]) -> bool:
         """
-        Valuta una singola regola usando jsonlogic, con debug avanzato per errori.
+        Valuta una singola regola usando l'espressione MistQL contenuta in 'condition'.
         """
-
-        # Normalizzazione JSON-safe
-        def normalize(value):
-            try:
-                # clone via JSON serialize/deserialize → garantisce struttura valida
-                return json.loads(json.dumps(value))
-            except Exception:
-                # fallback manuale in caso di oggetti non serializzabili in prima passata
-                if isinstance(value, dict):
-                    return {str(k): normalize(v) for k, v in value.items()}
-                if isinstance(value, (list, tuple, set)):
-                    return [normalize(v) for v in value]
-                if hasattr(value, "keys"):
-                    return normalize(list(value))  # dict_keys, dict_values
-                return value
-
         effect = rule.get("effect", "deny")
-        condition = rule.get("condition")
-
-        # No condition -> auto-match
-        if condition is None:
+        condition_mistql_string = rule.get("condition") 
+        
+        # 1. Gestione assenza condizione
+        if condition_mistql_string is None:
             return effect == "allow"
 
-        # Context normalized
-        safe_context = normalize(context)
-
-        # ➤ DEBUG STEP: validate JSON serializability
-        try:
-            json.dumps(safe_context)
-        except Exception as e:
-            print("\n❌ CONTEXT JSON SERIALIZATION ERROR")
-            print("---------------------------------")
-            print("Rule ID:", rule.get("id", "<no-id>"))
-            print("Context object:", safe_context)
-            print("Reason:", str(e))
-            print("---------------------------------\n")
-            return False
+        safe_context = context
 
         # ➤ DEBUG STEP: log condition before evaluation
         print("\n🧪 Evaluating Rule")
         print("Effect:", effect)
-        print("Condition:", json.dumps(condition, indent=2))
+        print("Condition:", condition_mistql_string)
         print("Context:", json.dumps(safe_context, indent=2))
 
-        # 🔥 Evaluation with traced exception
+        # 2. Evaluation con MistQL
         try:
-            result = jsonLogic(condition, safe_context)
-            print("➡️ Result:", result)
+            # MistQL valuta l'espressione (stringa) sul dizionario di contesto (safe_context)
+            result = mistql.query(condition_mistql_string, safe_context)
+            
+            print(f"➡️ Result: {result} (Type: {type(result).__name__})")
         except Exception as e:
-            print("\n❌ JSONLOGIC EVALUATION ERROR")
+            # Cattura errori di sintassi MistQL o errori di runtime
+            print("\n❌ MISTQL EVALUATION ERROR")
             print("---------------------------------")
-            print("Rule:", json.dumps(rule, indent=2))
-            print("Context:", json.dumps(safe_context, indent=2))
+            print("Rule:", condition_mistql_string)
             print("Error:", str(e))
             print("---------------------------------\n")
             return False
 
-        return result and effect == "allow"
+        # 3. Restituisce il risultato della decisione
+        return bool(result) and effect == "allow"
 
     def check(self, policy_name: str, input_data: Dict[str, Any]) -> bool:
         """
-        Esegue la valutazione policy su un input. Ritorna True/False.
-        Supporta il modello "first match allow".
+        Esegue la valutazione policy su un input. Ritorna True/False (first match allow).
         """
         if policy_name not in self._policies:
-            return False  # default deny
+            return False
 
+        # Crea il contesto completo unendo l'input e i dati di supporto
         context = {
             "input": input_data,
             "data": self._data_store,
@@ -155,14 +93,14 @@ class adapter():
             if self._evaluate_rule(rule, context):
                 return True
 
-        return False  # deny if no rule matched
+        return False # Deny se nessuna regola 'allow' ha fatto match
 
     # ------------------------------
     # MOCK PERSISTENCE LAYER
     # ------------------------------
 
     def load_data_store(self) -> Dict[str, Any]:
-        """Mock opzionale per consentire test immediati."""
+        """Dati di supporto statici (es. limiti di abbonamento)."""
         return {
             "limits": {
                 "free": {"max_download": 5},
@@ -171,24 +109,21 @@ class adapter():
         }
 
     def load_policies(self) -> Dict[str, Dict]:
-        """Mock: in produzione si caricherebbe da file, DB o API."""
+        """Definizione delle policy (le condizioni sono stringhe MistQL)."""
         return {
             "document_access": {
                 "rules": [
                     {
                         "effect": "allow",
-                        "condition": {
-                            "and": [
-                                {"==": ["PUBLISHED", "PUBLISHED"]},
-                                #{"==": [{"var": "input.resource.status"}, "PUBLISHED"]},
-                            ]
-                        }
+                        # Regola 1: documento PUBBLICATO E utente PREMIUM
+                        #"condition": 'input.resource.status == "PUBLISHED and true"'
+                        "condition": '(input.resource.status == "PUBLISHED") && ((input.principal.roles | find @ == "premium") != null)'
+                        #"condition": "(input.resource.status == \"PUBLISHED\") and (input.principal.roles | contains(\"premium\"))"
                     },
                     {
-                        "effect": "allow",
-                        "condition": {
-                            "==": ["PUBLISHED", "PUBLISHED"],
-                        }
+                        "effect": "deny",
+                        # Regola 2 (Fallback Deny): sempre True, quindi blocca se la Regola 1 fallisce
+                        "condition": "true" 
                     }
                 ]
             }
