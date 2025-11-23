@@ -1,0 +1,55 @@
+{% extends "free.xml" %}
+{% block main %}
+<Row class="p-2" expand="full">
+    <Media type="image" height="50px" src="https://i.postimg.cc/Kz6yzgHt/20250828-1405-Logo-Paa-S-Trasparente-simple-compose-01k3r909szfba96gd6r8x984sc.png" />
+    <Container expand="full" padding="p-5" alignment-content="center">
+        <Card width="400px" padding="p-5" alignment-content="center">
+            <Messenger>
+                <Message type="warning" mode="alert" >
+                    <Text>Login disabilitata</Text>
+                </Message>
+            </Messenger>
+            <Media type="image" height="50px" src="https://i.postimg.cc/Kz6yzgHt/20250828-1405-Logo-Paa-S-Trasparente-simple-compose-01k3r909szfba96gd6r8x984sc.png" />
+            <Action type="form" action="/login" id="form-login">
+                <Input name="provider" placeholder="provider" value="supabase" />
+                <Input name="email" type="email" placeholder="email" />
+                <Input name="password" type="password" placeholder="password" />
+                <Action class="primary" type="submit" ><Text>Login</Text></Action>
+            </Action>
+            <Action route="/auth/signup"><Text>Don't have an account? Sign up</Text></Action>
+            <Action route="/auth/reset-password"><Text>Forgot password? Reset it</Text></Action>
+        </Card>
+        
+    </Container>
+    <Container expand="4" class="bg-body-tertiary border border-1 rounded" padding="p-5" alignment-content="center">
+        <Media type="carousel" class="w-100 h-100">
+            <Card expand="full">
+                <Navigation type="accordion" id="prova" >
+                    <Navigation type="accordion-item" id="nb" >
+                        <Text>H11</Text>
+                        <Container><Text>T12</Text></Container>
+                    </Navigation>
+                    <Navigation type="accordion-item" id="nb2" >
+                        <Text>H12</Text>
+                        <Text>T12</Text>
+                    </Navigation>
+                </Navigation>
+                
+            </Card>
+            <Card expand="full">
+                <Media type="image" src="https://img.animeunity.so/anime/bx143598-FCvAhQJLllSP.png" />
+                <Text class="h1">1</Text>
+                <Media type="icon" src="bi-box-arrow-in-left" />
+            </Card>
+            <Card>
+                <Media type="image" src="https://img.animeunity.so/anime/bx143598-FCvAhQJLllSP.png" />
+                <Text>2</Text>
+            </Card>
+            <Card>
+                <Media type="video" src="https://www.w3schools.com/html/mov_bbb.mp4" controls="true" autoplay="true" width="100%" />
+                <Text class="h1" >Video</Text>
+            </Card>
+        </Media>
+    </Container>
+</Row>
+{% endblock %}

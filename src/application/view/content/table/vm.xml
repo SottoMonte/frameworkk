@@ -1,0 +1,13 @@
+<Graph type="table.row">
+    <Text storekeeper="name">name</Text>
+    <Text storekeeper="description">description</Text>
+    <Text storekeeper="os">type</Text>
+    <Text storekeeper="ip_address">type</Text>
+    <Text storekeeper="status">type</Text>
+    <Text storekeeper="firewall_enabled">type</Text>
+    <Text storekeeper="backup_enabled">language</Text>
+    <Text storekeeper="environment">Updated</Text>
+    <Group type="button">
+        <Action route="application/view/page/inventory/virtual-machine.xml?id={{storekeeper.id}}" class="d-inline-flex"><Graph icon="bi-card-heading"/></Action>
+    </Group>
+</Graph>

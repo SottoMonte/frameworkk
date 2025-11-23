@@ -1,0 +1,35 @@
+{% extends "auth.xml" %}
+{% block main %}
+<Row expand="dynamic" >
+    {% block start %}
+    {% endblock %}
+    <Row>
+        {% block bar %}
+        {% endblock %}
+    </Row>
+    <Column expand="dynamic">
+            <Navigation type="breadcrumb">
+            {% block breadcrumb %}
+            {% endblock %}
+            </Navigation>
+        <Row>
+            <Column padding="p-5" expand="dynamic" >
+                <Text class="h1">{% block title %}{% endblock %}</Text>
+                <Text class="h5">{% block subtitle %}{% endblock %}</Text>
+            </Column>
+            <Row padding="p-5" alignment-content="center" >
+                <Container>{% block action %}{% endblock %}</Container>
+            </Row>
+        </Row>
+        <Column expand="dynamic">
+            <Container id="alerts">
+                
+            </Container>
+            {% block content %}
+            {% endblock %}
+        </Column>
+    </Column>
+    {% block fine %}
+    {% endblock %}
+</Row>
+{% endblock %}

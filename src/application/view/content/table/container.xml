@@ -1,0 +1,13 @@
+<Graph type="table.row">
+    <Text storekeeper="name">Name</Text>
+    <Text storekeeper="description">Description</Text>
+    <Text storekeeper="os">Image</Text>
+    <Text storekeeper="status">Status</Text>
+    <Text storekeeper="ip_address">IP Address</Text>
+    <Text storekeeper="ports">Ports</Text>
+    <Text storekeeper="environment">Environment</Text>
+    <Text storekeeper="server">Server</Text>
+    <Group type="button">
+        <Action route="application/view/page/inventory/container.xml?id={{storekeeper.id}}" class="d-inline-flex"><Graph icon="bi-card-heading"/></Action>
+    </Group>
+</Graph>

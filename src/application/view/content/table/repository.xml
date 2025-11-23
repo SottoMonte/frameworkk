@@ -1,0 +1,12 @@
+<Graph type="table.row">
+    <Text>{{data.name}}</Text>
+    <Text>{{data.description}}</Text>
+    <Text>{{data.visibility}}</Text>
+    <Text>Github</Text>
+    <Text>{{data.language}}</Text>
+    <Text>{{data.updated}}</Text>
+    <Group type="button">
+        <Action click="ide(id:'ide',repository:{'owner':'{{ data.owner }}','name':'{{ data.name }}'})" route="application/view/page/cms/overview.xml" class="d-inline-flex"><Graph icon="bi-box-fill"/></Action>
+        <Action route="application/view/page/inventory/repository.xml?owner={{ data.owner }}&amp;name={{ data.name }}" class="d-inline-flex"><Graph icon="bi-bookmark-fill"/></Action>
+    </Group>
+</Graph>

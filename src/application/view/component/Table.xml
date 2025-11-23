@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Container id="{{component.id}}" >
+    {% set rows = (url.query.get('row_'+component.id) or [5])[-1] | int %}
+    {% set current_page = (url.query.get('page_'+component.id) or [1])[-1] | int %}
+    <Group type="input" class="rounded-0">
+        <Input width="auto" type="search" placeholder="search" class="rounded-0"></Input>
+        <Group type="action" width="auto" alignment-content="center" class="input-group-text" expand="dynamic">
+            
+        </Group>
+        <Group type="action" width="auto" alignment-content="center" class="input-group-text">
+            <Action><Media type="icon" src="bi-plus-circle" class="text-success" /></Action>
+            <Action><Media type="icon" src="bi-pencil" class="text-warning" /></Action>
+            <Action><Media type="icon" src="bi-trash" class="text-danger" /></Action>
+        </Group>
+        <Input width="auto" class="rounded-0" placeholder="actions" type="select">
+            <Text>actions</Text>
+        </Input>
+    </Group>
+    <Data type="table">
+        <Data type="table.header">
+            {{inner}}
+        </Data>
+        <Data type="table.body">
+            {% for value in storekeeper.result %}
+            <Data type="table.row">
+                <Text >{{value.name}}</Text>
+                <Text >{{value.slug}}</Text>
+                <Text >{{value.description}}</Text>
+                <Text >{{value.price}}</Text>
+                <Data >{{value.category}}</Data>
+            </Data>
+            {% endfor %}
+        </Data>
+    </Data>
+    <Group type="input" >
+        <Group type="action" expand="dynamic" class="input-group-text" alignment-content="center">
+            <Navigation type="pagination" class="h-100" >
+                <Action type="link" route="{{url|route('?page_' ~ component.id ~ '=' ~ (current_page - 1)|string)}}" ><Text>Previous</Text></Action>
+                {% for page in range(1,5) %}
+                    {% if current_page == page %}
+                <Action active=""><Text>{{page}}</Text></Action>
+                    {% else %}
+                <Action type="link" route="{{url|route('?page_' ~ component.id ~ '=' ~ (page)|string)}}" ><Text>{{page}}</Text></Action>
+                    {% endif %}
+                {% endfor %}
+                <Action type="link" route="{{url|route('?page_' ~ component.id ~ '=' ~ (current_page + 1)|string)}}"  ><Text>Next</Text></Action>
+            </Navigation>
+        </Group>
+        <Text class="input-group-text">1 at 10 grid 3x3 from 200 items for</Text>
+        <Input width="80px" type="select" event-change="route(`{{ url|route('?row_'+component.id+'=${this.value}') }}`)" value="{{rows}}">
+            {% for value_r in [2,3,4,6,8,9,30,40,50] %}
+            <Text value="{{value_r}}" >{{value_r}}</Text>
+            {% endfor %}
+        </Input>
+        <Text class="input-group-text">rows for page</Text>
+    </Group>
+</Container>

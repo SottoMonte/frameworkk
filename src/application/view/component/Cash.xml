@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Container id="{{component.id}}" expand="full" class="d-flex flex-column" >
+    <Column class="row-6 h-50" expand="dynamic">
+        <Column expand="dynamic">
+            <Group type="list" expand="dynamic" class="list-group-flush" >
+                {% for value in [{'slug':'splash-paper-white-x2rolls-maxi-2000-2v','amount':10,'total':30},{'slug':'splash-paper-white-x2rolls-maxi-2000-2v','amount':1,'total':3}] %}
+                <Group type="input" height="50px" >
+                    <Media class="input-group-text" type="icon" src="bi-cart-x" />
+                    <Input type="number" value="{{value.amount}}" width="100px" disabled="" />
+                    <Media class="input-group-text" type="icon" src="bi-bag" />
+                    <Input value="{{value.slug}}" disabled="" />
+                    <Input type="number" value="{{value.total}}" width="100px" disabled="" />
+                    <Media class="input-group-text" type="icon" src="bi-currency-euro" />
+                </Group>
+                {% endfor %}
+            </Group>
+            <Group type="list" class="list-group-flush" >
+                <Container>
+                    <Text class="h1" >Totale Euro</Text>
+                    <Group type="input" height="50px" >
+                        <Text class="h5">33</Text>
+                        <Media type="icon" src="bi-currency-euro" />
+                    </Group>
+                </Container>
+                <Container>
+                    <Text class="h1" >Contanti</Text>
+                    <Group type="input" height="50px" >
+                        <Input type="number" value="40" />
+                        <Media class="input-group-text" type="icon" src="bi-currency-euro" />
+                    </Group>
+                </Container>
+                <Container>
+                    <Text class="h1" >Resto</Text>
+                    <Group type="input" height="50px" >
+                        <Text class="h5">7</Text>
+                        <Media type="icon" src="bi-currency-euro" />
+                    </Group>
+                </Container>
+            </Group>
+        </Column>
+        <Group type="input" height="50px" >
+            <Media class="input-group-text" type="icon" src="bi-cart-check" />
+            <Input value="splash-paper-white-x2rolls-maxi-2000-2v" disabled="" />
+            <Media class="input-group-text" type="icon" src="bi-input-cursor" />
+            <Input type="number" value="0" width="100px" />
+        </Group>
+    </Column>
+    <Row margin="py-2" height="400px" class="row-6">
+        <Row class="flex-wrap" expand="10">
+            <Action expand="4" height="auto" class="bg-primary" ><Text>7</Text></Action>
+            <Action expand="4" height="auto" class="bg-primary"><Text>8</Text></Action>
+            <Action expand="4" height="auto" class="bg-primary"><Text>9</Text></Action>
+            <Action expand="4" height="auto" class="bg-primary"><Text>4</Text></Action>
+            <Action expand="4" height="auto" class="bg-primary"><Text>5</Text></Action>
+            <Action expand="4" height="auto" class="bg-primary"><Text>6</Text></Action>
+            <Action expand="4" height="auto" class="bg-primary"><Text>1</Text></Action>
+            <Action expand="4" height="auto" class="bg-primary"><Text>2</Text></Action>
+            <Action expand="4" height="auto" class="bg-primary"><Text>3</Text></Action>
+            <Action expand="4" height="auto" class="bg-primary"><Text>.</Text></Action>
+            <Action expand="4" height="auto" class="bg-primary"><Text>0</Text></Action>
+            <Action expand="4" height="auto" class="bg-primary"><Text>,</Text></Action>
+        </Row>
+        <Row class="flex-wrap" expand="2">
+            <Action expand="12" height="auto" class="bg-secondary" route="#dialogCart"><Media type="icon" src="bi-cart" /></Action>
+            <Action expand="12" height="auto" class="bg-secondary" ><Media type="icon" src="bi-cart-plus" /></Action>
+            <Action expand="6" height="auto" class="bg-secondary"><Text>C</Text></Action>
+            <Action expand="6" height="auto" class="bg-secondary"><Text>=</Text></Action>
+        </Row>
+    </Row>
+</Container>

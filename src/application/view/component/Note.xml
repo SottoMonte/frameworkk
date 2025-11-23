@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Row id="{{ component.id }}" identifier="{{ component.attributes.identifier }}" style="border-color:{{ component.attributes.color }};" class="sticker-note" padding="p-2" draggable-component="Note" draggable-event="note(target:'{{ component.id }}')" draggable="note-inner">
+    <Text style="color:{{ component.attributes.color }};" type="text" class="fs-5" expand="dynamic">{{ component.attributes.text }}</Text>
+</Row>

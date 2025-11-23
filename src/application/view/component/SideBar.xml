@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Navigation orientation="vertical" class="bg-body-tertiary border-end">
+    {% set actions = {
+        'ops': [
+            {'route': '/ops', 'icon': 'bi-view-list', 'text': 'Overview'},
+            {'route': '/ops/machines', 'icon': 'bi-pc-horizontal', 'text': 'Machines'},
+            {'route': '/ops/containers', 'icon': 'bi-box-seam', 'text': 'Containers'},
+            {'route': '/ops/services', 'icon': 'bi-boxes', 'text': 'Services'},
+            {'route': '/ops/domains', 'icon': 'bi-globe', 'text': 'Domains'},
+            {'route': '/ops/volumes', 'icon': 'bi-database', 'text': 'Volumes'},
+            {'route': '/ops/repositories', 'icon': 'bi-bookmarks', 'text': 'Repository'},
+            {'route': '/ops/means', 'icon': 'bi-broadcast', 'text': 'Means'},
+            {'route': '/ops/products', 'icon': 'bi-tags', 'text': 'Products'},
+            {'route': '/ops/clients', 'icon': 'bi-people', 'text': 'Clients'},
+            {'route': '/ops/invoices', 'icon': 'bi-receipt', 'text': 'Invoices'},
+            {'route': '/ops/invoices', 'icon': 'bi-ticket-detailed', 'text': 'Tickets'},
+            {'route': '/ops/invoices', 'icon': 'bi-key', 'text': 'Secrets'},
+        ], 
+        'gov': [
+            {'route': '/ops/containers', 'icon': 'bi-gear', 'text': 'Public'},
+            {'route': '/ops/containers', 'icon': 'bi-people', 'text': 'Account'},
+            {'route': '/ops/containers', 'icon': 'bi-pass', 'text': 'Appearance'},
+            {'route': '/ops/containers', 'icon': 'bi-receipt', 'text': 'Billing'},
+            {'route': '/ops/containers', 'icon': 'bi-ticket-detailed', 'text': 'Collaborators'},
+            {'route': '/ops/containers', 'icon': 'bi-rocket', 'text': 'Partnership'},
+            {'route': '/ops/containers', 'icon': 'bi-rocket', 'text': 'Policy'},
+            {'route': '/ops/containers', 'icon': 'bi-rocket', 'text': 'Rules'},
+        ],
+        'dev': [
+            {'route': '/ops/containers', 'icon': 'bi-view-list', 'text': 'Overview'},
+            {'route': '/ops/containers', 'icon': 'bi-people', 'text': 'Repositories'},
+            {'route': '/ops/containers', 'icon': 'bi-pass', 'text': 'Projects'},
+            {'route': '/ops/containers', 'icon': 'bi-receipt', 'text': 'Packages'},
+            {'route': '/ops/containers', 'icon': 'bi-ticket-detailed', 'text': 'Teams'},
+        ],
+        } 
+    %}
+    {% for action in actions[component.attributes.from] %}
+        <Action route="{{url|route(action.route)}}" class="{% if component.attributes.selected == action.route[1:] %}active{% endif %} ">
+            <Media type="icon" src="{{ action.icon }}"/>
+            <Text>{{ action.text }}</Text>
+        </Action>
+    {% endfor %}
+</Navigation>

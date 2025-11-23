@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Column expand="full">
+    <!-- Header !-->
+    <Data id="page-loader" type="progress" class="rounded-0 fixed-top" height="3px" value="0"/>
+    <Window type="still" id="offcanvasExample">
+        <Text>This is an offcanvas window.</Text>
+        <Action type="button" ><Text>Close</Text></Action>
+    </Window>
+    <Window type="dialog" title="Machine" id="window-ai">
+        
+    </Window>
+    <Navigation orientation="horizontal" alignment-content="between" class="bg-body-tertiary border-bottom px-2">
+        <Navigation type="breadcrumb" alignment-content="center">
+                <Action type="link" route="{{url|route('dashboard')}}"><Media type="image" height="35px" src="https://i.postimg.cc/Kz6yzgHt/20250828-1405-Logo-Paa-S-Trasparente-simple-compose-01k3r909szfba96gd6r8x984sc.png" /></Action>
+                <Input width="auto" type="select" event-change="route(`{{url|route('?org=${this.value}')}}`)" value="{{url.query.get('org',['SottoMonte'])[-1]}}">
+                    <Text value="Colosso">Colosso</Text>
+                    <Text value="SottoMonte">SottoMonte</Text>
+                </Input>
+                <Input width="auto" type="select" event-change="route(`{{ url|route('/${this.value}') }}`)" value="{{url.path[-1]}}" >
+                    <Text value="dev" >DEV</Text>
+                    <Text value="ops" >OPS</Text>
+                    <Text value="gov" >GOV</Text>
+                </Input>
+        </Navigation>
+        <Group width="auto" expand="dynamic" padding="px-4">
+            <Input width="auto" type="search" value="{{url}}" />
+            <Action type="submit" class="border"><Media type="icon" src="bi-search" /></Action>
+        </Group>
+        <Container width="auto" alignment-content="between" spacing="2">
+            <Group width="auto" alignment-content="center" spacing="1">
+                <Media type="icon" src="bi-moon-fill"/>
+                <Input type="switch" id="theme-toggle" selected="true" event-click="toggleTheme(this.id)" />
+                <Media type="icon" src="bi-sun-fill"/>
+            </Group>
+            <Group type="action" width="auto" alignment-content="center" class="border">
+                <Action type="dropdown" tooltip="Help">
+                    <Media type="icon" src="bi-question-circle-fill" />
+                    <Media width="200px" height="200px" type="video" src="https://www.w3schools.com/html/mov_bbb.mp4" controls="" autoplay="" />
+                    <Action type="link" route="/products/item2"><Text>Item 2</Text></Action>
+                    <Action type="link" route="/products/item3"><Text>Item 3</Text></Action>
+                </Action>
+                <Action type="dropdown" tooltip="Notifications">
+                    <Media type="icon" src="bi-inbox-fill" />
+                    <Messenger>
+                        <Message type="info" title="Info" >
+                            <Text>This is a toast message.</Text>
+                        </Message>
+                    </Messenger>
+                </Action>
+                <Action type="dropdown" tooltip="Feedback">
+                    <Media type="icon" src="bi-bug-fill" />
+                    <Text>What would you like to share?</Text>
+                    <Group type="action" width="250px" padding="p-3">
+                        <Action alignment-content="center" spacing="2" class="border d-inline-flex">
+                            <Media type="icon" src="bi-exclamation-triangle" class="text-danger" />
+                            <Text>Issue</Text>
+                        </Action>
+                        <Action alignment-content="center" spacing="2" class="border">
+                            <Media type="icon" src="bi-lightbulb" class="text-warning" />
+                            <Text>Idea</Text>
+                        </Action>
+                    </Group>
+                </Action>
+                <Action tooltip="AI" route="#window-ai">
+                    <Media type="icon" src="bi-stars" />
+                </Action>
+            </Group>
+            <Action route="#offcanvasExample" alignment-content="center" class="d-inline-flex" spacing="2">
+                <Media type="image" height="40px" src="https://app.colosso.cloud/static/logo.png" class="rounded-circle border" />
+                <Text>{{user.email}}</Text>
+            </Action>
+        </Container>
+    </Navigation>
+    <!-- Content !-->
+    {{ inner }}
+    <!-- Footer !-->
+</Column>

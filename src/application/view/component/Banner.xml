@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Messenger id="{{ component.id }}" domain="{{ component.attributes.domain }}" >
+        {% for message in component.messenger %}
+                {% set color = 'primary' %}
+                {% set icon = 'bi-info-circle-fill' %}
+                {% if message.domain == 'error' %}
+                        {% set color = 'danger' %}
+                        {% set icon = 'bi-exclamation-triangle-fill' %}
+                {% elif message.domain == 'warning' %}
+                        {% set color = 'warning' %}
+                        {% set icon = 'bi-exclamation-circle-fill' %}
+                {% elif message.domain == 'info' %}
+                        {% set color = 'info' %}
+                        {% set icon = 'bi-info-circle-fill' %}
+                {% elif message.domain == 'success' %}
+                        {% set color = 'success' %}
+                        {% set icon = 'bi-check-circle-fill' %}
+                {% elif message.domain == 'debug' %}
+                        {% set color = 'secondary' %}
+                        {% set icon = 'bi-bug-fill' %}
+                {% elif message.domain == 'system' %}
+                        {% set color = 'dark' %}
+                        {% set icon = 'bi-gear-fill' %}
+                {% endif %}
+                <Column id="{{ message.identifier }}" class="alert alert-{{ color }} alert-dismissible" role="alert">
+                        <Graph class="text-{{ color }}" padding="pe-3" icon="{{ icon }}" />
+                        <Text class="">{{ message.message }}</Text>
+                        <Action class="btn-close" hide="alert:{{ message.identifier }}" click="messenger(identifier:'{{ component.id }}',message:'{{ message.identifier }}')"/>
+                </Column>
+        {% endfor %}
+</Messenger>

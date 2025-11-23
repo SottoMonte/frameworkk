@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+{% if user %}
+<Window type="{% if not model %}root{% else %}inner{% endif %}" title="Colosso - App" layout="page" expand="full">
+    
+    <Column expand="full">
+        {% block main %}
+        {% endblock %}
+    </Column>
+</Window>
+{% else %}
+<Window type="root">
+    
+    <View route="/auth/signin"/>
+</Window>
+{% endif %}

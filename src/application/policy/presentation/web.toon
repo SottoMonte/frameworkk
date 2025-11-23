@@ -1,0 +1,8 @@
+groups:
+  alice[1]: amministratori
+  bob[1]: membri
+  charlie[1]: ospiti
+permissions[3]{roles,resources,actions,subscribers}:
+  amministratori,/api/v1/resource,GET,Premium
+  membri,/api/v1/resource,GET,Basic
+  ospiti,/api/v1/public,GET,Free

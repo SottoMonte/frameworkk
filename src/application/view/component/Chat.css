@@ -1,0 +1,30 @@
+.chat-container {
+    display: flex;
+    flex-direction: column;
+    padding: 20px;
+    margin: auto;
+    font-family: Arial, sans-serif;
+  }
+  
+  .message {
+    padding: 10px 15px;
+    margin: 5px 0;
+    border-radius: 18px;
+    max-width: 70%;
+    word-wrap: break-word;
+    font-size: 14px;
+  }
+  
+  /* Messaggi del mittente (allineati a destra) */
+  .sender {
+    background-color: #dcf8c6;
+    align-self: flex-end;
+    border-bottom-right-radius: 0;
+  }
+  
+  /* Messaggi del destinatario (allineati a sinistra) */
+  .receiver {
+    background-color: #f1f0f0;
+    align-self: flex-start;
+    border-bottom-left-radius: 0;
+  }

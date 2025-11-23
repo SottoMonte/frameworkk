@@ -1,0 +1,37 @@
+{
+  "id": {
+    "type": "integer",
+    "min": 1,
+    "required": true
+  },
+  "created_at": {
+    "type": "string",
+    "required": false
+  },
+  "url": {
+    "type": "string",
+    "required": true
+  },
+  "type": {
+    "type": "string",
+    "required": true
+  },
+  "tags": {
+    "type": "dict",
+    "nullable": true,
+    "allow_unknown": true
+  },
+  "category": {
+    "type": "string",
+    "nullable": true
+  },
+  "title": {
+    "type": "string",
+    "nullable": true
+  },
+  "owner": {
+    "type": "string",
+    "required": true,
+    "regex": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+  }
+}

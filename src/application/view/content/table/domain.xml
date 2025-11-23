@@ -1,0 +1,13 @@
+<Graph type="table.row">
+    <Text storekeeper="domain">Domain</Text>
+    <Text storekeeper="description">Status</Text>
+    <Text storekeeper="status">Status</Text>
+    <Text storekeeper="ssl_enabled">SSL Enabled</Text>
+    <Text storekeeper="dns_records">DNS Records</Text>
+    <Text storekeeper="server">Server</Text>
+    <Text storekeeper="container">Container</Text>
+    <Text storekeeper="service">Service</Text>
+    <Group type="button">
+        <Action route="application/view/page/inventory/domain.xml?id={{storekeeper.id}}" class="d-inline-flex"><Graph icon="bi-card-heading"/></Action>
+    </Group>
+</Graph>

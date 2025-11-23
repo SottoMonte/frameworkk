@@ -1,0 +1,150 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Container color="light" id="{{ component.id }}" margin="m-0" padding="p-0" >
+    <Row expand="full">
+        {% set mappa = {} %}
+        {% if storekeeper is defined and storekeeper.result is defined and storekeeper.result is iterable %}
+            {% for row in storekeeper.result %}
+                {% if row.id|string in component.selected %}
+                    {% set _ = mappa.update({ row.id|string : loop.index0 }) %}
+                {% endif %}
+            {% endfor %}
+        {% endif %}
+        {% if component.attributes.create %}
+        <Window id="window-create" type="modal" position="centered" size="xl" title="Create" action="Create">
+            <View url="application/view/content/wizard/{{component.attributes.repository}}.xml" />
+        </Window>
+        {% endif %}
+        {% if component.attributes.update %}
+            <Window id="window-update" type="modal" position="centered" size="xl" title="Update" action="Update">
+                <Group type="nav" margin="m-0" padding="p-0">
+                    {% for row in component.selected %}
+                        <Action route="tab:overview-{{ row }}"><Graph icon="bi-display"/><Text class="text-uppercase">Overview {{ row }}</Text></Action>
+                    {% endfor %}
+                </Group>
+                <Group type="tab">
+                    {% for row in component.selected %}
+                        <Container id="overview-{{ row }}">
+                            <View url="application/view/content/wizard/{{component.attributes.repository}}.xml" data="result.{{ mappa[row] }}" />
+                        </Container>
+                    {% endfor %}
+                </Group>
+            </Window>
+        {% endif %}
+        {% if component.attributes.delete %}
+        <Window id="window-delete" type="modal" position="centered" size="xl" title="Delete" action="Delete">
+            <Text>Are you sure you want to delete the following items?</Text>
+            <Group type="nav" margin="m-0" padding="p-0">
+                {% for row in component.selected %}
+                    <Action route="tab:overview-{{ row }}"><Graph icon="bi-display"/><Text class="text-uppercase">Overview {{ row }}</Text></Action>
+                {% endfor %}
+            </Group>
+            <Group type="tab">
+                {% for row in component.selected %}
+                    <Container id="overview-{{ row }}">
+                        <View url="application/view/content/wizard/{{component.attributes.repository}}.xml" data="result.{{ mappa[row] }}" />
+                    </Container>
+                {% endfor %}
+            </Group>
+        </Window>
+        {% endif %}
+        <Column expand="auto" padding="py-2">
+            <Column expand="dynamic">
+            <Group type="input">
+                <Input width="150px" />
+                <Graph icon="bi-funnel"/>
+                <Input type="select" color="light" width="150px">
+                    <Text>Type</Text>
+                    <Text>all</Text>
+                    <Text>owner</Text>
+                    <Text>member</Text>
+                </Input>
+            </Group>
+            </Column>
+            <Column>
+            <Group type="input">
+                {% if 'create' in component.attributes %}
+                <Action size="sm" background="success" route="modal:window-create" ><Graph icon="bi-plus-square"/>Create</Action>
+                {% endif %}
+                {% if 'update' in component.attributes %}
+                <Action size="sm" background="warning" route="modal:window-update" ><Graph icon="bi-pencil"/>Update</Action>
+                {% endif %}
+                {% if 'delete' in component.attributes %}
+                <Action  size="sm" background="danger" route="modal:window-delete"><Graph icon="bi-trash"/>Delete</Action>
+                {% endif %}
+                <Graph icon="bi-command"/>
+                <Input type="select" color="light" width="150px">
+                    <Text>Select action</Text>
+                </Input>
+            </Group>
+            </Column>
+        </Column>
+        <Column>
+            {% if component.repository %}
+                <Graph type="table" class="table-striped">
+                    <Graph type="table.head">
+                        {{ inner }}
+                    </Graph>
+                    <Graph type="table.body" id="{{ component.id }}-body">
+                        {% for row in storekeeper.result %}
+                        <View url="application/view/content/table/{{ component.attributes.view }}.xml" data="result.{{ loop.index0 }}" >
+                            <Graph type="table.cell">
+                                <Input type="checkbox" click="table(id:'{{ component.id }}',selected:'{{row.id}}')" identifier="id[]"  selected="{% if row.id|string in component.selected %}true{% endif %}" />
+                            </Graph>
+                        </View>
+                        {% endfor %}
+                    </Graph>
+                </Graph>
+            {% else %}
+                <Graph id="{{ component.id }}-table" init="table(id:'{{ component.id }}',repository:'{{ component.attributes.repository }}'{% if 'filter' in component.attributes %},filter:{{ component.attributes.filter }}{% endif %})"  type="table" class="table-striped">
+                    <Graph type="table.head">
+                        {{ inner }}
+                    </Graph>
+                    <Graph type="table.body" id="{{ component.id }}-body">
+                        <View url="application/view/content/table/{{ component.attributes.view }}.xml" >
+                            
+                        </View>
+                    </Graph>
+                </Graph>
+                <Action  />
+            {% endif %}
+        </Column>
+        <Column>
+            <Column expand="dynamic" alignment-horizontal="center">
+                <Group type="pagination">
+                    <Action class="page-link" click="table(id:'{{ component.id }}',pageCurrent:'5')" color="light"><Graph icon="bi-chevron-double-left"/></Action>
+                    {% for x in [1,2,3,4,5] %}
+                    {% if component.pageCurrent|string == x|string %}
+                    <Action class="page-link active" color="light"><Text>{{x}}</Text></Action>
+                    {% else %}
+                    <Action class="page-link" click="table(id:'{{ component.id }}',pageCurrent:'{{x}}')" color="light"><Text>{{x}}</Text></Action>
+                    {% endif %}
+                    {% endfor %}
+                    <Action class="page-link" color="light"><Graph icon="bi-chevron-double-right"/></Action>
+                </Group>
+            </Column>
+            <Column>
+                <Group type="input" height="37px">
+                    {% set pageCurrent = component.pageCurrent if 'pageCurrent' in component else 1 %}
+                    {% set pageRows = component.pageRows if 'pageRows' in component else 10 %}
+                    {% set totalRows = component.totalRows if 'totalRows' in component else 100 %}
+                    {% set model = component.model if 'model' in component else 'none' %}
+                    {% set from = (pageCurrent|int - 1) * pageRows|int + 1 %}
+                    
+                    <Text>{{ from }} - {{ from + totalRows - 1 }} of 100 {{ model + 's' }}</Text>
+                    
+                    
+                    <Input type="select" color="light" width="140px" onchange="table(target:'{{ component.id }}',pageRows:'10')">
+                        {% for x in component.paginationOptions %}
+                            {% if component.pageRows|string == x|string %}
+                            <Text class="selected">{{x}}</Text>
+                            {% else %}
+                            <Text>{{x}}</Text>
+                            {% endif %}
+                        {% endfor %}
+                    </Input>
+                    <Text>rows per page</Text>
+                </Group>
+            </Column>
+        </Column> 
+    </Row>
+</Container>

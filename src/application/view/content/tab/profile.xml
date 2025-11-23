@@ -1,0 +1,118 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Container background="light" padding="3" margin="2">
+    <!-- Sezione informazioni account -->
+    <Group type="card" class="mb-4" shadow="sm" border="true" border-radius="md">
+        <Text type="h5" text-color="primary" class="mb-3">Informazioni Account</Text>
+        <Group type="input" flow="vertical">
+            <Input type="text" id="username" placeholder="Nome utente" class="form-control" value="user123" />
+            <Input type="email" id="email" placeholder="Email" class="form-control" value="{{ user.email }}"/>
+        </Group>
+    </Group>
+
+    <!-- Sezione wallet -->
+    <Group type="card" class="mb-4" shadow="sm" border="true" border-radius="md">
+        <Text type="h5" text-color="primary" class="mb-3">Wallet</Text>
+        
+        <Group type="input" flow="vertical">
+            <Text type="label" >Saldo corrente</Text>
+            <Text type="h4">$1,250.00</Text>
+            
+            <Input type="select" id="default-currency" class="form-select mt-2">
+                <Text value="usd">USD - Dollaro Americano</Text>
+                <Text value="eur">EUR - Euro</Text>
+                <Text value="gbp">GBP - Sterlina Inglese</Text>
+            </Input>
+        </Group>
+    </Group>
+
+    <!-- Sezione sicurezza -->
+    <Group type="card" class="mb-4" shadow="sm" border="true" border-radius="md">
+        <Text type="h5" text-color="primary" class="mb-3">Sicurezza</Text>
+        <!-- Cambio password -->
+        <Group type="input" flow="vertical">
+            <Input type="password" id="current-password" placeholder="Password attuale" class="form-control"/>
+            <Input type="password" id="new-password" placeholder="Nuova password" class="form-control"/>
+            <Input type="password" id="confirm-password" placeholder="Conferma nuova password" class="form-control"/>
+        </Group>
+        <!-- Autenticazione a due fattori -->
+        <Group type="input" class="mt-3">
+            <Input type="checkbox" id="2fa" value="true" class="me-2"/>
+            <Text type="label">Autenticazione a due fattori (2FA)</Text>
+        </Group>
+    </Group>
+    
+    <!-- Sezione preferenze -->
+    <Group type="card" class="mb-4" shadow="sm" border="true" border-radius="md">
+        <Text type="h5" text-color="primary" class="mb-3">Preferenze</Text>
+        
+        <Group type="input" flow="vertical">
+            <Text type="label" class="mb-2">Lingua</Text>
+            <Input type="select" id="language" class="form-select">
+                <Text value="it">Italiano</Text>
+                <Text value="en">English</Text>
+                <Text value="fr">Français</Text>
+                <Text value="de">Deutsch</Text>
+            </Input>
+            
+            <Text type="label" class="mb-2">Tema</Text>
+            <Input type="select" id="theme" class="form-select">
+                <Text value="light">Chiaro</Text>
+                <Text value="dark">Scuro</Text>
+                <Text value="system">Sistema</Text>
+            </Input>
+        </Group>
+    </Group>
+
+    <!-- Sezione notifiche -->
+    <Group type="card" class="mb-4" shadow="sm" border="true" border-radius="md">
+        <Text type="h5" text-color="primary" class="mb-3">Notifiche</Text>
+        
+        <Group type="input" flow="vertical">
+            <Group type="input" class="mb-2">
+                <Input type="checkbox" id="email-notifications" value="true" checked="true" class="me-2"/>
+                <Text type="label">Notifiche email</Text>
+            </Group>
+            
+            <Group type="input" class="mb-2">
+                <Input type="checkbox" id="push-notifications" value="true" checked="true" class="me-2"/>
+                <Text type="label">Notifiche push</Text>
+            </Group>
+            
+            <Group type="input">
+                <Input type="checkbox" id="sms-notifications" value="true" class="me-2"/>
+                <Text type="label">Notifiche SMS</Text>
+            </Group>
+        </Group>
+    </Group>
+
+    <!-- Sezione privacy -->
+    <Group type="card" shadow="sm" border="true" border-radius="md">
+        <Text type="h5" text-color="primary" class="mb-3">Privacy</Text>
+        
+        <Group type="input" flow="vertical">
+            <Group type="input" class="mb-2">
+                <Input type="radio" name="data-sharing" id="share-data" value="share" checked="true" class="me-2"/>
+                <Text type="label">Condividi dati anonimi per migliorare il servizio</Text>
+            </Group>
+            
+            <Group type="input">
+                <Input type="radio" name="data-sharing" id="private-data" value="private" class="me-2"/>
+                <Text type="label">Mantieni tutti i miei dati privati</Text>
+            </Group>
+        </Group>
+    </Group>
+    
+    <!-- Sezione azioni -->
+    <Group type="card" shadow="sm" border="true" border-radius="md">
+        <Text type="h5" text-color="primary" class="mb-3">Azioni</Text>
+        <Group type="button" shadow="sm" border="true" border-radius="md">
+            <Action type="button" class="w-100" background="primary" click="saveSettings" border-radius="md">
+                <Text>Salva modifiche</Text>
+            </Action>
+            <Action type="button" class="w-100" background="danger" click="deleteAccount" border-radius="md">
+                <Text>Elimina account</Text>
+            </Action>
+        </Group>
+    </Group>
+    
+</Container>

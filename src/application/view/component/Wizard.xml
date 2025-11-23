@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Container color="light" id="{{ component.id }}" size="true" margin="m-0" padding="p-0" >
+    <!-- Head -->
+    <Container top="+23px" position="relative" size="fluid" class="progress" height="2px" >
+        <Container size="fluid" class="progress-bar" role="progressbar" width="0%" ></Container>
+    </Container>
+    <Nav class="nav-tabs" margin="m-0" padding="p-0">
+        <Route start="0" href="#{{ component.id }}-profilo" data-bs-toggle="tab"><Icon icon="bi-buildings-fill"/><Text>Profilo</Text></Route>
+        <Route start="25" href="#{{ component.id }}-anagrafe" data-bs-toggle="tab"><Icon icon="bi-person-vcard-fill"/><Text>Anagrafe</Text></Route>
+        <Route start="50" href="#{{ component.id }}-contatti" data-bs-toggle="tab"><Icon icon="bi-postcard-fill"/><Text>Contatti</Text></Route>
+        <Route start="100" href="#{{ component.id }}-pagamenti" data-bs-toggle="tab"><Icon icon="bi-credit-card-2-front-fill"/><Text>Pagamenti</Text></Route>
+    </Nav>
+    <!-- Body -->
+     
+    <Storekeeper  model="client" identifier="{{ args }}" >
+    <Tab>
+        <Container id="{{ component.id }}-profilo" >
+            <Input var="storekeeper.result.identifier" identifier="identifier"/>
+            <Input var="storekeeper.result.name" identifier="name"/>
+        </Container>
+        <Container id="{{ component.id }}-anagrafe" >
+            <Input var="storekeeper.result.person.first" identifier="person.first"/>
+            <Input var="storekeeper.result.person.last" identifier="person.last"/>
+            <Input var="storekeeper.result.person.cf" identifier="person.cf"/>
+            <Input var="storekeeper.result.person.last" identifier="person.last"/>
+            <Input var="storekeeper.result.person.gender" identifier="person.gender"/>
+            <Input var="storekeeper.result.person.data" identifier="person.data"/>
+            <Input var="storekeeper.result.person.city" identifier="person.city"/>
+            <Input var="storekeeper.result.person.province" identifier="person.province"/>
+        </Container>
+        <Container id="{{ component.id }}-contatti" >
+            <Input var="storekeeper.result.person.contact.cellular" identifier="person.contact.cellular"/>
+            <Input var="storekeeper.result.person.contact.email" identifier="person.contact.email"/>
+            <Input var="storekeeper.result.person.contact.location.address" identifier="person.contact.location.address"/>
+            <Input var="storekeeper.result.person.contact.location.city" identifier="person.contact.location.city"/>
+            <Input var="storekeeper.result.person.contact.location.province" identifier="person.contact.location.province"/>
+        </Container>
+        <Container id="{{ component.id }}-pagamenti" >
+            <Input var="storekeeper.result.payment.method" identifier="payment.method"/>
+            <Input var="storekeeper.result.payment.iban" identifier="payment.iban"/>
+        </Container>
+    </Tab>
+</Storekeeper>
+</Container>

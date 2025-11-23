@@ -1,0 +1,20 @@
+<Graph type="table.row">
+    <Text storekeeper="id">UUID</Text>
+    <Text storekeeper="name">Name</Text>
+    <Text storekeeper="description">Description</Text>
+    <Text storekeeper="size_gb">Size (GB)</Text>
+    <Text storekeeper="type">Type</Text>
+    <Text storekeeper="mount_path">Mount Path</Text>
+    <Text storekeeper="status">Status</Text>
+    <Text storekeeper="encrypted">Encrypted</Text>
+    <Text storekeeper="backup_enabled">Backup Enabled</Text>
+    <Text storekeeper="server">Server</Text>
+    <Text storekeeper="container">Container</Text>
+    <Text storekeeper="service">Service</Text>
+    <Text storekeeper="owner">Owner</Text>
+    <Text storekeeper="created_at">Created At</Text>
+    <Text storekeeper="updated_at">Updated At</Text>
+    <Group type="button">
+        <Action route="application/view/page/inventory/volume.xml?id={{storekeeper.id}}" class="d-inline-flex"><Graph icon="bi-card-heading"/></Action>
+    </Group>
+</Graph>

@@ -1,0 +1,24 @@
+<Row expand="full">
+    <Row width="auto" class="border-end bg-body-secondary">
+        {% block west %}
+        {% endblock %}
+    </Row>
+    <Column expand="dynamic" padding="p-0" margin="m-0" class="overflow-auto">
+        <Column expand="auto" height="auto" class="border-bottom bg-body-secondary">
+            {% block north %}
+            {% endblock %}
+        </Column>
+        <Column expand="dynamic" class="overflow-auto">
+            {% block center %}
+            {% endblock %}
+        </Column>
+        <Column expand="auto" height="auto" class="border-top bg-body-secondary">
+            {% block south %}
+            {% endblock %}
+        </Column>
+    </Column>
+    <Row width="auto" class="border-start bg-body-secondary">
+        {% block east %}
+        {% endblock %}
+    </Row>
+</Row>

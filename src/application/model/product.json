@@ -1,0 +1,48 @@
+{
+  "id": {
+    "type": "string",
+    "required": false
+  },
+  "name": {
+    "type": "string",
+    "required": true
+  },
+  "slug": {
+    "type": "string",
+    "required": true
+  },
+  "description": {
+    "type": "string",
+    "required": false,
+    "nullable": true
+  },
+  "price": {
+    "type": "number",
+    "required": true,
+    "min": 0
+  },
+  "category": {
+    "type": "string",
+    "required": false,
+    "nullable": true
+  },
+  "sku": {
+    "type": "string",
+    "required": false,
+    "nullable": true
+  },
+  "images": {
+    "type": "string",
+    "required": false,
+    "nullable": true
+  },
+  "created_at": {
+    "type": "string",
+    "required": false
+  },
+  "updated_at": {
+    "type": "string",
+    "required": false,
+    "nullable": true
+  }
+}

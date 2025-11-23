@@ -1,0 +1,267 @@
+# ---------------------------------------------
+# Policy Configuration File: resource.document.toml
+# Modello: Verdict Engine
+# ---------------------------------------------
+
+# La sezione [input] definisce il contesto di input fornito dall'applicazione Python
+[input.context]
+i = ['sub', 'obj', 'act', 'type'] # Utente/Ruolo, Path/Risorsa, Azione, Abbonamento
+
+[input.principal]
+id = "user-101"
+roles = ["author", "premium"]
+department = "marketing"
+
+[input.resource]
+kind = "document"
+id = "doc-456"
+owner_id = "user-101"
+status = "PUBLISHED"
+
+# ---------------------------------------------
+# Dati Esterni (Data Store)
+
+# ---------------------------------------------
+# Rotte dell'Applicazione (Data Store)
+# Usate dalle Policy per identificare l'obiettivo della richiesta.
+# ---------------------------------------------
+
+[[store.data.routes]]
+path = "/"
+type = "view"
+view = "auth/login.xml"
+method = "GET"
+
+# --- VIEWS - OPS ---
+
+[[store.data.routes]]
+path = "/ops"
+type = "view"
+view = "ops/overview.xml"
+method = "GET"
+
+[[store.data.routes]]
+path = "/ops/repositories/{$id}"
+type = "view"
+view = "inventory/repository.xml"
+method = "GET"
+
+[[store.data.routes]]
+path = "/ops/domains/{$id}"
+type = "view"
+view = "inventory/domain.xml"
+method = "GET"
+
+[[store.data.routes]]
+path = "/ops/services/{$id}"
+type = "view"
+view = "inventory/service.xml"
+method = "GET"
+
+[[store.data.routes]]
+path = "/ops/volumes/{$id}"
+type = "view"
+view = "inventory/volume.xml"
+method = "GET"
+
+[[store.data.routes]]
+path = "/ops/containers/{$id}"
+type = "view"
+view = "inventory/container.xml"
+method = "GET"
+
+[[store.data.routes]]
+path = "/ops/machines/{$id}"
+type = "view"
+view = "inventory/machine.xml"
+method = "GET"
+
+[[store.data.routes]]
+path = "/ops/articles/{$id}"
+type = "view"
+view = "ops/article.xml"
+method = "GET"
+
+[[store.data.routes]]
+path = "/ops/clients/{$id}"
+type = "view"
+view = "ops/client.xml"
+method = "GET"
+
+[[store.data.routes]]
+path = "/ops/means/{$id}"
+type = "view"
+view = "inventory/media.xml"
+method = "GET"
+
+[[store.data.routes]]
+# Nota: La logica OR "{means|product}" deve essere gestita dall'Engine se la rotta viene valutata.
+path = "/ops/{means|product}"
+type = "view"
+view = "inventory/grid.xml"
+method = "GET"
+
+[[store.data.routes]]
+path = "/ops/products/{$id}"
+type = "view"
+view = "inventory/product.xml"
+method = "GET"
+
+[[store.data.routes]]
+# Nota: La logica OR per le overview deve essere gestita dall'Engine.
+path = "/ops/{repositories|domains|services|volumes|containers|machines|secrets|products}"
+type = "view"
+view = "inventory/overview.xml"
+method = "GET"
+
+# --- VIEWS - DEV ---
+
+[[store.data.routes]]
+path = "/dev"
+type = "view"
+view = "dev/overview.xml"
+method = "GET"
+
+[[store.data.routes]]
+path = "/dev/ide"
+type = "view"
+view = "dev/ide.xml"
+method = "GET"
+
+# --- VIEWS - GOV ---
+
+[[store.data.routes]]
+path = "/gov"
+type = "view"
+view = "gov/overview.xml"
+method = "GET"
+
+# --- Rotte di Autenticazione e Funzionali ---
+
+[[store.data.routes]]
+path = "/profile"
+type = "view"
+view = "auth/profile.xml"
+method = "GET"
+
+[[store.data.routes]]
+path = "/dashboard"
+type = "view"
+view = "auth/dashboard.xml"
+method = "GET"
+
+[[store.data.routes]]
+path = "/auth/signup"
+type = "view"
+view = "auth/registration.xml"
+method = "GET"
+
+[[store.data.routes]]
+path = "/auth/signin"
+type = "view"
+view = "auth/login.xml"
+method = "GET"
+
+[[store.data.routes]]
+path = "/auth/reset-password"
+type = "view"
+view = "auth/recovery.xml"
+method = "GET"
+
+# --- Actions ---
+
+[[store.data.routes]]
+path = "/login"
+type = "login"
+method = "POST"
+
+[[store.data.routes]]
+path = "/logout"
+type = "logout"
+method = "POST"
+
+[[store.data.routes]]
+path = "/github/callback"
+type = "login"
+method = "GET"
+
+[[store.data.routes]]
+path = "/gather"
+type = "action"
+method = "GET"
+
+[[store.data.routes]]
+path = "/create"
+type = "action"
+method = "POST"
+
+[[store.data.routes]]
+path = "/chat"
+type = "action"
+method = "POST"
+
+[store.data.limits.free_tier]
+max_downloads = 5
+max_storage_mb = 100
+
+[store.data.limits.premium_tier]
+max_downloads = 999
+max_storage_mb = 10240
+
+# ---------------------------------------------
+# Policy Rules (Regole di Policy)
+# Ogni [[policies]] rappresenta una regola autonoma in un array di regole.
+
+# Regola 1: Chiunque può leggere documenti PUBLISHED (se ha il ruolo corretto)
+[[policies]]
+id = "rule-1-read-published"
+effect = "allow"
+match = { act = "read" } # Specificare l'azione per cui questa regola è valida
+description = "Consente la lettura di documenti pubblici/pubblicati."
+condition = '(input.resource.status == "PUBLISHED") && ((input.principal.roles | find @ == "premium") != null)'
+
+[[policies]]
+id = "rule-2-owner-edit"
+effect = "allow"
+match = { act = "edit" }
+condition = 'input.principal.id == input.resource.owner_id'
+
+# Regola 2: Autorizzazione al Profilo/Dashboard (Utenti autenticati)
+[[policies]]
+id = "rule-2-profile-dashboard"
+effect = "allow"
+match = { type = "view" }
+description = "Permette l'accesso a /profile e /dashboard solo se autenticati."
+# Controlla che la rotta esista nello store E che sia /profile o /dashboard E che l'utente sia loggato
+condition = """
+  some route in store.data.routes:
+    route.path == input.path and
+    (input.path == "/profile" or input.path == "/dashboard") and
+    input.principal.id != ""
+"""
+
+# Regola 5: Azioni Login/Logout (Permesso incondizionato)
+[[policies]]
+id = "rule-5-actions-login-logout"
+effect = "allow"
+match = { type = "login" }
+description = "Permesso incondizionato per le azioni di login."
+condition = """
+  some route in store.data.routes:
+    route.path == input.path
+"""
+
+# Regola 3: Limite di Download per utenti Free
+[[policies]]
+id = "rule-3-download-limit"
+effect = "deny"
+match = { act = "download" }
+description = "Nega il download se la quota per il tier FREE è stata superata."
+condition = '"free" in input.principal.roles and input.principal.download_count > store.data.limits.free_tier.max_downloads'
+
+# ---------------------------------------------
+# Configurazione del Motore di Decisione
+
+[output]
+default = "deny"
+logic = "some(rule.effect == 'allow' AND rule.is_matched == true)"

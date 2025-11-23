@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Group id="{{ component.id }}" type="breadcrumb" margin="m-0" alignment-vertical="center" >
+    {{ inner }}
+</Group>

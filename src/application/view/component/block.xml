@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Container id="{% set id = '{:0=8}'.format(range(0, 99999999) | random) %}{{ id }}" padding="p-0;pt-3" draggable="element">
+    <Column style="background-color:#ccc;" alignment="center">
+        <Text size="expanded" >src/application/view/page/cubute/overview.xml</Text>
+        <Group type="nav">
+            <Action link="#framework"><Graph icon="bi-floppy2-fill"/></Action>
+            <Action link="#framework"><Graph icon="bi-layer-forward"/></Action>
+            <Action link="#framework"><Graph icon="bi-layer-backward"/></Action>
+        </Group>
+    </Column>
+    <Container droppable="element" padding="p-0" class="h-100" >
+        <Text id="block-editor-{{ id }}" class="editor h-100 border" type="editable">{{ text or '' }}</Text>
+    </Container>
+</Container>

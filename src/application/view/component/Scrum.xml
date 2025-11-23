@@ -1,0 +1,125 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Column expand="full" id="{{ component.id }}">
+    <!-- Artefatti -->
+    <Row expand="2">
+        <Column alignment-horizontal="evenly">
+            <!-- Eventi -->
+            <Action type="dropdown" >
+                <Action ><Graph icon="bi-briefcase-fill"/><Text padding="px-1">Organize the backlog</Text></Action>
+            </Action>
+            <Action type="dropdown" >
+                <Action ><Graph icon="bi-pin-fill"/><Text padding="px-1">Sprint planning</Text></Action>
+            </Action>
+            <Action type="dropdown" >
+                <Action ><Graph icon="bi-backpack-fill"/><Text padding="px-1">Sprint retrospective</Text></Action>
+            </Action>
+        </Column>
+        <Column background="#3498DB" alignment-content="between" >
+            <Window id="modal-note-{{ component.id }}" type="modal" size="xl" title="chat" action="create.note" >
+                <Input identifier="owner" collapse="full" type="text" value="{{ user.id }}" />
+                <Input identifier="location" collapse="full" type="text" value="{{ component.attributes.location }}" />
+                <Input identifier="type" collapse="full" type="text" value="backlog.product" />
+                <Input identifier="color" type="color" />
+                <Input identifier="text" type="textarea" class="rounded-0" />
+            </Window>
+            <Window id="modal-producer-{{ component.id }}" type="modal" size="xl" title="chat" action="chat" >
+                <Messenger id="chat-producer" domain="backlog.producer" view="Chat" />
+                <Input identifier="sender" collapse="full" type="text" value="user" />
+                <Input identifier="owner" collapse="full" type="text" value="{{ user.id }}" />
+                <Input identifier="location" collapse="full" type="text" value="{{ component.attributes.location }}" />
+                <Input identifier="domain" collapse="full" type="text" value="chat" />
+                <Input identifier="message" type="textarea" class="rounded-0" />
+            </Window>
+            <Window id="modal-team-{{ component.id }}" type="modal" size="xl" title="chat" action="chat" >
+                
+            </Window>
+            <Action type="button" route="modal:modal-note-{{ component.id }}"><Graph icon="bi-sticky-fill"/></Action>
+            
+            <Text expand="dynamic" >Product Backlog</Text>
+            <!-- Membri -->
+            <Action type="button" route="modal:modal-team-{{ component.id }}" alignment-content="horizontal" space="2"><Text>Product owner</Text><Graph icon="bi-people-fill"/></Action>
+            <Action type="button" route="modal:modal-producer-{{ component.id }}"><Graph icon="bi-chat-right-text-fill"/></Action>
+        </Column>
+        <Row droppable="note-inner" droppable-data="backlog.product" expand="dynamic" flow="auto" padding="p-2" space="2">
+            {% for note in storekeeper.result %}
+                {% if note.type == 'backlog.product' %}
+                    <Note title="Sistema di gestione dei prodotti" identifier="{{ note.id }}" text="{{ note.text }}" color="{{ note.color }}"></Note>
+                {% endif %}
+            {% endfor %}
+        </Row>
+    </Row>
+    <Row expand="8">
+        <Column alignment-horizontal="evenly">
+            <Action type="dropdown" >
+                <Action ><Graph icon="bi-calendar-week"/><Text padding="px-1">Sprint</Text></Action>
+            </Action>
+            <Action type="dropdown" >
+                <Action ><Graph icon="bi-brightness-high-fill"/><Text padding="px-1">Daily Scrum</Text></Action>
+            </Action>
+        </Column>
+        <Column background="#3498DB" alignment-content="between">
+            <Text>Sprint Backlog</Text>
+            <Action type="button" route="modal:modal-team-{{ component.id }}" alignment-content="horizontal" space="2"><Text>Development team</Text><Graph icon="bi-people-fill"/></Action>
+        </Column>
+        <Column expand="full">
+            <!-- Plan -->
+            <Row border="1" expand="3"><Text background="#2ECC71">Pianificazione</Text>
+                <Row expand="dynamic" droppable="note-inner" droppable-data="backlog.sprint.plan" flow="auto" padding="p-2" space="2">
+                    {% for note in storekeeper.result %}
+                        {% if note.type == 'backlog.sprint.plan' %}
+                            <Note title="Sistema di gestione dei prodotti" identifier="{{ note.id }}" text="{{ note.text }}" color="{{ note.color }}"></Note>
+                        {% endif %}
+                    {% endfor %}
+                </Row>
+            </Row>
+            <!-- Sviluppo -->
+            <Row border="1" expand="3"><Text background="#34CBDB">Sviluppo</Text>
+                <Row expand="dynamic" droppable="note-inner" droppable-data="backlog.sprint.development" flow="auto" padding="p-2" space="2">
+                    {% for note in storekeeper.result %}
+                        {% if note.type == 'backlog.sprint.development' %}
+                            <Note title="Sistema di gestione dei prodotti" identifier="{{ note.id }}" text="{{ note.text }}" color="{{ note.color }}"></Note>
+                        {% endif %}
+                    {% endfor %}
+                </Row>
+            </Row>
+            <!-- Test -->
+            <Row border="1" expand="3"><Text background="#F1C40F">Test</Text>
+                <Row expand="dynamic" droppable="note-inner" droppable-data="backlog.sprint.test" flow="auto" padding="p-2" space="2">
+                    {% for note in storekeeper.result %}
+                        {% if note.type == 'backlog.sprint.test' %}
+                            <Note title="Sistema di gestione dei prodotti" identifier="{{ note.id }}" text="{{ note.text }}" color="{{ note.color }}"></Note>
+                        {% endif %}
+                    {% endfor %}
+                </Row>
+            </Row>
+            <!-- Rilascio -->
+            <Row border="1" expand="3"><Text background="#E74C3C">Rilascio</Text>
+                <Row expand="dynamic" droppable="note-inner" droppable-data="backlog.sprint.release" flow="auto" padding="p-2" space="2">
+                    {% for note in storekeeper.result %}
+                        {% if note.type == 'backlog.sprint.release' %}
+                            <Note title="Sistema di gestione dei prodotti" identifier="{{ note.id }}" text="{{ note.text }}" color="{{ note.color }}"></Note>
+                        {% endif %}
+                    {% endfor %}
+                </Row>
+            </Row>
+        </Column>
+    </Row>
+    <Row expand="2">
+        <Column alignment-horizontal="evenly">
+            <Action type="dropdown" >
+                <Action ><Graph icon="bi bi-briefcase-fill"/><Text padding="px-1">Sprint review</Text></Action>
+            </Action>
+        </Column>
+        <Column background="#3498DB" alignment-content="between" >
+            <Text>Increment Buildup</Text>
+            <Action type="button" route="modal:modal-team-{{ component.id }}" alignment-content="horizontal" space="2"><Text>All team</Text><Graph icon="bi-people-fill"/></Action>
+        </Column>
+        <Row expand="dynamic" flow="auto" padding="p-2" space="2">
+            {% for note in storekeeper.result %}
+                {% if note.type == 'backlog.increment' %}
+                    <Note title="Sistema di gestione dei prodotti" identifier="{{ note.id }}" text="{{ note.text }}" color="{{ note.color }}"></Note>
+                {% endif %}
+            {% endfor %}
+        </Row>
+    </Row>
+</Column>

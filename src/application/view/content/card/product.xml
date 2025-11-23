@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Card expand="{{component.attributes.row or '3'}}" height="auto" >
+    {% set value = storekeeper.result[view.index|int] %}
+    <Media type="image" src="{{value.images}}" width="100%"  />
+    <Text type="text" >{{value.name}}</Text>
+</Card>

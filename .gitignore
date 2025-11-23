@@ -166,4 +166,4 @@ cython_debug/
 # Flet
 storage/
 
-src/application
+#src/application

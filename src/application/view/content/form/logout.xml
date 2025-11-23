@@ -1,0 +1,3 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Action id="form-logout" type="form" act="/logout" method="POST">
+</Action>

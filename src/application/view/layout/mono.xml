@@ -1,0 +1,7 @@
+{% extends "auth.xml" %}
+{% block main %}
+<Row expand="dynamic" >
+    {% block content %}
+    {% endblock %}
+</Row>
+{% endblock %}

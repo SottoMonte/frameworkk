@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Messenger id="{{ component.id }}" domain="{{ component.attributes.domain }}" padding="p-0" >
+        {% for message in component.messenger %}
+                {% set color = 'primary' %}
+                {% set icon = 'bi-info-circle-fill' %}
+                {% if message.domain == 'error' %}
+                        {% set color = 'danger' %}
+                        {% set icon = 'bi-exclamation-triangle-fill' %}
+                {% elif message.domain == 'warning' %}
+                        {% set color = 'warning' %}
+                        {% set icon = 'bi-exclamation-circle-fill' %}
+                {% elif message.domain == 'info' %}
+                        {% set color = 'info' %}
+                        {% set icon = 'bi-info-circle-fill' %}
+                {% elif message.domain == 'success' %}
+                        {% set color = 'success' %}
+                        {% set icon = 'bi-check-circle-fill' %}
+                {% elif message.domain == 'debug' %}
+                        {% set color = 'secondary' %}
+                        {% set icon = 'bi-bug-fill' %}
+                {% elif message.domain == 'system' %}
+                        {% set color = 'dark' %}
+                        {% set icon = 'bi-gear-fill' %}
+                {% endif %}
+                <Container class="alert" padding="p-0 m-0 border-0">
+                        <Container class="card text-center text-bg-{{ color }} rounded-0 text-white">
+                                <Container class="card-header" alignment-content="horizontal">
+                                        <Graph class="" padding="pe-3" icon="{{ icon }}" />
+                                        <Text class="me-auto">{{ message.domain }}</Text>
+                                        
+                                        <Action class="btn-close" hide="alert:{{ message.identifier }}" click="messenger(identifier:'{{ component.id }}',message:'{{ message.identifier }}')"/>
+                                </Container>
+                                <Container class="card-body">
+                                        <Text class="text-muted">{{ message.message }}</Text>
+                                </Container>
+                                <Container class="card-footer text-body-secondary">
+                                        <Text class="text-muted">{{ message.timestamp }}</Text>
+                                </Container>
+                        </Container>
+                </Container>
+        {% endfor %}
+</Messenger>

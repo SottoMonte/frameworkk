@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Group id="{{ component.id }}" type="tree" class="overflow-auto tree" width="290px">
+    {% macro render_node(tree) %}
+        {% if tree.get('children') and tree['children']|length != 0 %}
+            <Group type="node">
+                <Action type="dropdown" class="reset">
+                    <Action draggable="window" draggable-maker="true" draggable-component="window" click="editor.move(row:'{{tree.lineno}}',col:'{{tree.col_offset}}',target:'{{ component.editor }}')" padding="p-0" margin="m-0" ><Text>{{tree.type}}:{{tree.name}}</Text></Action>
+                </Action>
+    
+                    {% for child in tree['children'] %}
+                    {{ render_node(child) }}
+                    {% endfor %}
+                
+            </Group>
+        {% else %}
+            <Action type="dropdown" class="reset">
+                <Action draggable="window" draggable-maker="true" click="editor.move(row:'{{tree.lineno}}',col:'{{tree.col_offset}}',target:'{{ component.editor }}')" draggable-component="window" padding="p-0" margin="m-0" ><Text>{{tree.type}} {{tree.name}} {{tree.lineno}}-{{tree.col_offset}}</Text></Action>
+            </Action>
+        {% endif %}
+    {% endmacro %}
+
+    {% if info %}
+        {{ render_node(info) }}
+    {% endif %}
+</Group>

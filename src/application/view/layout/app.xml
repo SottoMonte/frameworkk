@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Column expand="full">
+    <!-- Header !-->
+    <Data id="page-loader" type="progress" class="rounded-0 fixed-top" height="3px" value="0"/>
+    <Window type="still" id="settings" title="Impostazioni">
+        <Text>TEST</Text>
+    </Window>
+    <Window type="dialog" title="Crea un Account" id="auth-login">
+        
+    </Window>
+    <Navigation class="bg-body-tertiary" orientation="horizontal" alignment-content="between" >
+        
+        <Group width="auto" expand="dynamic" padding="px-4">
+            <Input width="auto" type="search" value="{{url}}" />
+            <Action type="submit" class="border"><Media type="icon" src="bi-search" /></Action>
+        </Group>
+        <Container width="auto" alignment-content="between" spacing="2">
+            <Action alignment-content="center" spacing="2" class="border">
+                <Media type="icon" src="bi-person-plus" />
+                <Text>Crea un account</Text>
+            </Action>
+            <Action alignment-content="center" spacing="2" class="border">
+                <Media type="icon" src="bi-person-lock" />
+                <Text>Accedi</Text>
+            </Action>
+            {% if user %}
+            <Action route="#offcanvasExample" alignment-content="center" class="d-inline-flex" spacing="2">
+                <Media type="image" height="40px" src="https://app.colosso.cloud/static/logo.png" class="rounded-circle border" />
+                <Text>{{user.email}}</Text>
+            </Action>
+            {%  endif %}
+        </Container>
+    </Navigation>
+    <!-- Content !-->
+    {{ inner }}
+    <!-- Footer !-->
+</Column>

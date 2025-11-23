@@ -1,0 +1,16 @@
+<Graph type="table.row">
+    <Text storekeeper="id">UUID</Text>
+    <Text storekeeper="name">Name</Text>
+    <Text storekeeper="description">Description</Text>
+    <Text storekeeper="image">Size (GB)</Text>
+    <Text storekeeper="type">Type</Text>
+    <Text storekeeper="status">Status</Text>
+    <Text storekeeper="snapshot">Backup Enabled</Text>
+    <Text storekeeper="server">Server</Text>
+    <Text storekeeper="container">Container</Text>
+    <Text storekeeper="service">Service</Text>
+    <Text storekeeper="owner">Owner</Text>
+    <Group type="button">
+        <Action route="application/view/page/inventory/service.xml?id={{storekeeper.id}}" class="d-inline-flex"><Graph icon="bi-card-heading"/></Action>
+    </Group>
+</Graph>

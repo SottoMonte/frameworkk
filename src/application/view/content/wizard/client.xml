@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Container color="light" size="true" margin="-0" padding="-0" >
+    {% for x in component.selected %}
+    <Tab>
+        <Row id="test">
+            <Input var="data.result.identifier.{{ loop.index - 1 }}" identifier="identifier"/>
+            <Input var="data.result.name.{{ loop.index - 1 }}" identifier="name"/>
+        </Row>
+        <Row>
+            <Input var="data.result.person.contact.cellular.{{ loop.index - 1 }}" identifier="person.contact.cellular"/>
+            <Input var="data.result.person.contact.email.{{ loop.index - 1 }}" identifier="person.contact.email"/>
+            <Input var="data.result.person.contact.location.address.{{ loop.index - 1 }}" identifier="person.contact.location.address"/>
+            <Input var="data.result.person.contact.location.city.{{ loop.index - 1 }}" identifier="person.contact.location.city"/>
+            <Input var="data.result.person.contact.location.province.{{ loop.index - 1 }}" identifier="person.contact.location.province"/>
+        </Row>
+    </Tab>
+    {% endfor %}
+</Container>

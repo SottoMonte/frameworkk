@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Form id="form-login" action="/login" method="POST" padding="p-2">
+    <Input identifier="username" padding="pb-2" />
+    <Input type="password" identifier="password" padding="pb-2" />
+    <Button type="submit">Accedi</Button>
+    <Route href="https://github.com/login/oauth/authorize?client_id=Iv23li8IzmjxqtrCVomM"><Icon icon="bi-github"/><Text>Github Login</Text></Route>
+</Form>

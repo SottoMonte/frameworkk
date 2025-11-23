@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Group id="registration-wizard" type="tab" expand="full">
+    <!-- Step 1: Informazioni base -->
+    <Group id="step1" type="tab-pane" title="Dati Personali">
+            <Group type="input">
+                <Input type="text" id="first-name" placeholder="Nome" required="true" />
+                <Input type="text" id="last-name" placeholder="Cognome" required="true" />
+                <Input type="email" id="email" placeholder="Email" required="true" />
+                <Input type="select" id="country" placeholder="Seleziona Paese" storekeeper="countries" />
+            </Group>
+        <Action type="button" value="Avanti" click="nextTab" target="step2" />
+    </Group>
+
+    <!-- Step 2: Credenziali -->
+    <Group id="step2" type="tab-pane" title="Credenziali">
+        <Group type="input">
+            <Input type="password" id="password" placeholder="Password" required="true" />
+            <Input type="password" id="confirm-password" placeholder="Conferma Password" required="true" />
+            <Graph type="progress" value="0" id="password-strength" />
+        </Group>
+        <Group type="input-group">
+            <Action type="button" value="Indietro" click="prevTab" target="step1" />
+            <Action type="button" value="Avanti" click="nextTab" target="step3" />
+        </Group>
+    </Group>
+
+    <!-- Step 3: Conferma -->
+    <Group id="step3" type="tab-pane" title="Conferma">
+        <Text>Riepilogo dati:</Text>
+        <Graph type="table.body">
+            <Graph type="table.row">
+                <Text>Nome:</Text>
+                <Text storekeeper="first-name" />
+            </Graph>
+            <Graph type="table.row">
+                <Text>Email:</Text>
+                <Text storekeeper="email" />
+            </Graph>
+        </Graph>
+        <Group type="input-group">
+            <Action type="button" value="Modifica" click="prevTab" target="step2" />
+            <Action type="submit" value="Completa Registrazione" click="submitRegistration" />
+        </Group>
+    </Group>
+
+    <!-- Finestra di successo -->
+    <Window id="success-modal" type="modal" title="Registrazione Completata">
+        <Text>La tua registrazione è avvenuta con successo!</Text>
+        <Action type="button" value="OK" hide="modal" route="/dashboard" />
+    </Window>
+</Group>

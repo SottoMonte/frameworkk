@@ -1,0 +1,127 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Column expand="full">
+    <!-- Header !-->
+    <Data id="page-loader" type="progress" class="rounded-0 fixed-top" height="3px" value="0"/>
+    <Window type="still" id="settings" title="Impostazioni">
+        <Text>TEST</Text>
+    </Window>
+    <Window type="dialog" title="Crea un Account" id="auth-login">
+        
+    </Window>
+    <Navigation class="bg-primary" orientation="horizontal" alignment-content="between" >
+        
+        <Group width="auto" expand="dynamic" padding="px-4">
+            <Input width="auto" type="search" value="{{url}}" />
+            <Action type="submit" class="border"><Media type="icon" src="bi-search" /></Action>
+        </Group>
+        <Container width="auto" alignment-content="between" spacing="2">
+            <Action alignment-content="center" spacing="2" class="border">
+                <Media type="icon" src="bi-person-plus" />
+                <Text>Crea un account</Text>
+            </Action>
+            <Action alignment-content="center" spacing="2" class="border">
+                <Media type="icon" src="bi-person-lock" />
+                <Text>Accedi</Text>
+            </Action>
+            {% if user %}
+            <Action route="#offcanvasExample" alignment-content="center" class="d-inline-flex" spacing="2">
+                <Media type="image" height="40px" src="https://app.colosso.cloud/static/logo.png" class="rounded-circle border" />
+                <Text>{{user.email}}</Text>
+            </Action>
+            {%  endif %}
+        </Container>
+    </Navigation>
+    <Navigation orientation="horizontal" alignment-content="between" class="bg-body-tertiary border-bottom px-2">
+        <Action type="dropdown" tooltip="Help"><Media type="icon" src="bi-bookmark-fill"/></Action>
+        <Action type="dropdown" tooltip="Help"><Text>Apple</Text></Action>
+        <Action type="dropdown" tooltip="Help"><Text>Samsung</Text></Action>
+        <Action type="dropdown" tooltip="Help"><Text>Xiaomi</Text></Action>
+        <Action type="dropdown" tooltip="Help"><Text>Honor</Text></Action>
+        <Action type="dropdown" tooltip="Help"><Text>Motorola</Text></Action>
+        <Action type="dropdown" tooltip="Help"><Media type="icon" src="bi-three-dots-vertical"/></Action>
+        <Action type="dropdown" tooltip="Help">
+            <Column><Media type="icon" src="bi-usb-plug"/><Text>Accessori</Text></Column>
+            <Container width="500px" height="200px">
+                <Row>
+                    <Group type="list" class="list-group-flush">
+                        <Text>Termini e condizioni d'uso</Text>
+                        <Text>Privacy</Text>
+                        <Text>Spedizioni</Text>
+                        <Text>Pagamenti</Text>
+                        <Text>Politiche di Reso</Text>
+                        <Text>Garanzia e Assistenza</Text>
+                        <Text>Note legali</Text>
+                    </Group>
+                    <Group type="list" class="list-group-flush">
+                        <Text>Termini e condizioni d'uso</Text>
+                        <Text>Privacy</Text>
+                        <Text>Spedizioni</Text>
+                        <Text>Pagamenti</Text>
+                        <Text>Politiche di Reso</Text>
+                        <Text>Garanzia e Assistenza</Text>
+                        <Text>Note legali</Text>
+                    </Group>
+                    <Group type="list" class="list-group-flush">
+                        <Text>Termini e condizioni d'uso</Text>
+                        <Text>Privacy</Text>
+                        <Text>Spedizioni</Text>
+                        <Text>Pagamenti</Text>
+                        <Text>Politiche di Reso</Text>
+                        <Text>Garanzia e Assistenza</Text>
+                        <Text>Note legali</Text>
+                    </Group>
+                </Row>
+            </Container>
+        </Action>
+        <Action type="dropdown" tooltip="Help"><Row><Media type="icon" src="bi-shield-shaded"/><Text>Protezioni</Text></Row></Action>
+        <Action type="dropdown" tooltip="Help"><Row><Media type="icon" src="bi-usb-plug"/><Text>Informatica</Text></Row></Action>
+        <Action type="dropdown" tooltip="Help"><Row><Media type="icon" src="bi-screwdriver"/><Text>Repairs</Text></Row></Action>
+        <Action type="dropdown" tooltip="Help"><Row><Media type="icon" src="bi-pc-display"/><Text>PC</Text></Row></Action>
+        <Action type="dropdown" tooltip="Help"><Row><Media type="icon" src="bi-laptop"/><Text>Laptops</Text></Row></Action>
+        <Action type="dropdown" tooltip="Help"><Row><Media type="icon" src="bi-phone"/><Text>Telephones</Text></Row></Action>
+    </Navigation>
+    <!-- Content !-->
+    {{ inner }}
+    <!-- Footer !-->
+    <Navigation class="bg-primary">
+        <Row>
+            <Media type="image" src="/assets/logo.png"/>
+            <Container class="overflow-auto">
+                <Group type="list">
+                <Text>Account</Text>
+                <Text>Miei ordini</Text>
+                <Text>Note di Credito</Text>
+                <Text>Miei indirizzi</Text>
+                <Text>Info personali</Text>
+                <Text>Garanzia e Assistenza</Text>
+                <Text>Note legali</Text>
+                </Group>
+            </Container>
+            <Container class="overflow-auto">
+            <Group type="list">
+                <Text>Contattaci</Text>
+                <Text>Chi Siamo</Text>
+                <Text>SiteMap</Text>
+                <Text>Pagamenti</Text>
+                <Text>Chat Telegram</Text>
+                <Text>Garanzia e Assistenza</Text>
+                <Text>Note legali</Text>
+            </Group>
+            </Container>
+            <Container class="overflow-auto">
+            <Group type="list">
+                <Text>Termini e condizioni d'uso</Text>
+                <Text>Privacy</Text>
+                <Text>Spedizioni</Text>
+                <Text>Pagamenti</Text>
+                <Text>Politiche di Reso</Text>
+                <Text>Garanzia e Assistenza</Text>
+                <Text>Note legali</Text>
+            </Group>
+            </Container>
+        </Row>
+        <Row>
+            <Text>Copyright ©Tectronix 2025</Text>
+        </Row>
+    </Navigation>
+</Column>

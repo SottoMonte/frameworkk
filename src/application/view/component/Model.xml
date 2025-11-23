@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Group id="{{ component.id }}" type="tree" >
+    <Window type="modal" id="window-create-{{ component.id }}" position="centered" title="Create" action="create">
+        <Action type="form" id="form-create" action="/create" method="POST">
+            <Input type="text" collapse="full" identifier="location" placeholder="Name" value="{{ storekeeper.result[0].tree.repository }}" />
+            <Input id="tree-create-path" type="text" identifier="path" placeholder="path" />
+            <Input id="tree-create-name" type="text" identifier="name" placeholder="name" />
+        </Action>
+    </Window>
+    <Window type="modal" id="window-delete-{{ component.id }}" position="centered" title="Delete" action="delete">
+        <Action type="form" id="form-delete" action="/delete" method="POST">
+            <Input type="text" collapse="full" identifier="location" placeholder="Name" value="{{ storekeeper.result[0].tree.repository }}" />
+            <Input id="tree-delete-path" type="text" identifier="path" placeholder="path" />
+            <Input id="tree-delete-name" type="text" identifier="name" placeholder="name" />
+        </Action>
+    </Window>
+
+    {% for child in tree['children'] %}
+    <Action type="dropdown" >
+        <Action id="maker-{{tree.id}}" draggable="window" draggable-component="window" padding="p-0" margin="m-0" value="{{tree.path}}"><Text>{{tree.name}}</Text></Action>
+        <Action click="input(inputs:['tree-create-path'],value:'{{tree.path}}')" alignment-content="horizontal" route="modal:window-create-{{ component.id }}"><Text padding="px-1">New folder</Text></Action>
+        <Action click="input(inputs:['tree-create-path'],value:'{{tree.path}}')" alignment-content="horizontal" route="modal:window-create-{{ component.id }}"><Text padding="px-1">New file</Text></Action>
+        <Action click="input(inputs:['tree-delete-path'],value:'{{tree.path}}')" alignment-content="horizontal" route="modal:window-delete-{{ component.id }}"><Text padding="px-1">Delete</Text></Action>
+    </Action>
+    {% endfor %}
+    
+    {{ render_node(storekeeper.result[0].tree) }}
+</Group>

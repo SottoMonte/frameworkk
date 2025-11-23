@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Card expand="{{component.attributes.row or '3'}}" height="auto" >
+    {% set value = storekeeper.result[view.index|int] %}
+    <Media type="{{value.type}}" src="{{value.url}}" width="100%" height="500px" />
+    <Text type="text" >{{value.title}}</Text>
+    <Action route="{{url|route('/ops/means/' ~ value.id)}}"><Text>In</Text></Action>
+</Card>

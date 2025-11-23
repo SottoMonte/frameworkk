@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Row id="{% set id = '{:0=8}'.format(range(0, 99999999) | random) %}{{ id }}" click="editor.ide(selected:'{{id}}')" padding="p-0" draggable="element" expand="dynamic" >
+    {% macro file_icon(path) %}
+        {% set icon_map = {
+            '.test.py': 'bi-file-earmark-check',
+            '.xml': 'bi-filetype-xml',
+            '.py': 'bi-filetype-py',
+            '.js': 'bi-filetype-js',
+            '.css': 'bi-filetype-css',
+            '.html': 'bi-filetype-html',
+            '.json': 'bi-filetype-json',
+            '.txt': 'bi-file-text',
+            '.csv': 'bi-filetype-csv',
+            '.sql': 'bi-filetype-sql',
+            '.php': 'bi-filetype-php',
+            '.java': 'bi-filetype-java',
+            '.jpg': 'bi-file-image',
+            '.png': 'bi-file-image',
+            '.gif': 'bi-file-image',
+            '.pdf': 'bi-filetype-pdf',
+            '.zip': 'bi-file-zip',
+            '.exe': 'bi-file-binary',
+            '.sh': 'bi-file-earmark-code',
+            '.yml': 'bi-filetype-yml',
+            '.yaml': 'bi-filetype-yml',
+            '.md': 'bi-filetype-md',
+        } %}
+        {%- for ext, icon in icon_map.items() %}
+            {%- if path is string and path.endswith(ext) %}
+                {{ icon }}
+            {%- endif %}
+        {%- endfor %}
+        {%- if not path is string  %}
+        {{ 'bi-file-earmark' }}
+        {%- endif %}
+    {% endmacro %}
+    <Column style="background-color:#ccc;">
+        <Group type="nav" margin="m-0" padding="p-0" expand="dynamic">
+            {% if 'parameters' in storekeeper and 'src/' in storekeeper|get('result.0.path') %}
+            <Action route="tab:test-{{ id }}" click="tab(tab:'context-test-{{ id }}')" class="d-inline-flex"><Graph icon="bi-file-earmark-check"/></Action>
+            {% endif %}
+            <Action route="tab:code-{{ id }}" click="tab(tab:'context-code-{{ id }}')" class="d-inline-flex"><Graph icon="{{file_icon(storekeeper|get('result.0.path'))}}"/></Action>
+            {% if 'parameters' in storekeeper and 'src/application/view/' in storekeeper|get('result.0.path') %}
+            <Action route="tab:css-{{ id }}" click="preview(id:'preview-{{ id }}',code:'{{ id }}')" class="d-inline-flex"><Graph icon="bi-filetype-css"/></Action>
+            {% endif %}
+            <Action route="tab:view-{{ id }}" click="preview(id:'preview-{{ id }}',code:'{{ id }}')" class="d-inline-flex"><Graph icon="bi-binoculars"/></Action>
+        </Group>
+        <Group type="tab">
+            {% if 'parameters' in storekeeper and 'src/' in storekeeper|get('result.0.path') and '.py' in storekeeper|get('result.0.path') %}
+            <Container id="context-test-{{ id }}" expand="full" padding="p-0">
+                <Action click="save(location:'{{ storekeeper|get('parameters.payload.location') }}',model:'file',path:'{{ storekeeper|get('result.0.path') | replace('.', '.test.') }}',target:'{{ id }}',field:'block-test-')" ><Graph icon="bi-floppy2-fill"/></Action>
+            </Container>
+            {% endif %}
+            <Container id="context-code-{{ id }}" expand="full" padding="p-0">
+                <Action click="save(location:'{{ storekeeper|get('parameters.payload.location') }}',model:'file',path:'{{ storekeeper|get('result.0.path') }}',target:'{{ id }}',field:'block-editor-')" ><Graph icon="bi-floppy2-fill"/></Action>
+            </Container>
+        </Group>
+        <Action route="modal:modal-ia" click="input(inputs:['window-ai-file'],value:'{{ storekeeper|get('result.0.path') }}')|input(inputs:['window-ai-location'],value:'{{ storekeeper|get('parameters.payload.location') }}')" class="d-inline-flex"><Graph icon="bi-stars"/></Action>
+    </Column>
+    <Row droppable="element" padding="p-0" expand="dynamic" >
+        <Group type="tab" expand="dynamic" class="overflow-auto">
+            {% if 'parameters' in storekeeper and 'src/' in storekeeper|get('result.0.path')  %}
+            <Container id="test-{{ id }}" expand="full" padding="p-0">
+                <Storekeeper expand="full" method="gather" repository='file' payload="test(location:'{{storekeeper|get('parameters.payload.location')}}',path:'{{ storekeeper|get('result.0.path') | replace('.py', '.test.py') | replace('.xml', '.test.py') }}')" >
+                    <Text id="block-test-{{ id }}" init="editor(field:'block-test-',target:'{{ id }}',path:'{{ storekeeper|get('result.0.path') | replace('.', '.test.') }}')" class="editor h-100 border" storekeeper="result.0.content" type="editable"></Text>
+                </Storekeeper>
+            </Container>
+            {% endif %}
+            {% if 'parameters' in storekeeper and 'src/application/view/' in storekeeper|get('result.0.path') %}
+            <Container id="css-{{ id }}" expand="full" padding="p-0">
+                <Storekeeper expand="full" method="gather" repository='file' payload="test(location:'{{storekeeper|get('parameters.payload.location')}}',path:'{{ storekeeper|get('result.0.path') | replace('.py', '.css') | replace('.xml', '.css') }}')" >
+                    <Text id="block-css-{{ id }}" init="editor(field:'block-css-',target:'{{ id }}',path:'{{ storekeeper|get('result.0.path') | replace('.py', '.css') }}')" class="editor h-100 border" storekeeper="result.0.content" type="editable"></Text>
+                </Storekeeper>
+            </Container>
+            {% endif %}
+            <Container id="code-{{ id }}" expand="full" padding="p-0">
+                <Text id="block-editor-{{ id }}" init="editor(field:'block-editor-',target:'{{ id }}',path:'{{ storekeeper|get('result.0.path') }}')" class="editor h-100 border" storekeeper="result.0.content" type="editable"></Text>
+            </Container>
+            <Container id="view-{{ id }}" expand="dynamic" class="overflow-auto" >
+                <Preview id="preview-{{ id }}" path="{{ storekeeper|get('result.0.path') }}" />
+            </Container>
+        </Group>
+    </Row>
+</Row>

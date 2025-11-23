@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Row id="{% set id = '{:0=8}'.format(range(0, 99999999) | random) %}{{ id }}" class="overflow-auto" init="load(url:'{{ value }}',target:'window-{{ id }}')" draggable="window" expand="dynamic" >
+    <Column style="background-color:#2fcc76;" alignment-vertical="center" padding="px-2">
+        <Text expand="dynamic" >{{ value or  '' }}</Text>
+        <Group type="nav">
+            <Action link="#framework"><Graph icon="bi-grid-1x2"/></Action>
+            <Action click="load('window-{{ id }}')" link="#framework"><Graph icon="bi-fullscreen"/></Action>
+            <Action click="close(target:'{{ id }}')"><Graph icon="bi-x-lg"/></Action>
+        </Group>
+    </Column>
+    <Row id="window-{{ id }}" class="overflow-auto" expand="dynamic" droppable="element" margin="mb-3"></Row>
+</Row>

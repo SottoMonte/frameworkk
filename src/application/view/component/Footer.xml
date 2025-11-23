@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Row background="#f1f1f1" border="top">
+    <Window id="machineModal" type="modal" size="fullscreen" title="Create" action="terminal" >
+        <Column height="100%" >
+            <Row expand="4">
+                <Action type="form" id="form-terminal" action="/terminal" method="POST">
+                    <Group type="input">
+                        <Input type="text" identifier="target" placeholder="Name" value="machineModal-terminal" collapse="full" />
+                        <Input type="text" identifier="host" placeholder="host" />
+                        <Input type="text" identifier="username" placeholder="username" value="root" />
+                        <Input type="password" identifier="password" placeholder="password" />
+                    </Group>
+                </Action>
+                <Container id="machineModal-terminal" expand="dynamic" height="100%" padding="p-0"></Container>
+            </Row>
+            <Window expand="dynamic" type="window" height="100%" url="http://195.231.64.226:443"></Window>
+        </Column>
+    </Window>
+    <Window id="window-error" type="modal" size="fullscreen" title="Create" action="terminal" >
+        <Column height="100%" >
+            <Messenger id="error-msg" domain="error" view="Banner" />
+        </Column>
+    </Window>
+    <Window id="window-debug" type="modal" size="fullscreen" title="Create" action="terminal" >
+        <Column height="100%" >
+            <Messenger id="debug-msg" domain="debug" view="Banner" />
+        </Column>
+    </Window>
+    <Column background="#ededed" height="200px" alignment-vertical="center" border="bottom" collapse="full" >
+        <Column border="end" height="80%">
+            <Graph src="static/logo.svg" height="60px" />
+        </Column>
+        <Column expand="full" alignment-horizontal="evenly" padding="p-4">
+            <Row>
+                <Text>Products</Text>
+            </Row>
+            <Row>
+                <Text>Products</Text>
+            </Row>
+            <Row>
+                <Text>Products</Text>
+            </Row>
+        </Column>
+    </Column>
+    <Column alignment-vertical="center">
+        <Column>
+            <Action text-size="14px" alignment-content="horizontal" show="modal:machineModal" background="#2fcc76" ><Graph icon="bi-ubuntu"/><Text padding="px-1">VM-100</Text></Action>
+            <Action text-size="14px" alignment-content="horizontal" ><Graph icon="bi-diagram-2-fill"/><Text padding="px-2" >main</Text><Graph icon="bi-arrow-repeat"/></Action>
+            <Action text-size="14px"><Graph icon="bi-terminal"/></Action>
+            <Action text-size="14px" show="modal:window-error"><Graph icon="bi-x-octagon"/></Action>
+            <Action text-size="14px" show="modal:machineModal"><Graph icon="bi-exclamation-triangle"/></Action>
+            <Action text-size="14px" show="modal:window-debug"><Graph icon="bi-bug"/></Action>
+            <Action text-size="14px"><Graph icon="bi-wifi-off"/></Action>
+        </Column>
+        <Column expand="dynamic" alignment-horizontal="center">
+            
+            <Text>Created with Cubute by Colosso</Text>
+        </Column>
+        <Column alignment-vertical="center">
+            <Column alignment-vertical="center">
+                <Action text-size="14px"><Graph icon="bi-zoom-in"/></Action>
+                <Action text-size="14px"><Graph icon="bi-zoom-out"/></Action>
+                <Text>Riga 45,Colonna 89 Spazi:4 UTF-8 LF XML</Text>
+            </Column>
+            <Action text-size="14px"><Graph icon="bi-translate"/></Action>
+            <Action text-size="14px"><Graph icon="bi-keyboard-fill"/></Action>
+            <Action text-size="14px"><Graph icon="bi-mouse-fill"/></Action>
+            <Action text-size="14px"><Graph icon="bi-layout-sidebar-inset-reverse"/></Action>
+        </Column>
+    </Column>
+</Row>
