@@ -1,14 +1,14 @@
 # Application Layer
 
-Il layer `application` è il cuore del sistema. Qui risiede tutta la logica di business, indipendente da framework esterni, database o interfacce utente.
+The `application` layer is the heart of the system. All business logic resides here, independent of external frameworks, databases, or user interfaces.
 
-## Responsabilità
-*   Definire i casi d'uso (`Action`).
-*   Definire i modelli di dominio (`Model`).
-*   Definire le interfacce per l'accesso ai dati (`Repository`).
-*   Implementare le regole di business (`Policy`).
+## Responsibilities
+*   Define use cases (`Action`).
+*   Define domain models (`Model`).
+*   Define interfaces for data access (`Repository`).
+*   Implement business rules (`Policy`).
 
-## Regole d'Oro
-1.  **Nessuna dipendenza esterna**: Questo layer non deve importare nulla da `infrastructure` o `framework` (eccetto forse utilità pure).
-2.  **Purezza**: Le funzioni dovrebbero essere il più pure possibile, delegando gli effetti collaterali alle porte.
-3.  **Testabilità**: Tutto qui deve essere testabile unitariamente senza mock complessi di database o server.
+## Golden Rules
+1.  **No external dependencies**: This layer must not import anything from `infrastructure` or `framework` (except perhaps pure utilities).
+2.  **Purity**: Functions should be as pure as possible, delegating side effects to ports.
+3.  **Testability**: Everything here must be unit-testable without complex mocks of databases or servers.

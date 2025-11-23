@@ -1,16 +1,16 @@
 # Managers
 
-I `Manager` sono componenti che orchestrano parti del sistema.
+`Manager`s are components that orchestrate parts of the system.
 
 ## Executor
-L'`Executor` (`src/framework/manager/executor.py`) è responsabile dell'esecuzione delle Action.
-*   Riceve una richiesta (nome dell'azione e parametri).
-*   Carica dinamicamente il modulo dell'azione appropriata.
-*   Inietta le dipendenze necessarie.
-*   Esegue l'azione e restituisce il risultato.
+The `Executor` (`src/framework/manager/executor.py`) is responsible for executing Actions.
+*   Receives a request (action name and parameters).
+*   Dynamically loads the appropriate action module.
+*   Injects necessary dependencies.
+*   Executes the action and returns the result.
 
 ## Actuator
-L'`Actuator` (`src/framework/manager/actuator.py`) gestisce l'esecuzione di effetti collaterali o comandi verso sistemi esterni, spesso in modo asincrono o differito.
+The `Actuator` (`src/framework/manager/actuator.py`) manages the execution of side effects or commands towards external systems, often asynchronously or deferred.
 
 ## Authenticator / Defender
-Gestiscono la sicurezza, verificando le credenziali e i permessi prima che un'azione venga eseguita.
+They manage security, verifying credentials and permissions before an action is executed.

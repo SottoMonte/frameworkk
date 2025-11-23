@@ -1,38 +1,38 @@
 # Actions
 
-Le `Action` rappresentano i casi d'uso del sistema. Ogni file in `src/application/action/` corrisponde a un'operazione specifica che l'utente può richiedere.
+`Action`s represent system use cases. Each file in `src/application/action/` corresponds to a specific operation the user can request.
 
-## Struttura
-Una Action è tipicamente una funzione asincrona o una classe con un metodo `execute`.
+## Structure
+An Action is typically an asynchronous function or a class with an `execute` method.
 
 ```python
 # src/application/action/create_user.py
 
 async def create_user(repository, mailer, **kwargs):
     """
-    Crea un nuovo utente.
+    Creates a new user.
     
     Args:
-        repository: Porta per la persistenza (iniettata).
-        mailer: Porta per invio email (iniettata).
-        kwargs: Dati di input (es. username, email).
+        repository: Persistence port (injected).
+        mailer: Email sending port (injected).
+        kwargs: Input data (e.g., username, email).
     """
     user_data = kwargs.get('data')
     
-    # 1. Validazione
+    # 1. Validation
     if not user_data.get('email'):
         return {"error": "Email required"}
         
-    # 2. Logica di business
+    # 2. Business Logic
     user = await repository.save(user_data)
     
-    # 3. Effetti collaterali (tramite porte)
+    # 3. Side Effects (via ports)
     await mailer.send_welcome(user['email'])
     
     return user
 ```
 
 ## Best Practices
-*   **Nomi espliciti**: Usa verbi nel nome del file (es. `save.py`, `delete.py`, `calculate_tax.py`).
-*   **Iniezione delle dipendenze**: Non istanziare mai database o servizi direttamente. Aspettati che vengano passati come argomenti.
-*   **Input/Output**: Ricevi dizionari o DTO semplici, restituisci dizionari o DTO semplici.
+*   **Explicit Names**: Use verbs in the filename (e.g., `save.py`, `delete.py`, `calculate_tax.py`).
+*   **Dependency Injection**: Never instantiate databases or services directly. Expect them to be passed as arguments.
+*   **Input/Output**: Receive dictionaries or simple DTOs, return dictionaries or simple DTOs.

@@ -1,30 +1,30 @@
-# Documentazione del Framework
+# Framework Documentation
 
-Benvenuto nella documentazione tecnica. Questa guida è strutturata per rispecchiare l'architettura del codice sorgente.
+Welcome to the technical documentation. This guide is structured to mirror the source code architecture.
 
-## Indice
+## Index
 
 ### 1. [Application Layer](application/README.md) (`src/application`)
-Il cuore della logica di business.
-*   [Actions](application/action.md): Come scrivere casi d'uso.
-*   [Models](application/model.md): Definizione dei dati.
-*   [Repositories](application/repository.md): Interfacce di accesso ai dati.
-*   [Policies](application/policy.md): Regole di business.
+The heart of business logic.
+*   [Actions](application/action.md): How to write use cases.
+*   [Models](application/model.md): Data definition.
+*   [Repositories](application/repository.md): Data access interfaces.
+*   [Policies](application/policy.md): Business rules.
 
 ### 2. [Framework Layer](framework/README.md) (`src/framework`)
-Il sistema di orchestrazione.
-*   [Managers](framework/manager.md): Executor, Actuator, ecc.
-*   [Ports](framework/port.md): Contratti per l'infrastruttura.
-*   [Services](framework/service.md): Servizi di dominio condivisi.
+The orchestration system.
+*   [Managers](framework/manager.md): Executor, Actuator, etc.
+*   [Ports](framework/port.md): Contracts for infrastructure.
+*   [Services](framework/service.md): Shared domain services.
 
 ### 3. [Infrastructure Layer](infrastructure/README.md) (`src/infrastructure`)
-Implementazioni concrete e dettagli tecnici.
-*   [Persistence](infrastructure/persistence.md): Database (SQL, Redis, ecc.).
-*   [Presentation](infrastructure/presentation.md): API Web, CLI.
-*   [Authorization](infrastructure/authorization.md): Sicurezza e permessi.
+Concrete implementations and technical details.
+*   [Persistence](infrastructure/persistence.md): Databases (SQL, Redis, etc.).
+*   [Presentation](infrastructure/presentation.md): Web APIs, CLI.
+*   [Authorization](infrastructure/authorization.md): Security and permissions.
 
-## Altre Risorse
-*   [Panoramica Generale](overview.md)
-*   [Guida Introduttiva](getting_started.md)
-*   [Architettura](architecture.md)
-*   [Guide Pratiche](guides.md)
+## Other Resources
+*   [General Overview](overview.md)
+*   [Getting Started Guide](getting_started.md)
+*   [Architecture](architecture.md)
+*   [Practical Guides](guides.md)

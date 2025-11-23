@@ -1,16 +1,16 @@
 # Presentation Adapters
 
-Gli adattatori di presentazione (`src/infrastructure/presentation/`) gestiscono l'interfaccia verso l'esterno. Sono il punto di ingresso delle richieste.
+Presentation adapters (`src/infrastructure/presentation/`) manage the interface towards the outside world. They are the entry point for requests.
 
 ## Web Adapter
-Espone l'applicazione via HTTP (es. REST API o HTML).
-*   Riceve la richiesta HTTP.
-*   Estrae i parametri.
-*   Chiama l'`Executor` del framework.
-*   Formatta la risposta (JSON, HTML) e la invia al client.
+Exposes the application via HTTP (e.g., REST API or HTML).
+*   Receives the HTTP request.
+*   Extracts parameters.
+*   Calls the framework's `Executor`.
+*   Formats the response (JSON, HTML) and sends it to the client.
 
 ## CLI Adapter
-Permette di usare l'applicazione da riga di comando.
+Allows using the application from the command line.
 
 ## WebSocket Adapter
-Gestisce connessioni in tempo reale.
+Manages real-time connections.

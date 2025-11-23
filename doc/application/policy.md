@@ -1,13 +1,13 @@
 # Policies
 
-Le `Policy` incapsulano regole di business complesse o trasversali che non appartengono a una singola entità o azione.
+`Policy`s encapsulate complex or cross-cutting business rules that do not belong to a single entity or action.
 
-## Esempi
-*   **Calcolo Sconti**: Una logica complessa per determinare lo sconto applicabile.
-*   **Approvazione**: Regole per determinare se un documento può essere approvato.
-*   **Accesso**: Regole di dominio per chi può fare cosa (distinte dall'autorizzazione tecnica).
+## Examples
+*   **Discount Calculation**: Complex logic to determine the applicable discount.
+*   **Approval**: Rules to determine if a document can be approved.
+*   **Access**: Domain rules for who can do what (distinct from technical authorization).
 
-## Esempio
+## Example
 
 ```python
 # src/application/policy/discount.py

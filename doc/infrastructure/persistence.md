@@ -1,23 +1,23 @@
 # Persistence Adapters
 
-Gli adattatori di persistenza (`src/infrastructure/persistence/`) implementano le logiche di salvataggio e recupero dati.
+Persistence adapters (`src/infrastructure/persistence/`) implement data saving and retrieval logic.
 
 ## SQL Adapter (`sql.py`)
-Utilizza SQLAlchemy per interagire con database relazionali (PostgreSQL, MySQL, SQLite).
-*   Mappa i modelli dell'applicazione su tabelle SQL.
-*   Gestisce le transazioni.
+Uses SQLAlchemy to interact with relational databases (PostgreSQL, MySQL, SQLite).
+*   Maps application models to SQL tables.
+*   Manages transactions.
 
 ## Redis Adapter (`redis.py`)
-Utilizza Redis per caching o storage veloce key-value.
+Uses Redis for caching or fast key-value storage.
 
 ## FileSystem Adapter (`fs.py`)
-Salva i dati su file locali (utile per sviluppo o configurazioni semplici).
+Saves data to local files (useful for development or simple configurations).
 
-## Configurazione
-La scelta dell'adapter da usare viene fatta nel file `pyproject.toml`.
+## Configuration
+The choice of adapter to use is made in the `pyproject.toml` file.
 
 ```toml
 [persistence.session]
 adapter = "sql"
-# ... configurazione specifica SQL ...
+# ... specific SQL configuration ...
 ```

@@ -1,12 +1,12 @@
 # Authorization Adapters
 
-Gli adattatori di autorizzazione (`src/infrastructure/authorization/`) implementano le logiche per decidere "chi può fare cosa".
+Authorization adapters (`src/infrastructure/authorization/`) implement logic to decide "who can do what".
 
 ## Verdict
-Il sistema `Verdict` valuta le richieste in base a regole predefinite.
-*   Analizza l'utente corrente (dal token o sessione).
-*   Controlla i permessi richiesti dall'azione.
-*   Emette un "verdetto": Permesso concesso o negato.
+The `Verdict` system evaluates requests based on predefined rules.
+*   Analyzes the current user (from token or session).
+*   Checks permissions required by the action.
+*   Issues a "verdict": Permission granted or denied.
 
-## Integrazione
-L'autorizzazione viene tipicamente invocata dal `Defender` (nel framework) prima di eseguire un'azione.
+## Integration
+Authorization is typically invoked by the `Defender` (in the framework) before executing an action.

@@ -1,11 +1,11 @@
 # Infrastructure Layer
 
-Il layer `infrastructure` contiene i dettagli tecnici e le implementazioni concrete. Qui il codice "tocca" il mondo reale: database, file system, rete, API esterne.
+The `infrastructure` layer contains technical details and concrete implementations. Here the code "touches" the real world: databases, file systems, networks, external APIs.
 
-## Responsabilità
-*   Implementare le interfacce (`Port`) definite nel framework.
-*   Gestire la configurazione specifica delle tecnologie (es. connection string SQL).
-*   Adattare i dati dal formato esterno a quello interno dell'applicazione.
+## Responsibilities
+*   Implement interfaces (`Port`) defined in the framework.
+*   Manage technology-specific configuration (e.g., SQL connection strings).
+*   Adapt data from external formats to internal application formats.
 
-## Organizzazione
-Ogni sottocartella corrisponde a un tipo di adattatore o servizio tecnico.
+## Organization
+Each subfolder corresponds to a type of adapter or technical service.

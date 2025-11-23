@@ -1,11 +1,11 @@
 # Framework Layer
 
-Il layer `framework` è il collante del sistema. Gestisce il flusso di esecuzione, l'orchestrazione e definisce i contratti (Porte) che l'infrastruttura deve rispettare.
+The `framework` layer is the glue of the system. It manages execution flow, orchestration, and defines the contracts (Ports) that the infrastructure must respect.
 
-## Responsabilità
-*   **Orchestrazione**: Coordinare l'esecuzione delle Action (`Manager`).
-*   **Astrazione**: Definire le interfacce per l'infrastruttura (`Port`).
-*   **Servizi**: Fornire servizi di utilità condivisi (`Service`).
+## Responsibilities
+*   **Orchestration**: Coordinate the execution of Actions (`Manager`).
+*   **Abstraction**: Define interfaces for the infrastructure (`Port`).
+*   **Services**: Provide shared utility services (`Service`).
 
-## Concetto Chiave: Inversione delle Dipendenze
-Il framework non dipende dall'infrastruttura. Definisce le interfacce (`Port`) che l'infrastruttura *deve implementare*. A runtime, il framework riceve le istanze concrete (Dependency Injection).
+## Key Concept: Dependency Inversion
+The framework does not depend on the infrastructure. It defines the interfaces (`Port`) that the infrastructure *must implement*. At runtime, the framework receives concrete instances (Dependency Injection).

@@ -1,22 +1,22 @@
-# Guide Pratiche (How-To)
+# Practical Guides (How-To)
 
-## Come creare una nuova Action
+## How to create a new Action
 
-1.  Crea un nuovo file in `src/application/action/`.
-2.  Il nome del file dovrebbe riflettere l'azione (es. `create_user.py`).
-3.  Definisci una funzione o una classe che implementa la logica.
-4.  Esempio:
+1.  Create a new file in `src/application/action/`.
+2.  The filename should reflect the action (e.g., `create_user.py`).
+3.  Define a function or class that implements the logic.
+4.  Example:
     ```python
     async def create_user(repository, **kwargs):
         user_data = kwargs.get('data')
-        # Validazione...
+        # Validation...
         return await repository.save(user_data)
     ```
 
-## Come aggiungere un nuovo Modello
+## How to add a new Model
 
-1.  Aggiungi un file JSON o Python in `src/application/model/`.
-2.  Definisci la struttura dei dati.
+1.  Add a JSON or Python file in `src/application/model/`.
+2.  Define the data structure.
     ```json
     {
         "name": "user",
@@ -27,17 +27,17 @@
     }
     ```
 
-## Come implementare un nuovo Adapter
+## How to implement a new Adapter
 
-Se vuoi supportare una nuova tecnologia (es. un nuovo database):
+If you want to support a new technology (e.g., a new database):
 
-1.  Identifica la `Port` corrispondente in `src/framework/port/` (es. `persistence.py`).
-2.  Crea un nuovo file in `src/infrastructure/persistence/` (es. `mongo.py`).
-3.  Implementa la classe o le funzioni richieste dalla Port.
-4.  Aggiorna `pyproject.toml` per usare il nuovo adapter.
+1.  Identify the corresponding `Port` in `src/framework/port/` (e.g., `persistence.py`).
+2.  Create a new file in `src/infrastructure/persistence/` (e.g., `mongo.py`).
+3.  Implement the class or functions required by the Port.
+4.  Update `pyproject.toml` to use the new adapter.
 
-## Come eseguire il Debug
+## How to Debug
 
-1.  Assicurati che i log siano configurati su `debug` in `pyproject.toml`.
-2.  Controlla l'output della console o il file di log configurato.
-3.  Usa `print()` o un debugger standard Python se necessario, ma ricorda che il codice è asincrono (`async/await`).
+1.  Ensure logs are configured to `debug` in `pyproject.toml`.
+2.  Check the console output or the configured log file.
+3.  Use `print()` or a standard Python debugger if necessary, but remember the code is asynchronous (`async/await`).

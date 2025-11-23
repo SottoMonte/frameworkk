@@ -1,9 +1,9 @@
 # Models
 
-I `Model` definiscono la struttura dei dati e le entità del dominio. Possono essere semplici definizioni JSON o classi Python (es. Pydantic o dataclasses).
+`Model`s define the data structure and domain entities. They can be simple JSON definitions or Python classes (e.g., Pydantic or dataclasses).
 
-## Definizione JSON
-Spesso usiamo JSON per definire lo schema in modo agnostico dal linguaggio.
+## JSON Definition
+We often use JSON to define the schema in a language-agnostic way.
 
 ```json
 // src/application/model/user.json
@@ -21,8 +21,8 @@ Spesso usiamo JSON per definire lo schema in modo agnostico dal linguaggio.
 }
 ```
 
-## Utilizzo
-I modelli vengono usati da:
-1.  **Repository**: Per sapere come mappare i dati sul database.
-2.  **Action**: Per validare l'input.
-3.  **Presentation**: Per formattare l'output.
+## Usage
+Models are used by:
+1.  **Repository**: To know how to map data to the database.
+2.  **Action**: To validate input.
+3.  **Presentation**: To format output.

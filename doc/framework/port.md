@@ -1,8 +1,8 @@
 # Ports
 
-Le `Port` (`src/framework/port/`) sono interfacce astratte. Definiscono i servizi di cui l'applicazione ha bisogno per funzionare.
+`Port`s (`src/framework/port/`) are abstract interfaces. They define the services the application needs to function.
 
-## Esempio: Persistence Port
+## Example: Persistence Port
 
 ```python
 # src/framework/port/persistence.py
@@ -15,6 +15,6 @@ class Port:
         pass
 ```
 
-## Perché usare le Porte?
-*   **Testabilità**: Puoi creare "finti" adapter (Mock) per i test che implementano la porta senza usare un vero database.
-*   **Flessibilità**: Puoi cambiare l'implementazione reale (es. da MySQL a PostgreSQL) senza toccare una riga di codice nell'applicazione.
+## Why use Ports?
+*   **Testability**: You can create "fake" adapters (Mock) for tests that implement the port without using a real database.
+*   **Flexibility**: You can change the real implementation (e.g., from MySQL to PostgreSQL) without touching a line of code in the application.

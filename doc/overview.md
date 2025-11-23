@@ -1,29 +1,29 @@
-# Panoramica del Framework
+# Framework Overview
 
-Benvenuto nella documentazione del framework. Questo framework è progettato per costruire applicazioni scalabili e manutenibili utilizzando un'architettura esagonale (o Clean Architecture).
+Welcome to the framework documentation. This framework is designed to build scalable and maintainable applications using a hexagonal architecture (or Clean Architecture).
 
-## Concetti Chiave
+## Key Concepts
 
-Il framework si basa su una netta separazione delle responsabilità:
+The framework is based on a clear separation of responsibilities:
 
-*   **Application (Core)**: Contiene la logica di business pura. Non dipende da database, framework web o altre tecnologie esterne. Qui risiedono i casi d'uso (`Action`) e i modelli di dominio.
-*   **Framework (Orchestration)**: Gestisce il flusso dell'applicazione. Collega le azioni dell'applicazione con le implementazioni concrete dell'infrastruttura. Utilizza i `Manager` per coordinare le operazioni.
-*   **Infrastructure (Adapters)**: Fornisce le implementazioni concrete per le interfacce definite nel framework. Include database, API esterne, sistemi di messaggistica, ecc.
+*   **Application (Core)**: Contains pure business logic. It does not depend on databases, web frameworks, or other external technologies. Use cases (`Action`) and domain models reside here.
+*   **Framework (Orchestration)**: Manages the application flow. Connects application actions with concrete infrastructure implementations. Uses `Managers` to coordinate operations.
+*   **Infrastructure (Adapters)**: Provides concrete implementations for interfaces defined in the framework. Includes databases, external APIs, messaging systems, etc.
 
-## Terminologia
+## Terminology
 
-*   **Action**: Un'unità di lavoro o caso d'uso (es. "Salva Utente", "Invia Email").
-*   **Manager**: Componenti che orchestrano le dipendenze e il flusso di esecuzione (es. `Executor`, `Actuator`).
-*   **Port**: Un'interfaccia definita nel framework che l'infrastruttura deve implementare.
-*   **Adapter**: L'implementazione concreta di una Port (es. un adattatore SQL per la persistenza).
-*   **Verdict**: Un sistema per gestire le autorizzazioni e le decisioni di accesso.
+*   **Action**: A unit of work or use case (e.g., "Save User", "Send Email").
+*   **Manager**: Components that orchestrate dependencies and execution flow (e.g., `Executor`, `Actuator`).
+*   **Port**: An interface defined in the framework that the infrastructure must implement.
+*   **Adapter**: The concrete implementation of a Port (e.g., a SQL adapter for persistence).
+*   **Verdict**: A system for managing authorizations and access decisions.
 
-## Flusso di Esecuzione Tipico
+## Typical Execution Flow
 
-1.  Una richiesta arriva dall'esterno (es. via HTTP o WebSocket).
-2.  L'infrastruttura di presentazione (`Presentation`) riceve la richiesta.
-3.  La richiesta viene passata all'`Executor` nel framework.
-4.  L'`Executor` carica l'`Action` appropriata dall'applicazione.
-5.  L'`Action` esegue la logica di business, utilizzando le `Port` per accedere ai dati o servizi esterni.
-6.  Le `Port` delegano alle implementazioni concrete (`Adapter`) nell'infrastruttura.
-7.  Il risultato viene restituito attraverso la catena fino alla presentazione.
+1.  A request arrives from outside (e.g., via HTTP or WebSocket).
+2.  The presentation infrastructure (`Presentation`) receives the request.
+3.  The request is passed to the `Executor` in the framework.
+4.  The `Executor` loads the appropriate `Action` from the application.
+5.  The `Action` executes business logic, using `Ports` to access data or external services.
+6.  The `Ports` delegate to concrete implementations (`Adapter`) in the infrastructure.
+7.  The result is returned up the chain to the presentation.

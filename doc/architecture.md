@@ -1,41 +1,41 @@
-# Architettura del Sistema
+# System Architecture
 
-## Struttura delle Directory
+## Directory Structure
 
-La struttura del progetto segue un'architettura a strati, progettata per mantenere il codice pulito, testabile e indipendente dai dettagli dell'infrastruttura.
+The project structure follows a layered architecture, designed to keep code clean, testable, and independent of infrastructure details.
 
 ### `src/application` (Core)
-Questa cartella contiene la logica di business e i modelli di dominio. È indipendente da qualsiasi framework esterno.
-*   **`action/`**: Contiene i casi d'uso (es. `save.py`). Ogni file rappresenta una singola azione che il sistema può compiere.
-*   **`model/`**: Definisce le entità e le strutture dati (spesso in formato JSON o classi Python).
-*   **`repository/`**: Interfacce per l'accesso ai dati. Definiscono *cosa* fare, non *come*.
-*   **`policy/`**: Regole di business specifiche.
+This folder contains business logic and domain models. It is independent of any external framework.
+*   **`action/`**: Contains use cases (e.g., `save.py`). Each file represents a single action the system can perform.
+*   **`model/`**: Defines entities and data structures (often in JSON format or Python classes).
+*   **`repository/`**: Interfaces for data access. They define *what* to do, not *how*.
+*   **`policy/`**: Specific business rules.
 
 ### `src/framework` (Orchestration)
-Collega l'applicazione all'infrastruttura.
-*   **`manager/`**: Gestori del flusso (es. `Executor` per le azioni, `Actuator` per gli effetti).
-*   **`port/`**: Interfacce (contratti) che l'infrastruttura deve soddisfare.
-*   **`service/`**: Servizi di dominio condivisi.
+Connects the application to the infrastructure.
+*   **`manager/`**: Flow managers (e.g., `Executor` for actions, `Actuator` for effects).
+*   **`port/`**: Interfaces (contracts) that the infrastructure must satisfy.
+*   **`service/`**: Shared domain services.
 
 ### `src/infrastructure` (Adapters)
-Implementazioni concrete delle tecnologie.
-*   **`persistence/`**: Adattatori per database (SQL, Redis, FileSystem).
-*   **`presentation/`**: Adattatori per l'interfaccia utente o API (Web, CLI).
-*   **`authentication/`**, **`authorization/`**: Gestione sicurezza.
+Concrete implementations of technologies.
+*   **`persistence/`**: Adapters for databases (SQL, Redis, FileSystem).
+*   **`presentation/`**: Adapters for user interface or APIs (Web, CLI).
+*   **`authentication/`**, **`authorization/`**: Security management.
 
-## Flusso dei Dati e Dipendenze
+## Data Flow and Dependencies
 
-Il principio fondamentale è che **le dipendenze puntano verso l'interno**.
-*   `Infrastructure` dipende da `Framework`.
-*   `Framework` dipende da `Application`.
-*   `Application` non dipende da nessuno (o solo da librerie standard).
+The fundamental principle is that **dependencies point inwards**.
+*   `Infrastructure` depends on `Framework`.
+*   `Framework` depends on `Application`.
+*   `Application` depends on no one (or only standard libraries).
 
-### Esempio: Salvataggio di un Dato
+### Example: Saving Data
 
-1.  **Presentation** (Infra) riceve una richiesta HTTP.
-2.  Chiama l'**Executor** (Framework).
-3.  L'Executor carica l'**Action** `save` (Application).
-4.  L'Action elabora i dati e chiama la porta **Repository** (Framework).
-5.  A runtime, la porta è implementata da un **Adapter SQL** (Infrastructure), che esegue la query.
+1.  **Presentation** (Infra) receives an HTTP request.
+2.  Calls the **Executor** (Framework).
+3.  The Executor loads the `save` **Action** (Application).
+4.  The Action processes data and calls the **Repository** port (Framework).
+5.  At runtime, the port is implemented by a **SQL Adapter** (Infrastructure), which executes the query.
 
-Questo design permette di cambiare il database (es. da SQL a Mongo) cambiando solo l'adapter in `infrastructure`, senza toccare la logica di business in `application`.
+This design allows changing the database (e.g., from SQL to Mongo) by only changing the adapter in `infrastructure`, without touching the business logic in `application`.

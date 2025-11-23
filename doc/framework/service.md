@@ -1,9 +1,9 @@
 # Services
 
-I `Service` (`src/framework/service/`) contengono logica che non appartiene a una specifica entità o azione, ma è di supporto al dominio o al framework stesso.
+`Service`s (`src/framework/service/`) contain logic that does not belong to a specific entity or action, but supports the domain or the framework itself.
 
-## Esempi
-*   **Flow**: Gestione di flussi di lavoro complessi.
-*   **Scheme**: Validazione di schemi dati.
+## Examples
+*   **Flow**: Management of complex workflows.
+*   **Scheme**: Data schema validation.
 
-A differenza dei Manager (che orchestrano), i Service offrono funzionalità pure o di utilità.
+Unlike Managers (which orchestrate), Services offer pure or utility functionalities.

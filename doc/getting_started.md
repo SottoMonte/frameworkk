@@ -1,67 +1,67 @@
-# Guida Introduttiva
+# Getting Started Guide
 
-Questa guida ti aiuterà a configurare e avviare un progetto basato su questo framework.
+This guide will help you configure and start a project based on this framework.
 
-## Prerequisiti
+## Prerequisites
 
-*   Python 3.9 o superiore
-*   `pip` (gestore pacchetti Python)
-*   Accesso a un database (opzionale per l'avvio base, ma necessario per molte funzionalità)
+*   Python 3.9 or higher
+*   `pip` (Python package manager)
+*   Access to a database (optional for basic startup, but necessary for many features)
 
-## Installazione
+## Installation
 
-1.  Clona il repository:
+1.  Clone the repository:
     ```bash
-    git clone <url-repository>
-    cd <nome-cartella>
+    git clone <repository-url>
+    cd <folder-name>
     ```
 
-2.  Crea un ambiente virtuale:
+2.  Create a virtual environment:
     ```bash
     python3 -m venv venv
-    source venv/bin/activate  # Su Linux/Mac
-    # venv\Scripts\activate  # Su Windows
+    source venv/bin/activate  # On Linux/Mac
+    # venv\Scripts\activate  # On Windows
     ```
 
-3.  Installa le dipendenze:
+3.  Install dependencies:
     ```bash
     pip install -r requirements.txt
     ```
 
-## Configurazione
+## Configuration
 
-Il file principale di configurazione è `pyproject.toml`. Qui puoi definire:
+The main configuration file is `pyproject.toml`. Here you can define:
 
-*   **Database**: Configura la sezione `[persistence.session]` o simili con le credenziali del tuo database (es. Redis, SQL).
-*   **Messaggistica**: Configura `[amessage]` per i log e la comunicazione.
-*   **Autenticazione**: Configura `[authentication]` per i provider (es. Supabase, GitHub).
+*   **Database**: Configure the `[persistence.session]` section or similar with your database credentials (e.g., Redis, SQL).
+*   **Messaging**: Configure `[amessage]` for logs and communication.
+*   **Authentication**: Configure `[authentication]` for providers (e.g., Supabase, GitHub).
 
-Esempio di configurazione minima per i log su console:
+Example of minimal configuration for console logs:
 ```toml
 [amessage.log]
 adapter = "console"
 level = "debug"
 ```
 
-## Avvio dell'Applicazione
+## Starting the Application
 
-L'applicazione può essere avviata utilizzando il comando (esempio basato su `Procfile` o script comuni):
+The application can be started using the command (example based on `Procfile` or common scripts):
 
 ```bash
 python src/main.py
-# Oppure, se usi un server web come uvicorn/gunicorn:
+# Or, if you use a web server like uvicorn/gunicorn:
 # uvicorn src.main:app --reload
 ```
-*(Nota: Verifica il file `Procfile` o la documentazione specifica del progetto per il comando esatto di avvio)*
+*(Note: Check the `Procfile` or specific project documentation for the exact startup command)*
 
-## Esecuzione dei Test
+## Running Tests
 
-Per eseguire i test unitari:
+To run unit tests:
 
 ```bash
 python -m unittest discover src -p "*.test.py"
 ```
-Oppure esegui un test specifico:
+Or run a specific test:
 ```bash
 python src/infrastructure/authorization/verdict.test.py
 ```
