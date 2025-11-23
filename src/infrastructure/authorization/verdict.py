@@ -14,7 +14,6 @@ class adapter():
         self.config = constants.get('config')
         self._policies: Dict[str, Dict] = {}
         self._data_store: Dict[str, Any] = {}
-        asyncio.create_task(self.load_policies())
 
     # ------------------------------
     # POLICY COMPILATION & LOADING
@@ -92,16 +91,13 @@ class adapter():
             if self._evaluate_rule(rule, context):
                 return True'''
         
-        if self._evaluate_rule(self._policies[policy_name], context):
-            return True
-
-        return False # Deny se nessuna regola 'allow' ha fatto match
+        return self._evaluate_rule(self._policies[policy_name], context)
 
     # ------------------------------
     # MOCK PERSISTENCE LAYER
     # ------------------------------
 
-    async def load_policies(self) -> Dict[str, Dict]:
+    async def load_policies(self):
         import framework.service.language as language
         for domain,name in self.config.get('project').get('policy',{}).items():
             text = await language.resource(path=f"application/policy/{domain}/{name}")

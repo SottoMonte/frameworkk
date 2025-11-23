@@ -710,12 +710,7 @@ class adapter(presentation.port):
 
         @language.asynchronous()
         async def main():
-            # Costruisce l'URL per il fetch, gestendo il caso di percorso vuoto
-            route_path = self.config.get('route', '')
-            resource_url = f"application/policy/presentation/{route_path}"
-            await messenger.post(domain='info', message=f"Caricamento delle rotte da: {resource_url}")
-            file = await language.fetch(path=resource_url)
-            self.parse_route(file)
+            await self.parse_route()
             self.mount_route(routes) # 'routes' deve essere accessibile qui
 
             # Inizializza l'applicazione Starlette con rotte e middleware

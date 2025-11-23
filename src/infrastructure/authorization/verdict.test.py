@@ -14,7 +14,7 @@ class Testadapter(contract.Contract):
         engine = verdict.adapter(config={'project':{'policy':
             {'presentation':'web.toml'}
         }})
-        
+        await engine.load_policies()
         request_allow = {
             "principal": {
                 "id": "user-101",

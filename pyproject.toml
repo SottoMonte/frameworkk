@@ -65,13 +65,13 @@ password = ""
 adapter = "starlette"
 host = "0.0.0.0"
 port = "5000"
-route = "web.xml"
+#route = "web.xml"
 #ssl_keyfile = "key.pem"
 #ssl_certfile = "cert.pem"
 
 [apresentation.native]
 adapter = "flutter"
-route = "route.xml"
+#route = "route.xml"
 
 # Configurazione dell'autenticazione
 [authorization.verdict]

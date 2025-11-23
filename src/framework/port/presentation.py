@@ -178,24 +178,22 @@ class port(ABC):
     async def render_css(self, *services, **constants):
         await self.apply_css(*services)
 
-    def parse_route(self, file):
+    async def parse_route(self):
         # Regex per opzioni multiple senza virgolette (es. {a|b})
         regex_simple_options = r'\{([a-zA-Z0-9_|]+)\}'
         # Regex per parametri dinamici tipo {$id} -> {id}
         regex_dynamic_param = r'\{\$([a-zA-Z0-9_]+)\}'
-
+        rotta = f"application/policy/presentation/{self.config.get('project',).get('policy').get('presentation')}"
+        file = await language.fetch(path=rotta)
+        policy = await language.convert(file,dict,'toml')
+        routes = policy.get('store').get('data').get('routes')
         try:
-            tree = untangle.parse(file)
-            if not tree or not tree.get_elements() or not tree.get_elements()[0].get_elements():
-                #print("Errore: Il file XML è vuoto o malformato.")
-                return
-
-            for setting in tree.get_elements()[0].get_elements():
-                path_attribute = setting.get_attribute('path')
-                method = setting.get_attribute('method')
-                typee = setting.get_attribute('type')
-                view = setting.get_attribute('view')
-                layout = setting.get_attribute('layout')
+            for setting in routes:
+                path_attribute = setting.get('path')
+                method = setting.get('method')
+                typee = setting.get('type')
+                view = setting.get('view')
+                layout = setting.get('layout')
 
                 if view:
                     view = 'application/view/page/' + view
