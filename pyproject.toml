@@ -7,6 +7,12 @@ requires-python = ">=3.9"                # Versione minima di Python richiesta
 key = "my-secret-key"                    # Chiave segreta dell'app
 mode = "development"                     # Modalita applicazione development/production
 
+[project.policy]
+presentation = "web.toml"
+persistence = "redis.toml"
+message = "log.toml"
+
+
 # Configurazione della messaggistica
 [amessage.log]
 adapter = "console"

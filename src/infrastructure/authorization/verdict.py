@@ -1,4 +1,5 @@
 imports = {
+    'policy':'application/policy/presentation/web.toml',
     #'persistence': 'framework/port/authorization.py',
 }
 
@@ -13,13 +14,7 @@ class adapter():
         self.config = constants
         self._policies: Dict[str, Dict] = {}
         self._data_store: Dict[str, Any] = {}
-
-        # Caricamento iniziale dei dati e delle policy
-        self._data_store = self.load_data_store()
-        policy_data = self.load_policies()
-        for name, policy in policy_data.items():
-            self.load_policy(name, policy)
-
+        asyncio.create_task(self.load_policies())
 
     # ------------------------------
     # POLICY COMPILATION & LOADING
@@ -32,9 +27,12 @@ class adapter():
         return policy_data
 
     def load_policy(self, name: str, policy_data: Dict[str, Any]):
+        print(policy_data,name)
         """Carica una policy pre-compilata nella memoria."""
-        compiled_policy = self._compile(policy_data)
-        self._policies[name] = compiled_policy
+        '''if isinstance(policy_data, list):
+            policy_data = {"rules": policy_data}
+        compiled_policy = self._compile(policy_data)'''
+        self._policies[name] = policy_data
 
     # ------------------------------
     # POLICY EVALUATION (MistQL)
@@ -82,7 +80,7 @@ class adapter():
         Esegue la valutazione policy su un input. Ritorna True/False (first match allow).
         """
         if policy_name not in self._policies:
-            return False
+            raise Exception(f"Policy '{policy_name}' non trovata")
 
         # Crea il contesto completo unendo l'input e i dati di supporto
         context = {
@@ -90,9 +88,12 @@ class adapter():
             "data": self._data_store,
         }
 
-        for rule in self._policies[policy_name].get("rules", []):
+        '''for rule in self._policies[policy_name].get("rules", []):
             if self._evaluate_rule(rule, context):
-                return True
+                return True'''
+        
+        if self._evaluate_rule(self._policies[policy_name], context):
+            return True
 
         return False # Deny se nessuna regola 'allow' ha fatto match
 
@@ -100,40 +101,14 @@ class adapter():
     # MOCK PERSISTENCE LAYER
     # ------------------------------
 
-    def load_data_store(self) -> Dict[str, Any]:
-        """Dati di supporto statici (es. limiti di abbonamento)."""
-        return {
-            "limits": {
-                "free": {"max_download": 5},
-                "premium": {"max_download": 999}
-            }
-        }
-
-    async def load_policieee(self) -> Dict[str, Dict]:
-        text = await language.fetch(path="application/policy/presentation/web.toml")
+    async def load_policies(self) -> Dict[str, Dict]:
+        import framework.service.language as language
+        text = await language.resource(path="application/policy/presentation/web.toml")
         ok = await language.convert(text,dict,'toml')
-        print(ok)
-        return ok
-        
-
-    def load_policies(self) -> Dict[str, Dict]:
-        #language.fetch
-        """Definizione delle policy (le condizioni sono stringhe MistQL)."""
-        return {
-            "document_access": {
-                "rules": [
-                    {
-                        "effect": "allow",
-                        # Regola 1: documento PUBBLICATO E utente PREMIUM
-                        #"condition": 'input.resource.status == "PUBLISHED and true"'
-                        "condition": '(input.resource.status == "PUBLISHED") && ((input.principal.roles | find @ == "premium") != null)'
-                        #"condition": "(input.resource.status == \"PUBLISHED\") and (input.principal.roles | contains(\"premium\"))"
-                    },
-                    {
-                        "effect": "deny",
-                        # Regola 2 (Fallback Deny): sempre True, quindi blocca se la Regola 1 fallisce
-                        "condition": "true" 
-                    }
-                ]
-            }
-        }
+        policies = ok.get('policies')
+        data = ok.get('store')
+        self._data_store = data
+        for policy in policies:
+            name = policy.get('id')
+            self.load_policy(name, policy)
+        return policies
