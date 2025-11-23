@@ -1,4 +1,5 @@
-from kink import di
+from framework.service.context import container
+from dependency_injector import providers
 import importlib
 import tomli
 import sys
@@ -27,14 +28,9 @@ import socket
 import asyncio
 # Cache e stack per prevenire loop e ricaricamenti ripetuti
 # Ora registrati in DI per poterli sovrascrivere / mockare facilmente.
-if 'module_cache' not in di:
-    di['module_cache'] = {}
-    di['module_cache_lock'] = asyncio.Lock()
-if 'loading_stack' not in di:
-    di['loading_stack'] = set()
-
-if 'log_buffer' not in di:
-    di['log_buffer'] = []
+# Cache e stack per prevenire loop e ricaricamenti ripetuti
+# Ora registrati in DI per poterli sovrascrivere / mockare facilmente.
+# Gestiti da container.py
 
 # Context var per propagare il transaction id nei flussi asincroni
 _transaction_id: contextvars.ContextVar[Optional[str]] = contextvars.ContextVar('transaction_id', default=None)
@@ -55,7 +51,7 @@ def set_transaction_id(tx: Optional[str]) -> None:
 def buffered_log(level: str, message: str, emoji: str = ""):
     """Logger rudimentale che bufferizza i messaggi iniziali"""
     formatted = f"{emoji} {message}"
-    di['log_buffer'].append({
+    container.log_buffer().append({
         'level': level,
         'message': message,
         'emoji': emoji,
@@ -65,7 +61,7 @@ def buffered_log(level: str, message: str, emoji: str = ""):
     print(formatted)  # Mantiene output semplice durante il bootstrap
 
 def asynchronous(custom_filename: str = __file__, app_context = None,**constants):
-    inject = [di[manager] for manager in constants.get('managers', [])]
+    inject = [getattr(container, manager)() for manager in constants.get('managers', []) if hasattr(container, manager)]
     output = constants.get('outputs', [])
     input = constants.get('inputs', [])
     
@@ -112,8 +108,8 @@ def asynchronous(custom_filename: str = __file__, app_context = None,**constants
                 ok = await convert(report, str, 'json')
                 print(ok)
                 # Buffera anche il log strutturato con il transaction id
-                if 'messenger' in di:
-                    await di['messenger'].post(domain='error', message=e)
+                if hasattr(container, 'messenger'):
+                    await container.messenger().post(domain='error', message=e)
                 else:
                     buffered_log("ERROR", e, emoji="❌")
 
@@ -134,7 +130,7 @@ def asynchronous(custom_filename: str = __file__, app_context = None,**constants
 
 def synchronous(custom_filename: str = __file__, app_context = None,**constants):
     
-    inject = [di[manager] for manager in constants.get('managers', [])]
+    inject = [getattr(container, manager)() for manager in constants.get('managers', []) if hasattr(container, manager)]
     output = constants.get('outputs', [])
     input = constants.get('inputs', [])
     
@@ -286,11 +282,11 @@ def _check_single_import(module_name, allowed_prefixes, project_modules, layer, 
 
 
 def _get_module_cache() -> Dict[str, types.ModuleType]:
-    return di['module_cache']
+    return container.module_cache()
 
 
 def _get_loading_stack():
-    return di['loading_stack']
+    return container.loading_stack()
     
 class LogReportEncoder(json.JSONEncoder):
     """
@@ -1292,16 +1288,16 @@ async def _load_dependencies(module: types.ModuleType,dependencies) -> None:
         cache_key = import_path
         # Se è già nel cache, riutilizza (DEBUG). Proviamo anche la forma risolta ('src/...')
         if isinstance(import_path, str) and import_path.endswith('.py'):
-            if cache_key in di['module_cache']:
-                value = di['module_cache'][cache_key]
+            if cache_key in container.module_cache():
+                value = container.module_cache()[cache_key]
                 buffered_log("DEBUG", f"♻️ {cache_key} Cache hit modulo Python da {dir(value)}")
                 setattr(module, key, value)
                 buffered_log("DEBUG", f"♻️ Cache hit per dipendenza '{key}' da {cache_key}")
                 continue
             # Fallback: risolvi il percorso (es. 'framework/..' -> 'src/framework/...')
             alt_key = import_path
-            if alt_key in di['module_cache']:
-                value = di['module_cache'][alt_key]
+            if alt_key in container.module_cache():
+                value = container.module_cache()[alt_key]
                 buffered_log("DEBUG", f"♻️ {alt_key} Cache hit modulo Python da {dir(value)} (resolved)")
                 setattr(module, key, value)
                 buffered_log("DEBUG", f"♻️ Cache hit per dipendenza '{key}' da {alt_key} (resolved)")
@@ -1328,7 +1324,7 @@ async def _load_dependencies(module: types.ModuleType,dependencies) -> None:
             value = imported_content'''
         value = await resource(path=import_path)
         setattr(module, key, value)
-        di['module_cache'][import_path] = value
+        container.module_cache()[import_path] = value
         buffered_log("DEBUG", f"📦 Dipendenza '{key}' caricata da {import_path}")
 
 async def _load_python_module(name: str, path: str, code: str) -> types.ModuleType:
@@ -1337,7 +1333,7 @@ async def _load_python_module(name: str, path: str, code: str) -> types.ModuleTy
     module = types.ModuleType(module_name)
     module.__file__ = path
     module.__source__ = code
-    module.__dict__['language'] = di['module_cache'].get('framework/service/language.py')
+    module.__dict__['language'] = container.module_cache().get('framework/service/language.py')
 
     #if di['module_cache'].get('framework/service/language.py') is None:
     #    raise('errore modulo language = None')
@@ -1348,12 +1344,12 @@ async def _load_python_module(name: str, path: str, code: str) -> types.ModuleTy
     # modulo sotto test, troverà qui un ModuleType (parzialmente inizializzato)
     # invece di riavviare un caricamento ricorsivo.
     try:
-        async with di['module_cache_lock']:
-            di['module_cache'][path] = module
+        async with container.module_cache_lock():
+            container.module_cache()[path] = module
             buffered_log("DEBUG", f"♻️ Placeholder module inserito nella cache per {path} (pre-caricamento)")
     except Exception:
         # Fallback non-bloccante se il lock non è disponibile
-        di['module_cache'][path] = module
+        container.module_cache()[path] = module
 
     if module.__dict__['language'] is None and path not in ['src/framework/service/contract.test.py','src/framework/service/contract.py','src/framework/service/language.test.py','src/framework/service/language.py','framework/service/language.py']:
         buffered_log("WARNING", "⚠️ Modulo di lingua non caricato prima delle dipendenze.",path)
@@ -1372,7 +1368,7 @@ async def _load_python_module(name: str, path: str, code: str) -> types.ModuleTy
         compiled_code = compile(code, module_name, 'exec')
         exec(compiled_code, module.__dict__)
         # salva nel cache globale per riusi futuri (evita ricaricamenti ripetuti)
-        di['module_cache'][path] = module
+        container.module_cache()[path] = module
     except Exception as e:
         raise ImportError(f"Esecuzione modulo Python fallita per {path}: {e}") from e
     return module
@@ -1434,77 +1430,47 @@ async def load_di_entry(**constants: Any) -> None:
         return
     
     # 3. Inizializzazione della Chiave nel DI (se assente)
-    # Si usa una lambda che restituisce [] per poter collezionare Provider
-    if service_name not in di:
-        di[service_name] = lambda _di: []
+    if not hasattr(container, service_name):
+        setattr(container, service_name, providers.Singleton(list))
 
     
-        # 4. Caricamento del Modulo/Risorsa (Usando il path fornito)
-        print('################################',constants)
-        module = await resource(**constants)
-        print('------------------>',module)
-        resource_class: Callable = getattr(module, attribute_name)
+    # 4. Caricamento del Modulo/Risorsa (Usando il path fornito)
+    print('################################',constants)
+    module = await resource(**constants)
+    print('------------------>',module)
+    resource_class: Callable = getattr(module, attribute_name)
 
-        # 5. Definizione della Factory/Resolver
+    # 5. Definizione della Factory/Resolver
+    
+    if dependency_keys:
+        # --- CASO: MANAGER/FACTORY (Istanziamento lazy con dipendenze) ---
         
-        if dependency_keys:
-            # --- CASO: MANAGER/FACTORY (Istanziamento lazy con dipendenze) ---
-            
-            dependencies: Dict[str, Any] = {}
-            for dep_key in dependency_keys:
-                if dep_key not in di:
-                    di[dep_key] = lambda _di: []
-                    
-                # Salva il resolver della dipendenza
-                dependencies[dep_key] = di[dep_key]
-            
-            #print(f"⏳ Caricamento Manager: '{service_name}' ({log_info}) con dipendenze {dependencies}",dependency_keys)
-            di[service_name] = lambda _di: resource_class(**init_args|{'providers': dependencies})
-            buffered_log("INFO", f"✅✅✅✅ Registrato Factory: '{service_name}' ({log_info})")
+        dependencies: Dict[str, Any] = {}
+        for dep_key in dependency_keys:
+            if not hasattr(container, dep_key):
+                setattr(container, dep_key, providers.Singleton(list))
+                
+            # Salva il resolver della dipendenza
+            dependencies[dep_key] = getattr(container, dep_key)()
+        
+        #print(f"⏳ Caricamento Manager: '{service_name}' ({log_info}) con dipendenze {dependencies}",dependency_keys)
+        # Registra Factory
+        setattr(container, service_name, providers.Factory(resource_class, **init_args, providers=dependencies))
+        buffered_log("INFO", f"✅✅✅✅ Registrato Factory: '{service_name}' ({log_info})")
 
-        else:
-            # --- CASO: PROVIDER/SINGLETON (Istanziamento eager in una lista) ---
-            if service_name not in di:
-                di[service_name] = lambda di: list([])
-            print(constants,resource_class)
-            #provider = getattr(module, 'adapter')
-            di[service_name].append(resource_class(config=init_args))
-            
-            buffered_log("INFO", f"✅✅✅✅ Aggiunto Provider a lista: '{service_name}' ({log_info})")
     else:
-        print(service_name,'===============  in di')
-        # 4. Caricamento del Modulo/Risorsa (Usando il path fornito)
-        print('################################',constants)
-        module = await resource(**constants)
-        print('------------------>',module)
-        resource_class: Callable = getattr(module, attribute_name)
-
-        # 5. Definizione della Factory/Resolver
+        # --- CASO: PROVIDER/SINGLETON (Istanziamento eager in una lista) ---
+        if not hasattr(container, service_name):
+            setattr(container, service_name, providers.Singleton(list))
         
-        if dependency_keys:
-            # --- CASO: MANAGER/FACTORY (Istanziamento lazy con dipendenze) ---
-            
-            dependencies: Dict[str, Any] = {}
-            for dep_key in dependency_keys:
-                if dep_key not in di:
-                    di[dep_key] = lambda _di: []
-                    
-                # Salva il resolver della dipendenza
-                dependencies[dep_key] = di[dep_key]
-            
-            #print(f"⏳ Caricamento Manager: '{service_name}' ({log_info}) con dipendenze {dependencies}",dependency_keys)
-            di[service_name] = lambda _di: resource_class(**init_args|{'providers': dependencies})
-            buffered_log("INFO", f"✅✅✅✅ Registrato Factory: '{service_name}' ({log_info})")
-
-        else:
-            # --- CASO: PROVIDER/SINGLETON (Istanziamento eager in una lista) ---
-            if service_name not in di:
-                di[service_name] = lambda di: list([])
-            print(constants,resource_class)
-            #provider = getattr(module, 'adapter')
-            di[service_name].append(resource_class(config=init_args))
-            
-            buffered_log("INFO", f"✅✅✅✅ Aggiunto Provider a lista: '{service_name}' ({log_info})")
+        print(constants,resource_class)
+        #provider = getattr(module, 'adapter')
+        
+        # Recupera la lista e aggiungi l'istanza
+        service_list = getattr(container, service_name)()
+        service_list.append(resource_class(config=init_args))
+        
+        buffered_log("INFO", f"✅✅✅✅ Aggiunto Provider a lista: '{service_name}' ({log_info})")
 # =====================================================================
 # --- Funzioni Principali di Analisi ---
 # =====================================================================

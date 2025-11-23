@@ -17,7 +17,7 @@ async def main():
 
         try:
             lang = await language.resource(path="framework/service/language.py")
-            language.di['module_cache']['framework/service/language.py'] = lang
+            language.container.module_cache()['framework/service/language.py'] = lang
             # If loading succeeded, replace cache entry with the filtered module
         except Exception as e:
             print(e)

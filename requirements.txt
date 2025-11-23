@@ -1,4 +1,4 @@
-kink>=0.8.0
+dependency-injector>=4.41.0
 tomli>=2.0.2
 bs4>=0.0.2 
 pyodide-py>=0.25.1

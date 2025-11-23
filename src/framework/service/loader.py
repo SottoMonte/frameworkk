@@ -3,7 +3,7 @@ import sys
 import asyncio
 import logging
 from typing import Dict, Any, List, Optional
-from kink import di # Dependancy Injection
+from framework.service.context import container
 
 # 1. Configurazione del Logging per la Massima Debuggabilità (Principio 1)
 # Nomi chiari delle funzioni e messaggi di log descrittivi.
@@ -103,6 +103,7 @@ async def installa_dipendenze_browser() -> None:
 # ----------------------------------------------------------------------
 
 async def bootstrap_core(config) -> None:
+    manager_loader_path = config.get('managers', [])
     manager_loader_path = [
         {
             'path': 'framework/manager/messenger.py', # Percorso per resource'name': 'UserManager', # Chiave nel DI E nome della classe da estrarre
@@ -178,9 +179,10 @@ async def bootstrap_core(config) -> None:
         # Assumiamo che language.load_manager sollevi ResourceLoadError in caso di fallimento
         await language.register(**mgr)
 
-    dependency_messenger = di['messenger']
-    for log in di['log_buffer']:
-        await dependency_messenger.post(domain=log.get('level','DEBUG').lower(), message=log.get('message'))
+    if hasattr(container, 'messenger'):
+        dependency_messenger = container.messenger()
+        for log in container.log_buffer():
+            await dependency_messenger.post(domain=log.get('level','DEBUG').lower(), message=log.get('message'))
 
 async def bootstrap() -> None:
     """
@@ -213,8 +215,8 @@ async def bootstrap() -> None:
     
     await bootstrap_core(config)
     
-    dependency_executor = di['executor']
-    dependency_messenger = di['messenger']
+    dependency_executor = container.executor()
+    dependency_messenger = container.messenger()
 
     await dependency_messenger.post(domain='debug', message="✅ Manager di base (Messenger, Executor) caricati e pronti.")
 
@@ -266,10 +268,10 @@ async def bootstrap() -> None:
 
     # --- FASE DI AVVIO DEGLI ELEMENTI DI PRESENTAZIONE ---
     # Uso l'interfaccia DI a dizionario, assumendo sia stata configurata
-    if 'presentation' not in di:
+    if not hasattr(container, 'presentation'):
         await dependency_messenger.post(domain='warning', message="Nessun elemento di 'Presentazione' trovato nel DI. Fase di caricamento saltata.")
         return
-    presentation_elements: List[Any] = di["presentation"] 
+    presentation_elements: List[Any] = container.presentation() 
     event_loop = asyncio.get_event_loop()
     await dependency_messenger.post(domain='debug', message=f"Avvio dei caricatori ({len(presentation_elements)}) per gli elementi di Presentazione.")
     for item in presentation_elements:
