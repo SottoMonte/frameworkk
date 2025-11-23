@@ -195,7 +195,9 @@ if sys.platform != 'emscripten':
 
         try:
             with open(f"{path}", "r") as f:
-                return f.read()
+                content = f.read()
+                _validate_imports(content, path)
+                return content
         except FileNotFoundError:
             raise FileNotFoundError(f"File non trovato: {path}")
         except Exception as e:
@@ -211,6 +213,76 @@ else:
             return await resp.text()
         except Exception as e:
             raise FileNotFoundError(f"File non trovato (fetch fallito): {path}") from e
+
+
+
+def _validate_imports(content: str, file_path: str):
+    """
+    Validates that imports in the file respect the architectural layering rules.
+    """
+    # Determine the layer of the current file
+    layer = None
+    if 'src/application/' in file_path:
+        layer = 'application'
+    elif 'src/framework/' in file_path:
+        layer = 'framework'
+    elif 'src/infrastructure/' in file_path:
+        layer = 'infrastructure'
+    
+    if not layer:
+        return
+
+    # Rules: layer -> allowed prefixes
+    allowed_imports = {
+        'application': ['application'],
+        'framework': ['framework', 'application'],
+        'infrastructure': ['infrastructure', 'framework']
+    }
+    
+    allowed = allowed_imports.get(layer)
+    if not allowed:
+        return
+
+    project_modules = ['application', 'framework', 'infrastructure']
+
+    try:
+        tree = ast.parse(content, filename=file_path)
+    except SyntaxError:
+        return
+
+    for node in ast.walk(tree):
+        imported_module = None
+        if isinstance(node, ast.Import):
+            for alias in node.names:
+                imported_module = alias.name
+                _check_single_import(imported_module, allowed, project_modules, layer, node.lineno, file_path)
+        elif isinstance(node, ast.ImportFrom):
+            if node.module:
+                imported_module = node.module
+                _check_single_import(imported_module, allowed, project_modules, layer, node.lineno, file_path)
+        elif isinstance(node, ast.Assign):
+            for target in node.targets:
+                if isinstance(target, ast.Name) and target.id == 'imports':
+                    if isinstance(node.value, ast.Dict):
+                        for i, value in enumerate(node.value.values):
+                            if isinstance(value, ast.Constant) and isinstance(value.value, str):
+                                _check_single_import(value.value, allowed, project_modules, layer, node.lineno, file_path, is_path=True)
+
+def _check_single_import(module_name, allowed_prefixes, project_modules, layer, lineno, file_path, is_path=False):
+    if is_path:
+        # Convert path to module-like prefix for checking
+        # e.g. "application/policy/..." -> "application"
+        root_module = module_name.split('/')[0]
+    else:
+        root_module = module_name.split('.')[0]
+    
+    # Check if it is a project module
+    if root_module not in project_modules:
+        return # External or stdlib
+
+    # Check if allowed
+    if root_module not in allowed_prefixes:
+        raise ImportError(f"Import violation in {file_path} at line {lineno}: Layer '{layer}' cannot import '{module_name}'. Allowed: {allowed_prefixes}")
 
 
 def _get_module_cache() -> Dict[str, types.ModuleType]:

@@ -1,5 +1,4 @@
 imports = {
-    'policy':'application/policy/presentation/web.toml',
     #'persistence': 'framework/port/authorization.py',
 }
 

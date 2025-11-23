@@ -897,7 +897,7 @@ class adapter(presentation.port):
                 query = dict(request.query_params)
                 #await messenger.post(identifier=id,name=request.url.path[1:],value=dict(query))
                 #data = await messenger.get(identifier=id,name=request.url.path[1:],value=dict(query))
-                import application.action.gather as gather
+                #import application.action.gather as gather
                 
                 data = await gather.gather(messenger,storekeeper,model=query['model'],payload=query)
                 return JSONResponse(data)
