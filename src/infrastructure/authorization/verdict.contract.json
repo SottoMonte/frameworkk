@@ -1,7 +1,7 @@
 {
     "adapter": {
         "check": {
-            "test": "19f10eedd2e67518e8131f0143e467e88dc93ab5a52c3b993975ac0e54425090",
+            "test": "267cde42fdb849636f9511992d840faf0afe51f7e1a860cefe78b94ebf80408b",
             "production": "e4abd0a67107a9b4efc8c550895a0b677d5e056f98864e71ebdde9b1214e56ed"
         },
         "load_policy": {
@@ -10,7 +10,7 @@
         },
         "load_policies": {
             "test": "d7addbf5379cd0ad8f967be095622c0dc179e75be5d819d93519db8a7a11338c",
-            "production": "7fa8f65bea35914dca9b57c22c2458de1add49095255d82828b0779a049b643b"
+            "production": "4c2c2f2466d278c5015acd8f4acf5d7fc8bbfa06f151166b8036dae36530cb17"
         }
     }
 }

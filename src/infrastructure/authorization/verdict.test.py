@@ -11,8 +11,9 @@ class Testadapter(contract.Contract):
 
     async def test_check(self):
         import infrastructure.authorization.verdict as verdict
-        engine = verdict.adapter(config={})
-        #await engine.load_policies()
+        engine = verdict.adapter(config={'project':{'policy':
+            {'presentation':'web.toml'}
+        }})
         
         request_allow = {
             "principal": {

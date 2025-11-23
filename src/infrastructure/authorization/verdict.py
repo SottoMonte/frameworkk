@@ -11,7 +11,7 @@ import asyncio
 class adapter():
     
     def __init__(self, **constants):
-        self.config = constants
+        self.config = constants.get('config')
         self._policies: Dict[str, Dict] = {}
         self._data_store: Dict[str, Any] = {}
         asyncio.create_task(self.load_policies())
@@ -103,12 +103,12 @@ class adapter():
 
     async def load_policies(self) -> Dict[str, Dict]:
         import framework.service.language as language
-        text = await language.resource(path="application/policy/presentation/web.toml")
-        ok = await language.convert(text,dict,'toml')
-        policies = ok.get('policies')
-        data = ok.get('store')
-        self._data_store = data
-        for policy in policies:
-            name = policy.get('id')
-            self.load_policy(name, policy)
-        return policies
+        for domain,name in self.config.get('project').get('policy',{}).items():
+            text = await language.resource(path=f"application/policy/{domain}/{name}")
+            ok = await language.convert(text,dict,'toml')
+            policies = ok.get('policies')
+            data = ok.get('store')
+            self._data_store |= data
+            for policy in policies:
+                name = policy.get('id')
+                self.load_policy(name, policy)
