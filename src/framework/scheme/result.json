@@ -1,0 +1,28 @@
+{
+    "ok": {
+        "type": "boolean",
+        "description": "True se l'Action ha completato l'obiettivo di business; False altrimenti.",
+        "default": false
+    },
+    "data": {
+        "type": [
+            "dict",
+            "list",
+            "string",
+            "number",
+            "boolean",
+            "null"
+        ],
+        "default": null,
+        "description": "Il payload di successo: i dati di dominio puri generati o restituiti dall'Action. Deve essere NULL in caso di fallimento."
+    },
+    "error": {
+        "type": "dict",
+        "default": null,
+        "description": "L'oggetto errore standardizzato se ok è False. Deve essere NULL in caso di successo.",
+        "schema": {
+            "type": "dict",
+            "ref": "StandardErrorSchema"
+        }
+    }
+}
