@@ -1,0 +1,169 @@
+{
+    "latency_ms": {
+        "type": "float",
+        "required": true,
+        "min": 0,
+        "description": "Tempo per completare una singola operazione I/O, misurato in millisecondi (ms) o microsecondi (μs). Obiettivo: MINIMIZZARE."
+    },
+    "throughput_mbs": {
+        "type": "float",
+        "required": true,
+        "min": 0,
+        "description": "Velocità di trasferimento dati in MegaByte/secondo (MB/s) o GigaByte/secondo (GB/s). Obiettivo: MASSIMIZZARE."
+    },
+    "iops": {
+        "type": "integer",
+        "required": true,
+        "min": 0,
+        "description": "Input/Output Operations Per Second. Obiettivo: MASSIMIZZARE."
+    },
+    "error_rate_pct": {
+        "type": "float",
+        "required": true,
+        "min": 0,
+        "max": 100,
+        "description": "Tasso di Errore come percentuale (%). Obiettivo: MINIMIZZARE."
+    },
+    "availability_pct": {
+        "type": "float",
+        "required": true,
+        "min": 0,
+        "max": 100,
+        "description": "Disponibilità del servizio come percentuale (%). Obiettivo: MASSIMIZZARE."
+    },
+    "max_concurrent_conn": {
+        "type": "integer",
+        "required": false,
+        "min": 1,
+        "description": "Limite massimo di richieste simultanee che il servizio può gestire. Obiettivo: MASSIMIZZARE."
+    },
+    "storage_total_size": {
+        "type": "number",
+        "required": false,
+        "description": "Dimensione massima dello storage (Unità: TB o PB). Obiettivo: N/A."
+    },
+    "cost_per_unit": {
+        "type": "float",
+        "required": false,
+        "min": 0,
+        "description": "Costo per unità di I/O (Moneta/Unità). Obiettivo: MINIMIZZARE."
+    },
+    "service_tier": {
+        "type": "string",
+        "required": false,
+        "allowed": [
+            "SSD",
+            "HDD",
+            "PREMIUM",
+            "STANDARD",
+            "DEFAULT"
+        ],
+        "description": "Livello di servizio (Tier). Requisito: MATCH (Corrispondenza esatta)."
+    }
+}
+
+{
+    "service_name": {
+        "type": "string",
+        "required": true,
+        "empty": false,
+        "description": "Nome logico del servizio o della sua interfaccia (Port) richiesti (es. IStoreKeeperAdapter)."
+    },
+    "contract_id": {
+        "type": "string",
+        "required": false,
+        "description": "Identificativo unico del contratto SLA."
+    },
+    "vincoli_rigidi": {
+        "type": "list",
+        "required": false,
+        "default": [],
+        "description": "Requisiti obbligatori (Hard Constraints). Se non soddisfatti, il servizio viene SCARTATO (Filtering).",
+        "schema": {
+            "type": "dict",
+            "schema": {
+                "metric": {
+                    "type": "string",
+                    "required": true,
+                    "allowed": [
+                        "latency_ms",
+                        "latency_p99_ms",
+                        "throughput_mbs",
+                        "iops",
+                        "availability_pct",
+                        "error_rate_pct",
+                        "service_tier",
+                        "is_encrypted",
+                        "service_region",
+                        "max_concurrent_conn",
+                        "max_storage_used_pct"
+                    ],
+                    "description": "La metrica QoS su cui si applica il vincolo."
+                },
+                "operator": {
+                    "type": "string",
+                    "required": true,
+                    "allowed": [
+                        "<",
+                        "<=",
+                        "==",
+                        ">=",
+                        ">",
+                        "!="
+                    ],
+                    "description": "L'operatore logico (es. Latenza < 50, Tier == 'SSD')."
+                },
+                "value": {
+                    "type": [
+                        "float",
+                        "integer",
+                        "string",
+                        "boolean"
+                    ],
+                    "required": true,
+                    "description": "Il valore target del vincolo (il tipo deve corrispondere alla metrica)."
+                }
+            }
+        }
+    },
+    "preferenze": {
+        "type": "list",
+        "required": false,
+        "default": [],
+        "description": "Preferenze di ottimizzazione (Soft Constraints). Usate per il RANKING (Scoring) tra i servizi candidati idonei.",
+        "schema": {
+            "type": "dict",
+            "schema": {
+                "metric": {
+                    "type": "string",
+                    "required": true,
+                    "allowed": [
+                        "cost_per_unit",
+                        "latency_ms",
+                        "latency_p99_ms",
+                        "iops",
+                        "throughput_mbs"
+                    ],
+                    "description": "La metrica che deve essere ottimizzata."
+                },
+                "goal": {
+                    "type": "string",
+                    "required": true,
+                    "allowed": [
+                        "MINIMIZE",
+                        "MAXIMIZE"
+                    ],
+                    "description": "L'obiettivo: ridurre (MINIMIZE) o aumentare (MAXIMIZE)."
+                },
+                "weight": {
+                    "type": "integer",
+                    "required": false,
+                    "min": 1,
+                    "max": 10,
+                    "default": 5,
+                    "description": "Peso o priorità nel calcolo del punteggio finale (da 1 a 10)."
+                }
+            }
+        }
+    }
+}

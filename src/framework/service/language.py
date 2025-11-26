@@ -48,6 +48,14 @@ def set_transaction_id(tx: Optional[str]) -> None:
     else:
         _transaction_id.set(str(tx))
 
+# Context var per propagare i requirements dei servizi
+_requirements: contextvars.ContextVar[Dict[str, Any]] = contextvars.ContextVar('requirements', default={})
+
+def get_requirements() -> Dict[str, Any]:
+    """Restituisce i requirements correnti dal contextvar."""
+    return _requirements.get()
+
+
 def buffered_log(level: str, message: str, emoji: str = ""):
     """Logger rudimentale che bufferizza i messaggi iniziali"""
     formatted = f"{emoji} {message}"
@@ -61,6 +69,17 @@ def buffered_log(level: str, message: str, emoji: str = ""):
     print(formatted)  # Mantiene output semplice durante il bootstrap
 
 def asynchronous(custom_filename: str = __file__, app_context = None,**constants):
+    requirements = constants.get('requirements', {})
+    # Se ci sono kwargs extra che non sono 'managers', 'outputs', 'inputs', li consideriamo requirements
+    # O meglio, l'utente passerà requirements come kwargs diretti al decoratore?
+    # Il piano dice: "Update `asynchronous` to accept `**kwargs` (requirements)."
+    # Ma `asynchronous` accetta già `**constants`.
+    # Modifichiamo per estrarre i requirements dai constants.
+    
+    # Separiamo i parametri noti dai requirements
+    known_params = {'managers', 'outputs', 'inputs'}
+    requirements = {k: v for k, v in constants.items() if k not in known_params}
+    
     inject = [getattr(container, manager)() for manager in constants.get('managers', []) if hasattr(container, manager)]
     output = constants.get('outputs', [])
     input = constants.get('inputs', [])
@@ -69,6 +88,9 @@ def asynchronous(custom_filename: str = __file__, app_context = None,**constants
         @functools.wraps(function)
         async def wrapper(*args, **kwargs):
             wrapper._is_decorated = True
+            # Imposta i requirements nel contesto
+            req_token = _requirements.set(requirements)
+            
             #tx_token = get_transaction_id()
             #set_transaction_id(uuid.uuid4())
             try:
@@ -124,6 +146,7 @@ def asynchronous(custom_filename: str = __file__, app_context = None,**constants
                     TRANSACTION_ID_VAR.reset(tx_token)'''
                 #set_transaction_id(None)
                 set_transaction_id(uuid.uuid4())
+                _requirements.reset(req_token)
                 pass
         return wrapper
     return decorator

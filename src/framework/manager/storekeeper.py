@@ -1,5 +1,6 @@
 import asyncio
 import importlib
+from framework.service import language
 
 imports = {
 }
@@ -22,7 +23,35 @@ class storekeeper():
             return None, []
         
         
-        for provider in self.providers.get('persistence'):
+        # Recupera i requirements dal contesto
+        requirements = language.get_requirements()
+        
+        # Filtra i provider in base ai requirements
+        providers_list = self.providers.get('persistence', [])
+        selected_providers = []
+        
+        if not requirements:
+             selected_providers = providers_list
+        else:
+            for provider in providers_list:
+                capabilities = getattr(provider, 'capabilities', {})
+                match = True
+                for req_key, req_val in requirements.items():
+                    cap_val = capabilities.get(req_key)
+                    if cap_val != req_val:
+                        match = False
+                        break
+                if match:
+                    selected_providers.append(provider)
+            
+            # Se nessun provider soddisfa i requisiti, fallback a tutti o logica specifica?
+            # Per ora fallback a tutti se vuoto, o meglio loggare e non fare nulla?
+            # Se l'utente chiede 'low latency' e nessuno lo ha, forse non vuole 'high latency'.
+            # Manteniamo vuoto se non trovato, ma logghiamo.
+            if not selected_providers:
+                 print(f"Nessun provider soddisfa i requisiti: {requirements}")
+        
+        for provider in selected_providers:
             print(self.providers,provider)
             try:
                 profile = provider.config.get('profile', '').upper()

@@ -12,6 +12,7 @@ class adapter:
 
     def __init__(self, **constants):
         self.config = constants.get('config', {})
+        self.capabilities = {'latency': 'high', 'speed': 'low'}
 
     @flow.asynchronous(outputs='transaction')
     async def load(self, *services, **constants):

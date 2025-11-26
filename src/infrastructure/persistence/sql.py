@@ -18,6 +18,7 @@ class adapter(port.port):
 
     def __init__(self,**constants):
         self.config = constants['config']
+        self.capabilities = {'speed': 'medium', 'latency': 'medium'}
         self.engine = create_async_engine(f"mysql+asyncmy://{self.config['username']}:{self.config['password']}@{self.config['host']}/{self.config['name']}")
         #self.conn = self.engine.connect()
         self.metadata = db.MetaData()

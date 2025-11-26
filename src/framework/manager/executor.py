@@ -2,6 +2,7 @@ import asyncio
 from typing import List, Dict, Any, Callable
 import re
 import traceback
+from framework.service import language
 
 imports = {}
 
@@ -26,11 +27,54 @@ class executor:
     @language.asynchronous(managers=('messenger',))
     async def action(self, messenger, **constants):
         #await asyncio.sleep(5)
+        
+        # Recupera i requirements dal contesto
+        requirements = language.get_requirements()
+        
+        # Seleziona il provider migliore
+        provider = self._select_provider(requirements)
+        
+        if not provider:
+            # Fallback all'ultimo provider o gestisci errore
+            provider = self.providers[-1] if self.providers else None
+            
+        if provider:
+            await provider.actuate(**constants)
+        else:
+            await messenger.post(domain='error', message="Nessun provider disponibile per l'azione.")
 
-        await self.providers[-1].actuate(**constants)
-        '''await self.providers[-1].actuate(case_name,owner="SottoMonte",
-        repo="framework",
-        username= "SottoMonte",)'''
+    def _select_provider(self, requirements: Dict[str, Any]) -> Any:
+        """Seleziona il provider che meglio soddisfa i requirements."""
+        if not self.providers:
+            return None
+            
+        if not requirements:
+            return self.providers[-1] # Default behavior (last one) or first? Original code used -1.
+            
+        best_provider = None
+        best_score = -1
+        
+        for provider in self.providers:
+            score = 0
+            capabilities = getattr(provider, 'capabilities', {})
+            
+            # Calcola score basato su requirements e capabilities
+            # Esempio semplice: +1 per ogni match esatto
+            match = True
+            for req_key, req_val in requirements.items():
+                cap_val = capabilities.get(req_key)
+                if cap_val != req_val:
+                    match = False
+                    break
+            
+            if match:
+                # Se tutti i requirements sono soddisfatti, questo è un candidato.
+                # Potremmo avere logiche più complesse di scoring.
+                return provider
+                
+        # Se nessun match esatto, ritorna l'ultimo (fallback) o None?
+        # Per ora fallback all'ultimo come comportamento di default
+        return self.providers[-1]
 
         
 

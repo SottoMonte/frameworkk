@@ -10,6 +10,7 @@ class adapter(persistence.port):
     engine = None
     def __init__(self,**constants):
         self.config = constants['config'] 
+        self.capabilities = {'speed': 'high', 'latency': 'low'} 
         #self.conn = r.from_url(f"redis://{self.config['host']}:{self.config['port']}")
         self.conn = redis.Redis(
                 host=self.config.get('host'),

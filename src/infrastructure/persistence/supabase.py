@@ -32,6 +32,7 @@ class adapter:
     def __init__(self, **config):
         """Inizializza il client Supabase in base all'ambiente."""
         self.config = config.get('config', {})
+        self.capabilities = {'speed': 'low', 'latency': 'high'}
         self.is_frontend = SUPABASE_ENV == 'FRONTEND'
         self.client = None
         self.js_client = None
