@@ -22,7 +22,7 @@
         },
         "asynchronous": {
             "test": "04852c350ccbc650ed6163dae362594037c43129b6147cd879e12ff0fb94aee3",
-            "production": "da98320dde4a87dc4c946df1bb4377f6949225d60f966209df3cba2715c89b3a"
+            "production": "96943a21a4730af5088b3db92100a7f2f90b8183979295468442a2ef62cd70a8"
         },
         "synchronous": {
             "test": "fce4373a51afc6fe6396a125b184f4892c6ff02b6e4588023b5f3b2ded5e58dc",
@@ -46,7 +46,7 @@
         },
         "normalize": {
             "test": "88926acbb1b3ed6e19c5267e181ebe3ec52dc7717e3f3599a99fcbf64213b7e7",
-            "production": "4712e9408e4acbd2365e799d530ed626382c69cf2de9eddaf98c6baff02187e7"
+            "production": "b72fcf43f3e33901cc42483cbd9aa583766aedad79618c2ae17263f7a8309394"
         }
     }
 }

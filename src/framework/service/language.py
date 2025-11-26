@@ -26,6 +26,7 @@ from typing import Dict, Any, Optional, List, Callable
 import psutil
 import socket
 import asyncio
+import copy
 # Cache e stack per prevenire loop e ricaricamenti ripetuti
 # Ora registrati in DI per poterli sovrascrivere / mockare facilmente.
 # Cache e stack per prevenire loop e ricaricamenti ripetuti
@@ -77,13 +78,30 @@ def asynchronous(custom_filename: str = __file__, app_context = None,**constants
     # Modifichiamo per estrarre i requirements dai constants.
     
     # Separiamo i parametri noti dai requirements
+    # Separiamo i parametri noti dai requirements
     known_params = {'managers', 'outputs', 'inputs'}
     requirements = {k: v for k, v in constants.items() if k not in known_params}
     
     inject = [getattr(container, manager)() for manager in constants.get('managers', []) if hasattr(container, manager)]
     output = constants.get('outputs', [])
     input = constants.get('inputs', [])
+
+    # Determina il layer e lo schema di default se outputs non è specificato
     
+    schema_path = None
+    if 'src/application/' in custom_filename or custom_filename.startswith('application/'):
+        schema_path = 'framework/scheme/result.json'
+    elif 'src/framework/' in custom_filename or custom_filename.startswith('framework/'):
+        schema_path = 'framework/scheme/transaction.json'
+    #elif 'src/infrastructure/' in custom_filename or custom_filename.startswith('infrastructure/'):
+    #    schema_path = 'framework/scheme/io.json'
+    
+    if schema_path:
+            # Carichiamo lo schema in modo asincrono (ma qui siamo nel decoratore sincrono...)
+            # Dobbiamo caricarlo nel wrapper o usare una cache sincrona/lazy?
+            # container.module_cache() potrebbe averlo se precaricato, ma meglio caricarlo nel wrapper.
+            output = schema_path
+
     def decorator(function):
         @functools.wraps(function)
         async def wrapper(*args, **kwargs):
@@ -108,11 +126,18 @@ def asynchronous(custom_filename: str = __file__, app_context = None,**constants
                     outcome = await function(*args_inject, **kwargs)
                 else:
                     outcome = await function(*args_inject, **kwargs)
-                if 'outputs' in constants:
-                        #return await language.model(output, outcome, 'full', language)
-                    return outcome
+                
+                # Gestione Output con Schema
+                target_schema = output
+                if target_schema and isinstance(target_schema, dict):
+                    try:
+                        return await normalize(outcome, target_schema)
+                    except Exception as e:
+                        buffered_log("ERROR", f"Errore normalizzazione output in {function.__name__}: {e}")
+                        raise e
                 else:
                     return outcome
+
             except Exception as e:
                 tx_token = get_transaction_id()
                 #current_tx = TRANSACTION_ID_VAR.get()
@@ -407,12 +432,15 @@ async def normalize(value,schema, mode='full'):
     value = value or {}
 
     if not isinstance(schema, dict):
-        raise TypeError("Lo schema deve essere un dizionario valido per Cerberus.")
+        raise TypeError("Lo schema deve essere un dizionario valido per Cerberus.",schema)
+    if not isinstance(value, dict):
+        raise TypeError("I dati devono essere un dizionario valido per Cerberus.",value)
 
     # 1. Popolamento e Trasformazione Iniziale (Default, Funzioni)
     # Cerberus gestisce i 'default', ma le 'functions' richiedono un pre-processing
-    processed_value = value.copy() # Lavora su una copia per non modificare l'originale
-
+    #processed_value = value.copy() # Lavora su una copia per non modificare l'originale
+    #processed_value = copy.deepcopy(value)
+    processed_value = value
     for key in schema.copy():
         item = schema[key]
         for field_name, field_rules in item.copy().items():

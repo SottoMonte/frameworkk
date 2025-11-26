@@ -219,7 +219,7 @@ async def discover_and_run_tests():
     #config = await language.format(text,**{})
     config = await language.convert(text, dict, 'toml')
 
-    await loader.bootstrap_core(config)
+    #await loader.bootstrap_core(config)
     
     # 1. FASE DI SCOPERTA E GENERAZIONE HASH
     for root, dirs, files in os.walk(test_dir):
