@@ -6,7 +6,7 @@
             "function": "generate_identifier"
         }
     },
-    "state": {
+    "success": {
         "type": "boolean",
         "default": false
     },
@@ -21,10 +21,6 @@
             "function": "time_now_utc"
         }
     },
-    "remark": {
-        "type": "string",
-        "default": ""
-    },
     "worker": {
         "type": "string",
         "default": "unknown"
@@ -33,15 +29,23 @@
         "type": "dict",
         "default": {}
     },
-    "result": {
+    "errors": {
         "type": "list",
-        "default": [], 
-        "schema": { 
+        "default": [],
+        "_builder_options": {
+            "force_type": "dict",
+            "iterable": true
+        }
+    },
+    "results": {
+        "type": "list",
+        "default": [],
+        "schema": {
             "type": "dict"
         },
         "_builder_options": {
             "force_type": "dict",
-            "iterable": true 
+            "iterable": true
         }
     }
 }

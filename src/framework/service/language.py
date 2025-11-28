@@ -129,9 +129,19 @@ def asynchronous(custom_filename: str = __file__, app_context = None,**constants
                 
                 # Gestione Output con Schema
                 target_schema = output
-                if target_schema and isinstance(target_schema, dict):
+                
+                # Se lo schema è un percorso file, caricalo dinamicamente
+                if isinstance(target_schema, str):
                     try:
-                        return await normalize(outcome, target_schema)
+                        schema_content = await _load_resource(path=target_schema)
+                        target_schema = json.loads(schema_content)
+                    except Exception as e:
+                        buffered_log("ERROR", f"Errore caricamento schema da {output}: {e}")
+                        raise e
+
+                if target_schema and isinstance(target_schema, dict) and isinstance(outcome, dict):
+                    try:
+                        return await normalize({"action": wrapper.__name__,"parameters": kwargs}|outcome, target_schema)
                     except Exception as e:
                         buffered_log("ERROR", f"Errore normalizzazione output in {function.__name__}: {e}")
                         raise e
@@ -160,10 +170,7 @@ def asynchronous(custom_filename: str = __file__, app_context = None,**constants
                 else:
                     buffered_log("ERROR", e, emoji="❌")
 
-                
-
-                # Rilancia l'eccezione
-                #raise
+                return {"success": False, "errors": [str(e)],"action": wrapper.__name__,"parameters": kwargs}
 
             finally:
                 # 5. Ripristina il contesto quando il task termina
@@ -1465,7 +1472,6 @@ async def load_di_entry(**constants: Any) -> None:
     :param lang: La lingua da iniettare nella funzione 'resource'.
     :param constants: La configurazione della risorsa da caricare.
     """
-    print(constants,'=================')
     # 1. Estrazione dei parametri di configurazione
     path: str = constants.get('path', '')
     service_name: str = constants.get('service', constants.get('name', '')) 
@@ -1522,6 +1528,7 @@ async def load_di_entry(**constants: Any) -> None:
         service_list.append(resource_class(config=init_args))
         
         buffered_log("INFO", f"✅✅✅✅ Aggiunto Provider a lista: '{service_name}' ({log_info})")
+        return { "success": True, "results": [] }
 # =====================================================================
 # --- Funzioni Principali di Analisi ---
 # =====================================================================

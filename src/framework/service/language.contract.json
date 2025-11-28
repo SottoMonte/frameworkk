@@ -22,7 +22,7 @@
         },
         "asynchronous": {
             "test": "04852c350ccbc650ed6163dae362594037c43129b6147cd879e12ff0fb94aee3",
-            "production": "96943a21a4730af5088b3db92100a7f2f90b8183979295468442a2ef62cd70a8"
+            "production": "17cd4b7705a2ecdeff29710076ef905052998456f6052ccbfe56e06d84f6dd5f"
         },
         "synchronous": {
             "test": "fce4373a51afc6fe6396a125b184f4892c6ff02b6e4588023b5f3b2ded5e58dc",
@@ -30,7 +30,7 @@
         },
         "load_di_entry": {
             "test": "7606f09c8428f82d3ac96586a41ccb77d4a7741e5d29c095aac55a476d8a4629",
-            "production": "bbe6e66b507d95f3d5fbcc7684cac368c36260d57bfb27493c9212a39b033739"
+            "production": "d9a6b3a20bd9e7ed945d8d4899817ada35a07a65c6bfef702a2fb7edfb5936f6"
         },
         "format": {
             "test": "459a11bfc004b126b6178a6553fff37b1b6c55edf4b1b93f17c2424379cbb850",
