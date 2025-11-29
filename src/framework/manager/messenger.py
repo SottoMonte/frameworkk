@@ -11,8 +11,8 @@ class messenger():
         self.providers = constants['providers']['message']
         pass
 
-    @language.asynchronous(inputs='messenger',outputs='transaction')
-    async def post(self,**constants):
+    @language.asynchronous(inputs='messenger',managers=('executor',))
+    async def post(self, executor, **constants):
         '''operations = []
         map_tasks = dict()
         # email -> email | log,fs -> messaggio | app -> evento
@@ -39,8 +39,8 @@ class messenger():
             #domain_message = constants.get('domain',[])
             await provider.post(**constants)
 
-    #@flow.asynchronous(inputs='messenger',outputs='transaction')
-    async def read(self,**constants):
+    @language.asynchronous(inputs='messenger',managers=('executor',))
+    async def read(self, executor, **constants):
         prohibited = constants['prohibited'] if 'prohibited' in constants else []
         allowed = constants['allowed'] if 'allowed' in constants else ['FAST']
         operations = []
@@ -49,16 +49,14 @@ class messenger():
             profile = provider.config['profile'].upper()
             domain_provider = provider.config.get('domain','*').split(',')
             domain_message = constants.get('domain',[])
-            #print(f"Domain: {domain_message} - Provider: {domain_provider}",[match for item in domain_provider for match in language.wildcard_match(domain_message, item)])
-            #if len([match for item in domain_provider for match in language.wildcard_match(domain_message, item)]) > 0:
-            #if profile in allowed:
             task = asyncio.create_task(provider.read(location=profile,**constants))
             operations.append(task)
         
-        finished, unfinished = await asyncio.wait(operations, return_when=asyncio.FIRST_COMPLETED)
+        return await executor.first_completed(operations=operations)
+        '''finished, unfinished = await asyncio.wait(operations, return_when=asyncio.FIRST_COMPLETED)
         for operation in finished:
             return operation.result()
-        #return finished[0].result()
+        #return finished[0].result()'''
         '''while operations:
             
             finished, unfinished = await asyncio.wait(operations, return_when=asyncio.FIRST_COMPLETED)

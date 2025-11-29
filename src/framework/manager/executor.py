@@ -2,7 +2,6 @@ import asyncio
 from typing import List, Dict, Any, Callable
 import re
 import traceback
-from framework.service import language
 
 imports = {}
 
@@ -13,16 +12,6 @@ class executor:
         self.providers = constants.get('providers', [])
         #print('EXE-',self.providers)
         #asyncio.create_task(self.action(case="github.invite-collaborator"))
-    
-    @language.asynchronous(managers=('messenger',))
-    async def action2(self, messenger, **constants):
-        await asyncio.sleep(5)
-        #print('EXE2-',self.providers)
-        tasks = [x.load() for x in self.providers]
-        
-        #print(tasks)
-        await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
-        #await self.all_completed(tasks=tasks)
     
     @language.asynchronous(managers=('messenger',))
     async def action(self, messenger, **constants):
@@ -75,51 +64,6 @@ class executor:
         # Se nessun match esatto, ritorna l'ultimo (fallback) o None?
         # Per ora fallback all'ultimo come comportamento di default
         return self.providers[-1]
-
-        
-
-    '''@language.asynchronous(managers=('messenger',))
-    async def act(self, messenger, **constants) -> Dict[str, Any]:
-        """Esegue un'azione specifica caricando dinamicamente il modulo corrispondente."""
-        action = constants.get('action', '')
-        await messenger.post(domain='debug',message=f"🔄 Caricamento dell'azione: {action}")
-        
-        module = await language.load_module(
-                language,
-                path=f'application.action.{action}',
-                area='application',
-                service='action',
-                adapter=action
-        )
-        act = getattr(module, action)
-        result = await act(**constants)
-
-        await messenger.post(domain='debug',message=f"✅ Azione '{action}' eseguita con successo.")
-        return {"state": True, "result": result, "error": None}'''
-    @language.asynchronous(managers=('messenger',))
-    async def act2(self, messenger, **constants) -> Dict[str, Any]:
-        """Esegue un'azione specifica caricando dinamicamente il modulo corrispondente."""
-        action = constants.get('action', '')
-        await messenger.post(domain='debug', message=f"🔄 Caricamento dell'azione: {action}")
-
-        # Gestione action tipo 'create' o 'create.note'
-        parts = action.split('.')
-        module_path = f"application.action.{parts[0]}"
-        adapter = parts[0]
-        func_name = parts[1] if len(parts) > 1 else parts[0]
-
-        module = await language.load_module(
-            language,
-            path=module_path,
-            area='application',
-            service='action',
-            adapter=adapter
-        )
-        act_func = getattr(module, func_name)
-        result = await act_func(**constants)
-
-        await messenger.post(domain='debug', message=f"✅ Azione '{action}' eseguita con successo.")
-        return {"state": True, "result": result, "error": None}
 
     @language.asynchronous(managers=('messenger',))
     async def act(self, messenger, **constants) -> Dict[str, Any]:
@@ -174,36 +118,27 @@ class executor:
         operations = constants.get('operations', [])
         await messenger.post(domain='debug',message="⏳ Attesa della prima operazione completata...")
 
-        try:
-            while operations:
-                finished, unfinished = await asyncio.wait(operations, return_when=asyncio.FIRST_COMPLETED)
+        while operations:
+            finished, unfinished = await asyncio.wait(operations, return_when=asyncio.FIRST_COMPLETED)
 
-                for operation in finished:
-                    try:
-                        transaction = operation.result()
-                        print(transaction,'<------------------')
-                        if transaction:
-                            print(f"Transazione completata: {type(transaction)}")
-                            if 'success' in constants:
-                                transaction = await constants['success'](transaction=transaction,profile=operation.get_name())
-                            await messenger.post(domain='debug',message=f"✅ Transazione completata: {str(transaction)}")
-                            for task in unfinished:
-                                task.cancel()
-                            transaction['parameters'] = operation.parameters
-                            return transaction
-                    except Exception as e:
-                        await messenger.post(domain='debug',message=f"❌ Errore nell'operazione: {e}")
+            for operation in finished:
+                transaction = operation.result()
+                print(transaction,'<------------------')
+                if transaction:
+                    print(f"Transazione completata: {type(transaction)}")
+                    if 'success' in constants:
+                        transaction = await constants['success'](transaction=transaction,profile=operation.get_name())
+                    await messenger.post(domain='debug',message=f"✅ Transazione completata: {str(transaction)}")
+                    for task in unfinished:
+                        task.cancel()
+                    transaction['parameters'] = operation.parameters
+                    return transaction
 
                 operations = unfinished
 
             error_msg = "⚠️ Nessuna transazione valida completata"
             await messenger.post(domain='debug',message=error_msg)
-            return {"state": False, "result": None, "error": error_msg}
-
-        except Exception as e:
-            error_msg = f"❌ Errore in first_completed: {str(e)}"
-            await messenger.post(domain='debug',message=error_msg)
-            return {"state": False, "result": None, "error": error_msg}
+            return {"success": False, "error": [error_msg]}
 
     @language.asynchronous(managers=('messenger',))
     async def all_completed(self, messenger, **constants) -> Dict[str, Any]:

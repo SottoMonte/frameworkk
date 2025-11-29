@@ -27,13 +27,10 @@ class defender:
         session = dict({'ip':constants.get('ip'),'identifier':constants.get('identifier')})
         for backend in self.providers.get('authentication'):
             provider_persistence = backend.config.get('persistence')
-            try:
-                session |= await backend.authenticate(**constants)
-                if provider_persistence:
-                    await storekeeper.store(repository='sessions',payload=session)
-                    pass
-            except Exception as e:
-                print(f"⚠️ Errore durante l'autenticazione con {backend}: {e}")
+            session |= await backend.authenticate(**constants)
+            if provider_persistence:
+                await storekeeper.store(repository='sessions',payload=session)
+                pass
         return session
 
     async def registration(self, **constants) -> Any:
@@ -49,8 +46,8 @@ class defender:
             token = await backend.registration(**constants)
             if token:
                 self.sessions[identifier] = {'token': token, 'ip': ip}
-                return token
-        return None
+                return {'success': True,'results':[token]}
+        return {'success': False}
 
     async def authenticated(self, **constants) -> bool:
         """

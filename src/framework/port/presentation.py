@@ -112,9 +112,6 @@ class port(ABC):
 
         if 'user' not in constants:
             user = await defender.whoami(storekeeperr,identifier=constants.get('identifier'))
-            print('BOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOM',user)
-        
-            #constants['user'] = user
         else:
             user = {}
         
