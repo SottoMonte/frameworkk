@@ -27,6 +27,7 @@ import psutil
 import socket
 import asyncio
 import copy
+import framework.service.flow as flow
 # Cache e stack per prevenire loop e ricaricamenti ripetuti
 # Ora registrati in DI per poterli sovrascrivere / mockare facilmente.
 # Cache e stack per prevenire loop e ricaricamenti ripetuti
@@ -1442,9 +1443,14 @@ async def resource(**kwargs) -> Any:
         lang (str): La lingua da iniettare nei moduli Python.
         path (str | None): Il percorso della risorsa.
     """
+    
     resource_path = kwargs.get('path', '')
     content = await _load_resource(path=resource_path)
-    if resource_path.endswith(".json"):
+    return await flow.switch(resource_path,{
+        '':convert(content, dict, 'json'),
+        '':flow.pipe(content,_load_python_module,_validate_and_filter_module)
+    },lambda x: x)
+    '''if resource_path.endswith(".json"):
         buffered_log("INFO", f"📄 Caricamento e parsing JSON da {resource_path}... type={type(content)}")
         return await convert(content, dict, 'json')
     
@@ -1458,7 +1464,7 @@ async def resource(**kwargs) -> Any:
         buffered_log("DEBUG", f"📦 Modulo Python caricato e validato da {resource_path}.")
         return filtered_module
     buffered_log("WARNING", f"⚠️ Tipo di risorsa non supportato per {resource_path}. Restituito contenuto grezzo.")
-    return content
+    return content'''
 
 #@asynchronous()
 async def load_di_entry(**constants: Any) -> None:

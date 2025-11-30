@@ -2,11 +2,11 @@
     "defender": {
         "authenticate": {
             "test": "d32e94550da96a2a8f9764e0a1b57223de400e401da2c92444ac93f827a86110",
-            "production": "b6d09b2a77491ac3214fdd6052c85264c7670286687242ea3f353dacd9de12af"
+            "production": "a06ec1462ee31b570a3b818c49ad0c288bb00b616794d956bffad7e00cfe57c5"
         },
         "registration": {
             "test": "63e74817d26c8ad1c8b61daf010cb7e26d93d5202a6186868c238ecf5d118a3a",
-            "production": "e9deef11e7e477abef643b345812d3d68661177994abce971e9d3394516d0561"
+            "production": "3fdab4c3c353991a96db37f4fac0bdfbaaed7188d8f97708f5668818035b32ee"
         },
         "whoami": {
             "test": "d832685f04a08ccf067c1a37cf8c2437c0aca5905169f5e3c9c80000694b587d",

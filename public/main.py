@@ -34,5 +34,6 @@ async def main():
     return run
 if __name__ == "__main__":
     run = asyncio.run(main())
+    print(run)
     run.application(args=sys.argv)
     

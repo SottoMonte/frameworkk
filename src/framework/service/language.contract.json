@@ -22,7 +22,7 @@
         },
         "asynchronous": {
             "test": "04852c350ccbc650ed6163dae362594037c43129b6147cd879e12ff0fb94aee3",
-            "production": "17cd4b7705a2ecdeff29710076ef905052998456f6052ccbfe56e06d84f6dd5f"
+            "production": "f94576931ab5ad9df2469c78f0e37f99d24d6f081a401c2e0e6edac7fc0a90a9"
         },
         "synchronous": {
             "test": "fce4373a51afc6fe6396a125b184f4892c6ff02b6e4588023b5f3b2ded5e58dc",

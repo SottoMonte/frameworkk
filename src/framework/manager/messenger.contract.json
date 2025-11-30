@@ -2,11 +2,11 @@
     "messenger": {
         "post": {
             "test": "7db7747f2c4e1b4c5b3d00f8b7e2efd4de6b38c0c7c6e103c13b59ab40ec9566",
-            "production": "4860e0c644f48c78fbb068c38643b4a972565253055cf94e871653a3623ffd38"
+            "production": "ee54799dc4b94df7b2ac00e21622f26699ae51f6c9b198f10b8a70707e54b181"
         },
         "read": {
             "test": "d8f4dccb7bfce541b30e10780bc1af20e817b9fe4bc6b8e57ebc1229c8984f66",
-            "production": "ba2fe43c718443bb40267ae8d9f919f4c4a1948fcd8957e4375b68c6fbc9d0bc"
+            "production": "bb5bb627590f5d24e14e0222f7435d2cd0eccc930e5c114e1e017e41e2f2f5e6"
         }
     }
 }
