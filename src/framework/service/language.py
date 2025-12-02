@@ -1447,9 +1447,17 @@ async def resource(**kwargs) -> Any:
     resource_path = kwargs.get('path', '')
     content = await _load_resource(path=resource_path)
     return await flow.switch(resource_path,{
-        '':convert(content, dict, 'json'),
-        '':flow.pipe(content,_load_python_module,_validate_and_filter_module)
-    },lambda x: x)
+        'match (regex ".json") @':flow.step(convert,content, dict, 'json'),
+        'match (regex ".py") @':flow.step(flow.pipe,
+            resource_path,
+            flow.step(_load_python_module,'main_module','input',content),
+            flow.step(flow.switch,'outputs',{
+                '@ | match (regex ".test.py")':flow.step(lambda x: x),
+                'true':flow.step(_validate_and_filter_module,'@',resource_path),
+            }),
+        ),
+    })
+
     '''if resource_path.endswith(".json"):
         buffered_log("INFO", f"📄 Caricamento e parsing JSON da {resource_path}... type={type(content)}")
         return await convert(content, dict, 'json')
