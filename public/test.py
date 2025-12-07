@@ -1,6 +1,7 @@
 from lark import Lark, Transformer, v_args, Token
 import json
 import pprint
+import mistql
 
 # ----------------------------------------------------------------------
 # --- 1. Definizione della Grammatica (DSL Rules) - CORRETTA V18 ---
@@ -29,6 +30,8 @@ grammar = r"""
     #COMPLEX: complex
     #BOOLEAN: boolean
     #STRING: string
+
+    property_access: (CNAME | ESCAPED_STRING) ("." (CNAME | ESCAPED_STRING))*
 
     value: SIGNED_NUMBER -> number
         | ESCAPED_STRING -> string
@@ -292,7 +295,8 @@ class DSLVisitor:
             try:
                 # Valuta la stringa come espressione Python
                 # Permette operazioni base (a + b, ecc)
-                val = eval(str(expr_str), {}, local_context)
+                #val = eval(str(expr_str), {}, local_context)
+                val = mistql.query(str(expr_str), data=local_context)
                 local_context[str(key)] = val
             except Exception as e:
                 print(f"Errore valutazione espressione '{expr_str}': {e}")
@@ -360,12 +364,12 @@ file_input = """
     # Inputs: (type:name, ...)
     # Body: { output_var: "expression"; }  <-- Semicolon required
     somma_dsl: (integer:a, integer:c), { res: "a + c"; }, (integer:res);
-    moltiplica_dsl: (integer:a, integer:c), { res: "a * c"; }, (integer:res);
+    moltiplica_dsl: (integer:a, integer:c), { res: "a + c"; }, (integer:res);
     
     # --- Utilizzo in Pipeline ---
     # (100, 200) -> somma_dsl (esegue a+b=300) -> raddoppia (600) -> print
     test_dsl_func: (100, 200) | somma_dsl | raddoppia | print; 
-    test_dsl_func2: (100, 200) | moltiplica_dsl | raddoppia | print;
+    test_dsl_func2: (100, 200) | moltiplica_dsl | print;
 }
 """
 
