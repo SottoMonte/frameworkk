@@ -1,7 +1,0 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<Routes prefix="/api" path="/api" >
-    <Route path="/login" type="login" method="POST" />
-    <Route path="/logout" type="logout" method="POST" />
-    <Route path="/" type="view" view="application/view/layout/app.xml" method="GET" />
-    <Route path="/gather" type="action" method="GET" policy="" />
-</Routes>

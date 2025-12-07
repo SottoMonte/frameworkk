@@ -356,20 +356,71 @@ dsl_functions = {
 
 file_input = """
 {
-    numeri: 100;
-    stringa: "ciao";
+    # ----------------------------------------------------------------------
+    # --- 1. Dati Iniziali (Carrello) ---
+    # ----------------------------------------------------------------------
     
-    # --- Definizione Funzione DSL ---
-    # somma: (Inputs), { Body }, (Returns)
-    # Inputs: (type:name, ...)
-    # Body: { output_var: "expression"; }  <-- Semicolon required
-    somma_dsl: (integer:a, integer:c), { res: "a + c"; }, (integer:res);
-    moltiplica_dsl: (integer:a, integer:c), { res: "a + c"; }, (integer:res);
+    # Input: Tupla (ID Prodotto, Quantità, Prezzo Unitario)
+    dati_carrello: ("PROD_007", 2, 50.00);
     
-    # --- Utilizzo in Pipeline ---
-    # (100, 200) -> somma_dsl (esegue a+b=300) -> raddoppia (600) -> print
-    test_dsl_func: (100, 200) | somma_dsl | raddoppia | print; 
-    test_dsl_func2: (100, 200) | moltiplica_dsl | print;
+    # Costante di Spedizione usata nelle formule
+    COSTO_SPEDIZIONE: 10.00;
+    
+    # ----------------------------------------------------------------------
+    # --- 2. Logica di Business Definite nel DSL (Usando MistQL) ---
+    # ----------------------------------------------------------------------
+    
+    # Funzione DSL: Calcola il totale del carrello
+    # Input atteso: Una tupla (id, quantità, prezzo)
+    calcola_totale: 
+        (string:id, integer:quantita, float:prezzo), 
+        { 
+            # Corpo: MistQL esegue la moltiplicazione. 
+            # Nota: il risultato finale è una tupla che mantiene id e prezzo originale
+            # ma aggiorna il totale finale calcolato.
+            risultato_totale: "quantita * prezzo"; 
+        }, 
+        (string:id, integer:quantita, float:prezzo, float:risultato_totale); 
+        # Output: (ID, Qta, Prezzo, Totale Lordo)
+
+    
+    # Funzione DSL: Applica le spese di spedizione
+    # Input atteso: Una tupla (id, quantità, prezzo, totale_lordo)
+    applica_spedizione:
+        (string:id, integer:quantita, float:prezzo, float:totale_lordo), 
+        {
+            # Corpo: MistQL esegue l'addizione.
+            # Nota: 'COSTO_SPEDIZIONE' deve essere accessibile nel contesto locale/globale.
+            risultato_netto: "totale_lordo + COSTO_SPEDIZIONE"; 
+        },
+        (string:id, float:risultato_netto); 
+        # Output: (ID, Totale Netto)
+
+
+    # ----------------------------------------------------------------------
+    # --- 3. Azione di Business (Flusso di Lavoro) ---
+    # ----------------------------------------------------------------------
+    
+    azione_checkout: dati_carrello
+        
+        # 1. Calcola il totale lordo (Funzione DSL)
+        | calcola_totale 
+        
+        # 2. Aggiunge le spese di spedizione (Funzione DSL)
+        | applica_spedizione 
+        
+        # 3. Finalizza la transazione (Funzione Python mappata per I/O)
+        | registra_transazione
+        
+        # 4. Notifica l'utente e stampa (Funzioni Python mappate per I/O)
+        | invia_email
+        | print; 
+        
+    # ----------------------------------------------------------------------
+    # --- 4. Output Finale ---
+    # ----------------------------------------------------------------------
+
+    risultato_transazione: azione_checkout;
 }
 """
 
