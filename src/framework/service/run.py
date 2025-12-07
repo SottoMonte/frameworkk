@@ -216,6 +216,7 @@ async def discover_and_run_tests():
 
     #di['module_cache']['framework/service/language.py'] = language
     text = await language.resource(path="pyproject.toml")
+    print(text,'ok')
     #config = await language.format(text,**{})
     config = await language.convert(text, dict, 'toml')
 

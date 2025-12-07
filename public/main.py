@@ -11,9 +11,19 @@ async def main():
         cwd = os.getcwd()
         sys.path.insert(1, cwd+'/src')
         import framework.service.language as language
+        import framework.service.flow as flow
 
         # Seed the DI cache with the imported module so dynamically loaded
         # modules that ask for `language` during their own import don't see None.
+        return await flow.pipe('',
+            flow.step(language.resource, path="framework/service/language.py"),
+            #flow.step(lambda lang: language.container.module_cache()['framework/service/language.py'] = lang),
+            flow.step(flow.catch, 
+                flow.step('@.fetch', path="framework/service/run.py"),
+                flow.step(language.resource, path="framework/service/run.py"),
+                context='@'
+            )
+        )
 
         try:
             lang = await language.resource(path="framework/service/language.py")
@@ -27,7 +37,7 @@ async def main():
             run = await lang.fetch(path="framework/service/run.py")
         except Exception as e:
             print(e)
-            raise('ssss')
+            #raise('ssss')
             run = await language.resource(path="framework/service/run.py")
             pass
     

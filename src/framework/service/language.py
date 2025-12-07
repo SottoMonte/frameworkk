@@ -155,7 +155,7 @@ def asynchronous(custom_filename: str = __file__, app_context = None,**constants
                 source_code = await _load_resource(path="/"+custom_filename)
 
                 # Genera il rapporto usando l'eccezione attiva
-                report = analyze_exception(
+                '''report = analyze_exception(
                     source_code=source_code,
                     custom_filename=custom_filename,
                     app_context=app_context
@@ -164,10 +164,11 @@ def asynchronous(custom_filename: str = __file__, app_context = None,**constants
                 #report['TRANSACTION_ID'] = tx
                 
                 ok = await convert(report, str, 'json')
-                print(ok)
+                print(ok)'''
                 # Buffera anche il log strutturato con il transaction id
                 if hasattr(container, 'messenger'):
-                    await container.messenger().post(domain='error', message=e)
+                    #await container.messenger().post(domain='error', message=e)
+                    pass
                 else:
                     buffered_log("ERROR", e, emoji="❌")
 
@@ -1448,14 +1449,14 @@ async def resource(**kwargs) -> Any:
     content = await _load_resource(path=resource_path)
     return await flow.switch(resource_path,{
         'match (regex ".json") @':flow.step(convert,content, dict, 'json'),
-        'match (regex ".py") @':flow.step(flow.pipe,
-            resource_path,
+        'match (regex ".py") @':flow.step(flow.pipe,resource_path,
             flow.step(_load_python_module,'main_module','input',content),
             flow.step(flow.switch,'outputs',{
-                '@ | match (regex ".test.py")':flow.step(lambda x: x),
+                '@ | match (regex ".test.py")':flow.step(lambda x: x,'@'),
                 'true':flow.step(_validate_and_filter_module,'@',resource_path),
             }),
         ),
+        'true':flow.step(lambda : content),
     })
 
     '''if resource_path.endswith(".json"):

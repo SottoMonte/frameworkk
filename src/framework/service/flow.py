@@ -20,66 +20,123 @@ I/O (Punto di Ingresso): trigger,data
 
 '''
 
+def get(data, domain, default=None):
+    """
+    Ottiene dati da un oggetto (dict, list, module o object) usando una 
+    stringa di accesso puntata (dotted accessor-string), restituendo 
+    'default' solo se il percorso non viene trovato.
+    """
+    
+    # 1. Controllo del tipo iniziale
+    # Rimuoviamo il TypeError iniziale per consentire moduli e altri oggetti.
+    current_data = data
+    
+    # Se il dato iniziale è None o la stringa di dominio è vuota/None, restituisci l'oggetto stesso.
+    if current_data is None or not domain:
+        return current_data
+
+    # 2. Iterazione sui "chunk" della stringa di accesso
+    for chunk in domain.split('.'):
+        
+        # Gestisce i casi in cui current_data diventa None durante l'iterazione
+        if current_data is None:
+            return default
+            
+        # A. Gestione delle liste (accesso tramite indice numerico)
+        if isinstance(current_data, list):
+            try:
+                index = int(chunk)
+                current_data = current_data[index]
+            except (IndexError, ValueError, TypeError):
+                # Indice non valido o current_data non è una lista
+                return default
+                
+        # B. Gestione dei dizionari (accesso tramite chiave)
+        elif isinstance(current_data, dict):
+            if chunk in current_data:
+                current_data = current_data[chunk]
+            else:
+                # Chiave non presente nel dizionario
+                return default
+                
+        # C. Gestione di Moduli/Oggetti (accesso tramite attributo, es. modulo.attributo)
+        # Questo cattura oggetti generici, moduli, classi e istanze.
+        elif hasattr(current_data, '__iter__'):
+            # Usa getattr() per accedere all'attributo. 
+            # Il default di getattr è un oggetto 'sentinella' per distinguere
+            # tra attributo non trovato e un attributo che è None.
+            sentinel = object() 
+            current_data = getattr(current_data, chunk, sentinel)
+            
+            if current_data is sentinel:
+                # L'attributo non è stato trovato nell'oggetto/modulo
+                return default
+        
+        # D. Caso non gestito (il dato non è più navigabile)
+        else:
+            # Se un oggetto non è navigabile (ad esempio, un int, str, float)
+            return default
+    
+    # 3. Restituisce il valore finale
+    return current_data
+
+async def _execute_step_internal(action_step,context=dict()) -> Any:
+    """
+    Esegue un'azione (funzione, args, kwargs) fornita da 'step', 
+    senza il contesto completo del pipe.
+    """
+        
+    fun = action_step[0]
+    args = action_step[1] if len(action_step) > 1 else ()
+    kwargs = action_step[2] if len(action_step) > 2 else {}
+    if isinstance(fun, str):
+        print("funzione##############################################à",context,fun)
+        fun = get({'@':context}, fun)
+    aaa = []
+    for arg in args:
+        if isinstance(arg, str) and "@" in arg:
+            aaa.append(get({'@':context}, arg))
+        else:
+            aaa.append(arg)
+    args = tuple(aaa)
+
+    kkk = {}
+    for k, v in kwargs.items():
+        if isinstance(v, str) and "@" in v:
+            kkk[k] = get({'@':context}, v)
+        else:
+            kkk[k] = v
+    kwargs = kkk
+
+    if not isinstance(action_step, tuple) or len(action_step) < 2 or not callable(action_step[0]):
+        raise TypeError("L'azione fornita non è un formato step valido.",fun,args,kwargs)
+
+    try:
+        if asyncio.iscoroutinefunction(fun):
+            return await fun(*args, **kwargs)
+        return fun(*args, **kwargs)
+    except Exception as e:
+        # Implementazione minimale ROP per gli errori
+        return {"ok": False, "error": str(e), "function": fun.__name__}
+
 def step(func, *args, **kwargs):
     return (func, args, kwargs)
 
-async def pipe(initial_data, *stages):
+async def pipe(*stages,context=dict()):
     """
     Orchestra un flusso dichiarativo, chiamando le funzioni in sequenza.
     Ogni stage deve essere fornito nel formato: (funzione, args_tuple, kwargs_dict).
     Le sorgenti supportate sono: 'input', 'output' o valori letterali.
     """
-    context = {
-        'input': initial_data,
-        'outputs': [],
-    }
+    context |= {'outputs': []}
+    #context = {'@': context}
     stage_index = 0
     final_output = None
     
     for stage_tuple in stages:
         stage_index += 1
-        func = stage_tuple[0]
-        pos_sources = stage_tuple[1] # Tupla per args posizionali
-        kw_sources = stage_tuple[2]  # Dizionario per kwargs
-        
-        # --- Funzione Helper per Risolvere la Sorgente ---
-        def resolve_source(source, is_kwarg) -> Any:
-            if source == 'outputs':
-                if not context['outputs']:
-                    scope = "Kwarg" if is_kwarg else "Arg"
-                    raise ValueError(f"Stage {stage_index} {scope} richiede 'output', ma non ci sono stage precedenti.")
-                return context['outputs'][-1]
-
-            elif source == 'input':
-                return context['input']
-            
-            else:
-                # Argomento letterale
-                return source 
-
-        # 1. Risoluzione Argomenti Posizionali (call_args)
-        call_args = [resolve_source(source, is_kwarg=False) for source in pos_sources]
-        
-
-        # 2. Risoluzione Argomenti per Parola Chiave (call_kwargs)
-        call_kwargs = {}
-        for key, source in kw_sources.items():
-            call_kwargs[key] = resolve_source(source, is_kwarg=True)
-
-        # 3. Esecuzione della Funzione
-        try:
-            #print(f"Stage {stage_index}: Chiamata a {func.__name__}(args={call_args}, kwargs={call_kwargs})")
-            if asyncio.iscoroutinefunction(func):
-                outcome = await func(*call_args, **call_kwargs)
-            else:
-                outcome = func(*call_args, **call_kwargs)
-
-        except Exception as e:
-            print(f"ERRORE nello stage {stage_index} ({func.__name__}): {e}")
-            return {"ok": False, "error": str(e), "stage": stage_index}
-
-        # 4. Aggiornamento del Contesto di Stato (Logica ROP)
-        
+        outcome = await _execute_step_internal(stage_tuple,context)
+        print("outcome",outcome,"<---------------------")
         if isinstance(outcome, dict) and outcome.get('ok') is True and 'data' in outcome:
             data_to_pass = outcome['data']
         else:
@@ -141,7 +198,7 @@ async def match_result(outcome: Dict[str, Any], on_success: Callable, on_failure
             return await on_failure(outcome.get('error'))
         return on_failure(outcome.get('error'))
 
-async def smart_retry(func: Callable, max_attempts: int = 3, retryable_errors: List[str] = None, *args, **kwargs) -> Dict[str, Any]:
+async def retry(func , max_attempts: int = 3, retryable_errors: List[str] = None, context=dict()) -> Dict[str, Any]:
     """
     Esegue una funzione che ritorna 'transaction.json'.
     Se 'success' è False, analizza gli errori e decide se riprovare.
@@ -163,10 +220,7 @@ async def smart_retry(func: Callable, max_attempts: int = 3, retryable_errors: L
         retryable_errors = ['timeout', 'connection', 'network', 'busy', 'unavailable']
         
     for attempt in range(max_attempts):
-        if asyncio.iscoroutinefunction(func):
-            transaction = await func(*args, **kwargs)
-        else:
-            transaction = func(*args, **kwargs)
+        transaction = await _execute_step_internal(func,context)
             
         last_transaction = transaction
         
@@ -296,7 +350,7 @@ async def gather_results(functions_list: List[Callable]) -> Dict[str, Any]:
         "error": failures if failures else None
     }
 
-async def guard(condition: str, data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+async def guard(condition: str, context=dict()) -> Optional[Dict[str, Any]]:
     """
     Verifica una pre-condizione usando MistQL.
     
@@ -312,15 +366,15 @@ async def guard(condition: str, data: Dict[str, Any]) -> Optional[Dict[str, Any]
     
     try:
         # Esegue la query MistQL sui dati forniti
-        if type(data) not in [str, int, float, bool,dict,list]:
-            data = str(data)
-        result = mistql.query(condition, data)
+        if type(context) not in [str, int, float, bool,dict,list]:
+            context = str(context)
+        result = mistql.query(condition, context)
         
         # Se il risultato è truthy, la condizione è soddisfatta
         if result:
             return {
                 "success": True, 
-                "results": data, 
+                "results": context, 
                 "error": None
             }
         else:
@@ -346,7 +400,7 @@ async def guard(condition: str, data: Dict[str, Any]) -> Optional[Dict[str, Any]
             }
         }
 
-async def fallback(primary_func: Callable, secondary_func: Callable, *args, **kwargs) -> Dict[str, Any]:
+async def fallback(primary_func, secondary_func, context=dict()) -> Dict[str, Any]:
     """
     Esegue una funzione secondaria se la primaria fallisce.
     
@@ -359,24 +413,15 @@ async def fallback(primary_func: Callable, secondary_func: Callable, *args, **kw
         Il risultato della prima che ha successo, o l'errore della seconda.
     """
     # Prova primaria
-    try:
-        if asyncio.iscoroutinefunction(primary_func):
-            res = await primary_func(*args, **kwargs)
-        else:
-            res = primary_func(*args, **kwargs)
-            
-        if isinstance(res, dict) and res.get('ok'):
-            return res
-    except Exception:
-        pass # Ignora eccezioni nella primaria, vai al fallback
+    transaction = await _execute_step_internal(primary_func,context)
+    if transaction['success']:
+        return transaction
         
     # Prova secondaria
-    if asyncio.iscoroutinefunction(secondary_func):
-        return await secondary_func(*args, **kwargs)
-    else:
-        return secondary_func(*args, **kwargs)
+    transaction = await _execute_step_internal(secondary_func,context)  
+    return transaction
 
-async def switch(value, cases):
+async def switch(cases, context=dict()):
     """
     Esegue una funzione (creata con step) basata su una condizione corrispondente.
     """
@@ -391,32 +436,14 @@ async def switch(value, cases):
     for condition, action_step in case_list:
         
         # 1. Valuta la condizione
-        guard_result = await guard(condition, value)
+        guard_result = await guard(condition, context)
         print(guard_result)
         success = guard_result.get("success", False)
         
         if success:
-            # 2. Decostruisci l'output di step (func, args, kwargs)
-            if not isinstance(action_step, tuple) or len(action_step) < 2:
-                raise TypeError("L'azione nel case deve essere un output di step (funzione, args, kwargs).")
-            
-            fun = action_step[0]
-            args = action_step[1] if len(action_step) > 1 else ()
-            kwargs = action_step[2] if len(action_step) > 2 else {}
-            aaa = []
-            for arg in args:
-                if arg == "@":
-                    aaa.append(value)
-                else:
-                    aaa.append(arg)
-            args = tuple(aaa)
-            #print(f"Chiamata a {fun.__name__}(args={args}, kwargs={kwargs})")
-            # 3. Esegui la funzione
-            if asyncio.iscoroutinefunction(fun):
-                return await fun(*args, **kwargs)
-            return fun(*args, **kwargs)
+            return await _execute_step_internal(action_step,context)
 
-async def catch(try_step, catch_step):
+async def catch(try_step, catch_step,context=dict()):
     """
     Esegue il primo step. Se il risultato è un oggetto errore (dizionario con 'ok': False), 
     esegue il secondo step come fallback.
@@ -425,7 +452,7 @@ async def catch(try_step, catch_step):
     # Per semplicità, la chiameremo _execute_step
     
     # 1. Tenta di eseguire lo step principale
-    outcome = await _execute_step_internal(try_step)
+    outcome = await _execute_step_internal(try_step,context)
     
     # 2. Verifica se è un oggetto errore ROP
     if isinstance(outcome, dict) and outcome.get('ok') is False:
@@ -437,7 +464,7 @@ async def catch(try_step, catch_step):
     
     return outcome
 
-async def foreach(input_list, step_to_run) -> List[Any]:
+async def foreach(input_list, step_to_run, context=dict()) -> List[Any]:
     """
     Esegue uno step o un pipe su ogni elemento di una lista in modo sequenziale.
     Ogni elemento della lista diventa l'initial_data per lo step_to_run.
@@ -453,30 +480,10 @@ async def foreach(input_list, step_to_run) -> List[Any]:
         
     for item in input_list:
         # Esegue lo step usando 'item' come initial_data del sub-flow
-        result = await pipe(item, step_to_run)
+        result = await pipe(item, step_to_run,context)
         results.append(result)
         
     return results
-
-async def _execute_step_internal(action_step) -> Any:
-    """
-    Esegue un'azione (funzione, args, kwargs) fornita da 'step', 
-    senza il contesto completo del pipe.
-    """
-    if not isinstance(action_step, tuple) or len(action_step) < 2 or not callable(action_step[0]):
-        raise TypeError("L'azione fornita non è un formato step valido.")
-        
-    fun = action_step[0]
-    args = action_step[1] if len(action_step) > 1 else ()
-    kwargs = action_step[2] if len(action_step) > 2 else {}
-    
-    try:
-        if asyncio.iscoroutinefunction(fun):
-            return await fun(*args, **kwargs)
-        return fun(*args, **kwargs)
-    except Exception as e:
-        # Implementazione minimale ROP per gli errori
-        return {"ok": False, "error": str(e), "function": fun.__name__}
 
 async def fan_out(*steps_to_run) -> List[Any]:
     """
@@ -497,7 +504,7 @@ async def fan_out(*steps_to_run) -> List[Any]:
     # Attendiamo che tutti i task in parallelo completino
     return await asyncio.gather(*tasks)
 
-async def retry(action_step, attempts = 3, delay = 1.0) -> Any:
+async def retry(action_step, attempts = 3, delay = 1.0, context=dict()) -> Any:
     """
     Esegue uno step, riprovando in caso di fallimento fino a un massimo di tentativi.
     """
@@ -507,7 +514,7 @@ async def retry(action_step, attempts = 3, delay = 1.0) -> Any:
         print(f"Tentativo {attempt + 1}/{attempts} per lo step...")
         
         # Esegue lo step usando l'helper interno
-        outcome = await _execute_step_internal(action_step)
+        outcome = await _execute_step_internal(action_step,context)
         last_outcome = outcome
         
         # Logica di successo (non è un oggetto errore ROP)
@@ -525,14 +532,14 @@ async def retry(action_step, attempts = 3, delay = 1.0) -> Any:
     print(f"Fallimento definitivo dopo {attempts} tentativi.")
     return last_outcome
 
-async def timeout(action_step, max_seconds = 30.0) -> Any:
+async def timeout(action_step, max_seconds = 30.0, context=dict()) -> Any:
     """
     Esegue uno step e lo annulla se supera il tempo limite specificato.
     """
     # Usiamo il meccanismo di timeout di asyncio
     try:
         # Crea un Task che esegue lo step
-        task = asyncio.create_task(_execute_step_internal(action_step))
+        task = asyncio.create_task(_execute_step_internal(action_step,context))
         
         # Attende il completamento del Task con un timeout
         return await asyncio.wait_for(task, timeout=max_seconds)
@@ -600,7 +607,7 @@ async def select(source, path) -> Any:
         
     return current_data
 
-async def throttle(action_step, rate_limit_ms = 1000) -> Any:
+async def throttle(action_step, rate_limit_ms = 1000, context=dict()) -> Any:
     """
     Esegue uno step solo se è trascorso abbastanza tempo (rate_limit_ms) 
     dall'ultima esecuzione di quello stesso step. 
@@ -634,7 +641,7 @@ async def throttle(action_step, rate_limit_ms = 1000) -> Any:
     
     return await _execute_step_internal(action_step)
 
-async def trigger(event_name, **params) -> Dict[str, Any]:
+async def trigger(event_name, context=dict()) -> Dict[str, Any]:
     """
     Sospende l'esecuzione del flow fino a quando l'evento con il nome specificato non viene 
     attivato esternamente tramite la funzione 'activate_trigger'.
