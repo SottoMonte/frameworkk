@@ -1,7 +1,16 @@
 import asyncio
 import functools
 from typing import Any, Callable, Dict, List, Optional, Union
-#from framework.service.language import get
+from framework.service.inspector import LogReportEncoder, buffered_log, _load_resource
+from framework.service.context import container
+import uuid
+import contextvars
+import inspect
+import json
+import tomli
+import hashlib
+from jinja2 import Environment
+from cerberus import Validator
 
 '''
 Orchestrazione: pipe
@@ -20,7 +29,557 @@ I/O (Punto di Ingresso): trigger,data
 
 '''
 
-def get(data, domain, default=None):
+mappa = {
+    (str,dict,''): lambda v: v if isinstance(v, dict) else {},
+    (str,dict,'json'): lambda v: json.loads(v) if isinstance(v, str) else {},
+    (dict,str,'json'): lambda v: json.dumps(v,indent=4,cls=LogReportEncoder) if isinstance(v, dict) else '',
+    (str,str,'hash'): lambda v: hashlib.sha256(v.encode('utf-8')).hexdigest() if isinstance(v, str) else '',
+    (str,dict,'toml'): lambda content: tomli.loads(content) if isinstance(content, str) else {},
+    (dict,str,'toml'): lambda data: tomli.dumps(data) if isinstance(data, dict) else '',
+}
+
+async def convert(target, output,input=''):
+    try:
+        return mappa[(type(target),output,input)](target)
+    except KeyError:
+        raise ValueError(f"Conversione non supportata: {type(target)} -> {type(output)} da {input}")
+    except Exception as e:
+        raise ValueError(f"Errore conversione: {e}")
+
+def get(dictionary, domain, default=None):
+    """Gets data from a dictionary using a dotted accessor-string, returning default only if path not found."""
+    if not isinstance(dictionary, (dict, list)):
+        raise TypeError("Il primo argomento deve essere un dizionario o una lista.")
+    current_data = dictionary
+    for chunk in domain.split('.'):
+        if isinstance(current_data, list):
+            try:
+                index = int(chunk)
+                current_data = current_data[index]
+            except (IndexError, ValueError, TypeError):
+                # Se l'indice non è valido o current_data non è una lista
+                return default
+        elif isinstance(current_data, dict):
+            if chunk in current_data:
+                current_data = current_data[chunk]
+            else:
+                # Se la chiave non è presente nel dizionario
+                return default
+        else:
+            # Se current_data non è né un dizionario né una lista nel mezzo del percorso
+            return default
+    
+    # Restituisce il valore trovato. Se il valore trovato è None, lo restituisce così com'è.
+    return current_data 
+
+async def format(target ,**constants):
+    try:
+        jinjaEnv = Environment()
+        jinjaEnv.filters['get'] = lambda d, k, default=None: d.get(k, default) if isinstance(d, dict) else default
+        template = jinjaEnv.from_string(target)
+        return template.render(constants)
+    except Exception as e:
+        raise ValueError(f"Errore formattazione: {e}")
+
+async def normalize(value,schema, mode='full'):
+    """
+    Convalida, popola, trasforma e struttura i dati utilizzando uno schema Cerberus.
+
+    Args:
+        schema (dict): Lo schema Cerberus da applicare ai dati.
+        value (dict, optional): I dati da elaborare. Defaults a {}.
+        mode (str, optional): Modalità di elaborazione (es. 'full'). Non completamente utilizzato qui,
+                              ma mantenuto per coerenza se hai logiche esterne che lo usano.
+        lang (str, optional): Lingua per il caricamento dinamico degli schemi (se implementato).
+
+    Returns:
+        dict: I dati elaborati e validati.
+
+    Raises:
+        ValueError: Se la validazione fallisce.
+    """
+    value = value or {}
+
+    if not isinstance(schema, dict):
+        raise TypeError("Lo schema deve essere un dizionario valido per Cerberus.",schema)
+    if not isinstance(value, dict):
+        raise TypeError("I dati devono essere un dizionario valido per Cerberus.",value)
+
+    # 1. Popolamento e Trasformazione Iniziale (Default, Funzioni)
+    # Cerberus gestisce i 'default', ma le 'functions' richiedono un pre-processing
+    #processed_value = value.copy() # Lavora su una copia per non modificare l'originale
+    #processed_value = copy.deepcopy(value)
+    processed_value = value
+    for key in schema.copy():
+        item = schema[key]
+        for field_name, field_rules in item.copy().items():
+            if field_name.startswith('_'):
+                schema.get(key).pop(field_name)
+
+
+    for field_name, field_rules in schema.copy().items():
+        #print(f"Processing field: {field_name} with rules: {field_rules}")
+        if isinstance(field_rules, dict) and 'function' in field_rules:
+            func_name = field_rules['function']
+            if func_name == 'generate_identifier':
+                # Applica solo se il campo non è già presente
+                if field_name not in processed_value:
+                    #processed_value[field_name] = generate_identifier()
+                    pass
+            elif func_name == 'time_now_utc':
+                # Applica solo se il campo non è già presente
+                if field_name not in processed_value:
+                    #processed_value[field_name] = time_now_utc()
+                    pass
+            # Aggiungi altre funzioni qui
+
+    # Cerberus Validation (Convalida, Tipi, Required, Regex, Default)
+    # Crea un validatore Cerberus con lo schema fornito
+    #print("##################",schema)
+    v = Validator(schema,allow_unknown=True)
+    # allow_unknown={'comment': True}
+
+    # Permetti a Cerberus di gestire i valori di default durante la validazione
+    # Cerberus gestirà 'type', 'required', 'default' e 'regex' direttamente
+    if not v.validate(processed_value):
+        # La validazione fallisce, Cerberus fornisce i messaggi di errore
+        #errors_str = "; ".join([f"{k}: {', '.join(v)}" for k, v in v.errors.items()])
+        print(f"⚠️ Errore di validazione: {v.errors}  | data:{processed_value}")
+        raise ValueError(f"⚠️ Errore di validazione: {v.errors} | data:{processed_value}")
+
+    final_output = v.document
+
+    return final_output
+
+# =====================================================================
+# --- Context Management ---
+# =====================================================================
+
+# Context var per propagare il transaction id nei flussi asincroni
+_transaction_id: contextvars.ContextVar[Optional[str]] = contextvars.ContextVar('transaction_id', default=None)
+
+def get_transaction_id() -> Optional[str]:
+    """Restituisce il transaction id corrente dal contextvar, se presente."""
+    return _transaction_id.get()
+
+def set_transaction_id(tx: Optional[str]) -> None:
+    """Imposta il transaction id corrente nel contextvar (pubblica API)."""
+    if tx is None:
+        _transaction_id.set(None)
+    else:
+        _transaction_id.set(str(tx))
+
+# Context var per propagare i requirements dei servizi
+_requirements: contextvars.ContextVar[Dict[str, Any]] = contextvars.ContextVar('requirements', default={})
+
+def get_requirements() -> Dict[str, Any]:
+    """Restituisce i requirements correnti dal contextvar."""
+    return _requirements.get()
+
+# =====================================================================
+# --- Decorators ---
+# =====================================================================
+
+def asynchronous(custom_filename: str = __file__, app_context = None,**constants):
+    requirements = constants.get('requirements', {})
+    known_params = {'managers', 'outputs', 'inputs'}
+    requirements = {k: v for k, v in constants.items() if k not in known_params}
+    
+    inject = [getattr(container, manager)() for manager in constants.get('managers', []) if hasattr(container, manager)]
+    output = constants.get('outputs', [])
+    input = constants.get('inputs', [])
+
+    # Determina il layer e lo schema di default se outputs non è specificato
+    schema_path = None
+    if 'src/application/' in custom_filename or custom_filename.startswith('application/'):
+        schema_path = 'framework/scheme/result.json'
+    elif 'src/framework/' in custom_filename or custom_filename.startswith('framework/'):
+        schema_path = 'framework/scheme/transaction.json'
+    
+    if schema_path:
+            output = schema_path
+
+    def decorator(function):
+        @functools.wraps(function)
+        async def wrapper(*args, **kwargs):
+            wrapper._is_decorated = True
+            # Imposta i requirements nel contesto
+            req_token = _requirements.set(requirements)
+            
+            try:
+                args_inject = list(args) + inject
+                
+                if 'inputs' in constants:
+                    outcome = await function(*args_inject, **kwargs)
+                else:
+                    outcome = await function(*args_inject, **kwargs)
+                
+                # Gestione Output con Schema
+                target_schema = output
+                
+                # Se lo schema è un percorso file, caricalo dinamicamente
+                if isinstance(target_schema, str):
+                    try:
+                        schema_content = await _load_resource(path=target_schema)
+                        target_schema = json.loads(schema_content)
+                    except Exception as e:
+                        buffered_log("ERROR", f"Errore caricamento schema da {output}: {e}")
+                        raise e
+
+                if target_schema and isinstance(target_schema, dict) and isinstance(outcome, dict):
+                    try:
+                        return await normalize({"action": wrapper.__name__,"parameters": kwargs}|outcome, target_schema)
+                    except Exception as e:
+                        buffered_log("ERROR", f"Errore normalizzazione output in {function.__name__}: {e}")
+                        raise e
+                else:
+                    return outcome
+
+            except Exception as e:
+                tx_token = get_transaction_id()
+                # Buffera anche il log strutturato con il transaction id
+                if hasattr(container, 'messenger'):
+                    pass
+                else:
+                    buffered_log("ERROR", e, emoji="❌")
+
+                return {"success": False, "errors": [str(e)],"action": wrapper.__name__,"parameters": kwargs}
+
+            finally:
+                set_transaction_id(uuid.uuid4())
+                _requirements.reset(req_token)
+                pass
+        return wrapper
+    return decorator
+
+def synchronous(custom_filename: str = __file__, app_context = None,**constants):
+    
+    inject = [getattr(container, manager)() for manager in constants.get('managers', []) if hasattr(container, manager)]
+    output = constants.get('outputs', [])
+    input = constants.get('inputs', [])
+    
+    def decorator(function):
+        @functools.wraps(function)
+        def wrapper(*args, **kwargs):
+            wrapper._is_decorated = True
+            try:
+                args_inject = list(args) + inject
+                if 'inputs' in constants:
+                    outcome = function(*args_inject, **kwargs)
+                else:
+                    outcome = function(*args_inject, **kwargs)
+                if 'outputs' in constants:
+                    return outcome
+                else:
+                    return outcome
+            except Exception:
+                try:
+                    source_code = inspect.getsource(function)
+                except KeyboardInterrupt:
+                    print("Interruzione da tastiera (Ctrl + C).")
+                except (OSError, TypeError):
+                    source_code = ""
+
+            finally:
+                set_transaction_id(None)
+                pass
+        return wrapper
+    return decorator
+
+
+def transform(data_dict, mapper, values, input, output):
+
+    """ Trasforma un set di costanti in un output mappato. """
+    def find_matching_keys(mapper, target_dict):
+        """
+        Trova la prima chiave del dizionario 'mapper' che è anche presente
+        come chiave nel 'target_dict' (output o input).
+        
+        Args:
+            mapper (dict): Il dizionario di mappatura.
+            target_dict (dict): Il dizionario con cui confrontare le chiavi (e.g., output/input).
+            
+        Returns:
+            str or None: La prima chiave corrispondente trovata, altrimenti None.
+        """
+        if not isinstance(mapper, dict) or not isinstance(target_dict, dict):
+            # Gestione di base dell'errore se non sono dizionari
+            return None
+            
+        # Crea un set delle chiavi del dizionario target per una ricerca efficiente
+        target_keys = set(target_dict.keys())
+        
+        # Itera sulle chiavi del mapper e cerca la prima corrispondenza nel target
+        for key in mapper.keys():
+            if key in target_keys:
+                return key
+                
+        return None
+    translated = {}
+
+    if not isinstance(data_dict, dict):
+        raise TypeError("Il primo argomento deve essere un dizionario.")
+
+    if not isinstance(mapper, dict):
+        raise TypeError("'mapper' deve essere un dizionario.")
+
+    if not isinstance(values, dict):
+        raise TypeError("'values' deve essere un dizionario.")
+    
+    if not isinstance(input, dict):
+        raise TypeError("'input' deve essere un dizionario.")
+    
+    if not isinstance(output, dict):
+        raise TypeError("'output' deve essere un dizionario.")
+
+    key = find_matching_keys(mapper,output) or find_matching_keys(mapper,input)
+    #print(f"find_matching_keys: {key}######################")
+    for k, v in mapper.items():
+        
+        n1 = get(data_dict, k)
+        n2 = get(data_dict, v.get(key, None))
+        
+        if n1:
+            output_key = v.get(key, None)
+            value = n1
+            translated |= put(translated, output_key, value, output)
+        if n2:
+            output_key = k
+            value = n2
+            translated |= put(translated, output_key, value, output)
+
+        #print(f"translation: k:{k},key:{key} = {v},{data_dict}",n1,n2) 
+
+    fieldsData = data_dict.keys()
+    fieldsOutput = output.keys()
+
+
+    for field in fieldsData:
+        if field in fieldsOutput:
+            value = get(data_dict, field)
+            translated |= put(translated, field, value, output)
+
+    return translated
+
+def _get_next_schema(schema, key):
+    if isinstance(schema, dict):
+        if 'schema' in schema:
+            if schema.get('type') == 'list': return schema['schema']
+            if isinstance(schema['schema'], dict): return schema['schema'].get(key)
+        return schema.get(key)
+    return None
+
+def put(data: dict, path: str, value: any, schema: dict) -> dict:
+    if not isinstance(data, dict): raise TypeError("Il dizionario iniziale deve essere di tipo dict.")
+    if not isinstance(path, str) or not path: raise ValueError("Il dominio deve essere una stringa non vuota.")
+    if not isinstance(schema, dict) or not schema: raise ValueError("Lo schema deve essere un dizionario valido.")
+
+    result = copy.deepcopy(data)
+    node, sch = result, schema
+    chunks = path.split('.')
+
+    for i, chunk in enumerate(chunks):
+        is_last = i == len(chunks) - 1
+        is_index = chunk.lstrip('-').isdigit()
+        key = int(chunk) if is_index else chunk
+        next_sch = _get_next_schema(sch, chunk)
+
+        if isinstance(node, dict):
+            if is_index:
+                raise IndexError(f"Indice numerico '{chunk}' usato in un dizionario a livello {i}.")
+            if is_last:
+                if next_sch is None:
+                    raise IndexError(f"Campo '{chunk}' non definito nello schema.")
+                if not Validator({chunk: next_sch}, allow_unknown=False).validate({chunk: value}):
+                    raise ValueError(f"Valore non valido per '{chunk}': {value}")
+                node[key] = value
+            else:
+                node.setdefault(key, {} if next_sch and next_sch.get('type') == 'dict'
+                                     else [] if next_sch and next_sch.get('type') == 'list'
+                                     else None)
+                if node[key] is None:
+                    raise IndexError(f"Nodo intermedio '{chunk}' non valido nello schema.")
+                node, sch = node[key], next_sch
+
+        elif isinstance(node, list):
+            if not is_index:
+                raise IndexError(f"Chiave '{chunk}' non numerica usata in una lista a livello {i}.")
+            if not isinstance(next_sch, dict) or 'type' not in next_sch:
+                raise IndexError(f"Schema non valido per lista a livello {i}.")
+
+            if key == -1:  # Append mode
+                t = next_sch['type']
+                new_elem = {} if t == 'dict' else [] if t == 'list' else None
+                node.append(new_elem)
+                key = len(node) - 1
+
+            if key < 0:
+                raise IndexError(f"Indice negativo '{chunk}' non valido in lista.")
+
+            while len(node) <= key:
+                t = next_sch['type']
+                node.append({} if t == 'dict' else [] if t == 'list' else None)
+
+            if is_last:
+                if not Validator({chunk: next_sch}, allow_unknown=False).validate({chunk: value}):
+                    raise ValueError(f"Valore non valido per indice '{chunk}': {value}")
+                node[key] = value
+            else:
+                if node[key] is None or not isinstance(node[key], (dict, list)):
+                    t = next_sch['type']
+                    if t == 'dict': node[key] = {}
+                    elif t == 'list': node[key] = []
+                    else: raise IndexError(f"Tipo non contenitore '{t}' per nodo '{chunk}' in lista.")
+                node, sch = node[key], next_sch
+
+        else:
+            raise IndexError(f"Nodo non indicizzabile al passo '{chunk}' (tipo: {type(node).__name__})")
+
+    return result
+
+def get(data, path, default=None):
+    """
+    Accesso sicuro a strutture nidificate (dict/list) tramite notazione a punti.
+    Supporta '*' per iterare su elementi di una lista.
+    """
+    if not path:
+        return data
+
+    parts = path.split('.', 1)
+    key = parts[0]
+    rest = parts[1] if len(parts) > 1 else None
+
+    # Converte la chiave in intero se numerica
+    if key.isnumeric():
+        key = int(key)
+    
+    # --- Gestione carattere jolly '*' ---
+    if key == '*':
+        if not isinstance(data, list):
+            return default
+        
+        # Mappa la chiamata ricorsiva su ogni elemento della lista
+        results = [get(item, rest or '', default) for item in data]
+        return results
+    
+    # --- Accesso a dict/list ---
+    try:
+        if isinstance(data, dict):
+            next_data = data.get(key)
+        elif isinstance(data, list) and isinstance(key, int):
+            next_data = data[key]
+        else:
+            return default # Tipo di dato non supportato per la chiave
+        
+    except (KeyError, IndexError, TypeError):
+        return default
+
+    # --- Ricorsione ---
+    if rest is None:
+        return next_data if next_data is not None else default
+    else:
+        # Continua la ricorsione sul resto del path
+        return get(next_data, rest, default)
+
+def route(url: dict, new_part: str) -> str:
+    """
+    Updates the URL's path and/or adds query parameters based on the input string.
+    New values overwrite existing ones with the same name.
+
+    Args:
+        url: A dict containing parts of the URL (protocol, host, port, path, query, fragment).
+        new_part: The new path string (e.g., '/nuova/pagina') or a query string (e.g., '?id=100'),
+                  or a combination of both (e.g., '/nuova/pagina?page=2&category=tech').
+
+    Returns:
+        The updated full URL as a string.
+    """
+    # Copia i dati dal dizionario URL per sicurezza
+    #url = url.copy()
+    url = copy.deepcopy(url)
+    protocol = url.get("protocol", "http")
+    host = url.get("host", "localhost")
+    port = url.get("port")
+    path = url.get("path", [])
+    query_params = url.get('query', {})
+    fragment = url.get("fragment", "")
+
+    # Usa un dizionario per i segnaposto, mappando le stringhe speciali a token unici
+    '''placeholders = {
+        '${this.value}': '__PLACEHOLDER_THIS_VALUE__',
+    }'''
+    
+    # Sostituisci i caratteri speciali con i segnaposto prima di decodificare
+    
+    #for special_string, placeholder in placeholders.items():
+    #    new_part = new_part.replace(special_string, placeholder)
+
+    # Analizza la stringa di input per separare il percorso dalla query
+    parsed_new_part = urlparse(new_part)
+
+    # Aggiorna il percorso se la stringa di input contiene un percorso
+    if parsed_new_part.path:
+        path = [p for p in parsed_new_part.path.split('/') if p]
+
+    # Aggiorna i parametri di query se la stringa di input contiene una query
+    '''if parsed_new_part.query:
+        query_params = {}
+        [query_params.setdefault(k, []).append(v) for k, v in (param.split('=', 1) for param in parsed_new_part.query.split('&') if '=' in param)]
+        #new_params = parse_qs(parsed_new_part.query, keep_blank_values=True)
+        # Unisce e sovrascrive i parametri esistenti con i nuovi
+        for key, value in query_params.items():
+            query_params.setdefault(key, []).append(value)
+            #query[key] = [value[-1]]'''
+    
+    if parsed_new_part.query:
+        [query_params.setdefault(k, []).append(v) for k, v in (param.split('=', 1) for param in parsed_new_part.query.split('&') if '=' in param)]
+        for key, value in query_params.items():
+            # ?org=colosso&org=${this.value}
+            # ?org=${this.value}&org=colosso
+            # ?org=${this.value}
+            #query_params.setdefault(key, [])
+            #query_params[key].reverse()
+            
+            #query_params[key] = [query_params[key][-1]]
+            #if "${" in query_params[key][-1]:
+            #    query_params[key].reverse()
+            #query[key] = [value[-1]]
+            pass
+    else:
+        #query_params = query_
+        pass
+
+    # Ricostruisci la query string con SOLO l'ultimo valore per ogni chiave
+    query_parts = []
+    query_string = ""
+    for key, values in query_params.items():
+        if values:  # prendi solo l'ultimo elemento
+            query_parts.append(f"{key}={values[-1]}")
+    query_string = "&".join(query_parts)
+
+    base_url = ""
+    '''# Ricostruisce l'URL completo
+    base_url = f"{protocol}://{host}"
+    if port:
+        base_url += f":{port}"'''
+    if path:
+        base_url += "/" + "/".join(path)
+
+    # Codifica i parametri di query
+    if query_string:
+        #encoded_query = urlencode(query, doseq=True)
+        #base_url += f"?{encoded_query}"
+        base_url += f"?{query_string}"
+    
+    if fragment:
+        base_url += f"#{fragment}"
+
+    #for key, value in placeholders.items():
+    #    base_url = base_url.replace(value,key)
+
+    return base_url
+
+def get2(data, domain, default=None):
     """
     Ottiene dati da un oggetto (dict, list, module o object) usando una 
     stringa di accesso puntata (dotted accessor-string), restituendo 
