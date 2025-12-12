@@ -40,7 +40,7 @@ class LogReportEncoder(json.JSONEncoder):
 
 def _get_system_info() -> Dict[str, Any]:
     """Raccoglie le informazioni chiave su CPU, RAM e Processo."""
-    mem = psutil.virtual_memory()
+    mem = 2000
     
     return {
         "hostname": socket.gethostname(),

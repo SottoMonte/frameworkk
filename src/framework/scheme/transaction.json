@@ -37,15 +37,11 @@
             "iterable": true
         }
     },
-    "results": {
-        "type": "list",
-        "default": [],
-        "schema": {
-            "type": "dict"
-        },
+    "data": {
+        "default": {},
+        "nullable": true,
         "_builder_options": {
-            "force_type": "dict",
-            "iterable": true
+            "description": "Any type allowed (dict, list, primitive)"
         }
     }
 }

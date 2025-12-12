@@ -1,7 +1,7 @@
 import asyncio
 import functools
 from typing import Any, Callable, Dict, List, Optional, Union
-from framework.service.inspector import LogReportEncoder, buffered_log, _load_resource
+from framework.service.inspector import LogReportEncoder, buffered_log, _load_resource, analyze_exception, _get_system_info
 from framework.service.context import container
 import uuid
 import contextvars
@@ -162,12 +162,16 @@ def get_transaction_id() -> Optional[str]:
     """Restituisce il transaction id corrente dal contextvar, se presente."""
     return _transaction_id.get()
 
-def set_transaction_id(tx: Optional[str]) -> None:
+def set_transaction_id(tx: Optional[str]) -> contextvars.Token:
     """Imposta il transaction id corrente nel contextvar (pubblica API)."""
     if tx is None:
-        _transaction_id.set(None)
-    else:
-        _transaction_id.set(str(tx))
+        return _transaction_id.set(None)
+    
+    if not isinstance(tx, str):
+         # raise TypeError(f"Il Transaction ID deve essere una stringa, ricevuto {type(tx)}")
+         tx = str(tx)
+    
+    return _transaction_id.set(tx)
 
 # Context var per propagare i requirements dei servizi
 _requirements: contextvars.ContextVar[Dict[str, Any]] = contextvars.ContextVar('requirements', default={})
@@ -186,68 +190,101 @@ def asynchronous(custom_filename: str = __file__, app_context = None,**constants
     requirements = {k: v for k, v in constants.items() if k not in known_params}
     
     inject = [getattr(container, manager)() for manager in constants.get('managers', []) if hasattr(container, manager)]
-    output = constants.get('outputs', [])
-    input = constants.get('inputs', [])
-
-    # Determina il layer e lo schema di default se outputs non è specificato
-    schema_path = None
-    if 'src/application/' in custom_filename or custom_filename.startswith('application/'):
-        schema_path = 'framework/scheme/result.json'
-    elif 'src/framework/' in custom_filename or custom_filename.startswith('framework/'):
-        schema_path = 'framework/scheme/transaction.json'
+    # input = constants.get('inputs', []) # Unused variable
     
-    if schema_path:
-            output = schema_path
+    # Standardizza su transaction.json
+    output_schema_path = 'framework/scheme/transaction.json'
+    if 'outputs' in constants and constants['outputs']:
+         output_schema_path = constants['outputs']
 
     def decorator(function):
         @functools.wraps(function)
         async def wrapper(*args, **kwargs):
             wrapper._is_decorated = True
+            
+            # 1. Gestione Transaction ID
+            current_tx_id = get_transaction_id()
+            tx_token = None # Token per il reset del contesto
+            
+            if not current_tx_id:
+                current_tx_id = str(uuid.uuid4())
+                tx_token = set_transaction_id(current_tx_id)
+            
             # Imposta i requirements nel contesto
             req_token = _requirements.set(requirements)
             
             try:
                 args_inject = list(args) + inject
                 
-                if 'inputs' in constants:
-                    outcome = await function(*args_inject, **kwargs)
-                else:
-                    outcome = await function(*args_inject, **kwargs)
+                # 2. Esecuzione tramite _execute_step_internal
+                step_tuple = (function, tuple(args_inject), kwargs)
+                outcome = await _execute_step_internal(step_tuple)
                 
-                # Gestione Output con Schema
-                target_schema = output
+                # Arricchimento Transaction
+                outcome['identifier'] = current_tx_id
                 
-                # Se lo schema è un percorso file, caricalo dinamicamente
+                # Aggiunge info sul worker se inspector è disponibile
+                try:
+                    sys_info = _get_system_info()
+                    outcome['worker'] = f"{sys_info.get('hostname', 'unknown')}:{sys_info.get('process_id', '?')}"
+                except Exception:
+                    pass
+
+                # 3. Normalizzazione / Validazione Schema
+                target_schema = output_schema_path
+                
                 if isinstance(target_schema, str):
                     try:
                         schema_content = await _load_resource(path=target_schema)
                         target_schema = json.loads(schema_content)
                     except Exception as e:
-                        buffered_log("ERROR", f"Errore caricamento schema da {output}: {e}")
-                        raise e
+                        buffered_log("ERROR", f"Errore caricamento schema da {output_schema_path}: {e}")
+                        target_schema = None
 
-                if target_schema and isinstance(target_schema, dict) and isinstance(outcome, dict):
+                if target_schema and isinstance(target_schema, dict):
                     try:
-                        return await normalize({"action": wrapper.__name__,"parameters": kwargs}|outcome, target_schema)
+                        meta = {
+                            "action": wrapper.__name__,
+                            "parameters": kwargs,
+                            "identifier": current_tx_id,
+                            "worker": outcome.get('worker', 'unknown')
+                        }
+                        return await normalize(meta | outcome, target_schema)
                     except Exception as e:
                         buffered_log("ERROR", f"Errore normalizzazione output in {function.__name__}: {e}")
-                        raise e
+                        return outcome
                 else:
                     return outcome
 
             except Exception as e:
-                tx_token = get_transaction_id()
-                # Buffera anche il log strutturato con il transaction id
+                # 4. Gestione Errori Avanzata con Introspection
+                error_details = str(e)
+                try:
+                    report = analyze_exception(inspect.getsource(function) if hasattr(function, '__code__') else "", custom_filename)
+                    if report and 'EXCEPTION_DETAILS' in report:
+                        error_details = report['EXCEPTION_DETAILS']
+                except Exception:
+                    pass 
+
                 if hasattr(container, 'messenger'):
                     pass
                 else:
                     buffered_log("ERROR", e, emoji="❌")
 
-                return {"success": False, "errors": [str(e)],"action": wrapper.__name__,"parameters": kwargs}
+                return {
+                    "success": False, 
+                    "errors": [error_details],
+                    "data": None,
+                    "action": wrapper.__name__,
+                    "identifier": current_tx_id
+                }
 
             finally:
-                set_transaction_id(uuid.uuid4())
                 _requirements.reset(req_token)
+                
+                # Reset Transaction ID se l'abbiamo impostato noi
+                if tx_token:
+                    _transaction_id.reset(tx_token)
                 pass
         return wrapper
     return decorator
@@ -598,11 +635,19 @@ async def _execute_step_internal(action_step,context=dict()) -> Any:
 
     try:
         if asyncio.iscoroutinefunction(fun):
-            return await fun(*args, **kwargs)
-        return fun(*args, **kwargs)
+            result = await fun(*args, **kwargs)
+        else:
+            result = fun(*args, **kwargs)
+
+        # Auto-wrapping in Transaction se non lo è già
+        if isinstance(result, dict) and 'success' in result and ('data' in result or 'errors' in result):
+            return result
+        
+        return {"success": True, "data": result, "errors": []}
+
     except Exception as e:
-        # Implementazione minimale ROP per gli errori
-        return {"ok": False, "error": str(e), "function": fun.__name__}
+        # Implementazione minimale ROP per gli errori (Transaction)
+        return {"success": False, "errors": [str(e)], "function": fun.__name__}
 
 def step(func, *args, **kwargs):
     return (func, args, kwargs)
@@ -622,7 +667,7 @@ async def pipe(*stages,context=dict()):
         stage_index += 1
         outcome = await _execute_step_internal(stage_tuple,context)
         print("outcome",outcome,"<---------------------")
-        if isinstance(outcome, dict) and outcome.get('ok') is True and 'data' in outcome:
+        if isinstance(outcome, dict) and outcome.get('success') is True and 'data' in outcome:
             data_to_pass = outcome['data']
         else:
             data_to_pass = outcome
@@ -651,15 +696,15 @@ async def safe(func: Callable, *args, **kwargs) -> Dict[str, Any]:
             data = func(*args, **kwargs)
             
         # Se la funzione ritorna già un result.json (ha 'ok' e 'data'), lo restituiamo così com'è
-        if isinstance(data, dict) and 'ok' in data and 'data' in data:
+        if isinstance(data, dict) and 'success' in data and 'data' in data:
             return data
             
-        return {"ok": True, "data": data, "error": None}
+        return {"success": True, "data": data, "errors": []}
     except Exception as e:
         return {
-            "ok": False, 
+            "success": False, 
             "data": None, 
-            "error": {"type": type(e).__name__, "message": str(e)}
+            "errors": [{"type": type(e).__name__, "message": str(e)}]
         }
 
 async def branch(on_success: Callable, on_failure: Callable, context=dict()) -> Any:
@@ -674,14 +719,14 @@ async def branch(on_success: Callable, on_failure: Callable, context=dict()) -> 
     Returns:
         Il risultato della funzione chiamata (on_success o on_failure).
     """
-    if context.get('ok') is True:
+    if context.get('success') is True:
         if asyncio.iscoroutinefunction(on_success):
             return await on_success(context.get('data'))
         return on_success(context.get('data'))
     else:
         if asyncio.iscoroutinefunction(on_failure):
-            return await on_failure(context.get('error'))
-        return on_failure(context.get('error'))
+            return await on_failure(context.get('errors'))
+        return on_failure(context.get('errors'))
 
 async def retry(func , max_attempts: int = 3, retryable_errors: List[str] = None, context=dict()) -> Dict[str, Any]:
     """
@@ -751,30 +796,30 @@ async def guard(condition: str, context=dict()) -> Optional[Dict[str, Any]]:
         if result:
             return {
                 "success": True, 
-                "results": context, 
-                "error": None
+                "data": context, 
+                "errors": []
             }
         else:
             # Condizione non soddisfatta
             return {
                 "success": False, 
-                "results": None, 
-                "error": {
+                "data": None, 
+                "errors": [{
                     #"message": error_message,
                     "condition": condition,
                     "evaluated_result": result
-                }
+                }]
             }
     except Exception as e:
         # Errore nell'esecuzione della query MistQL
         return {
             "success": False,
-            "results": None,
-            "error": {
+            "data": None,
+            "errors": [{
                 "message": f"Errore nella valutazione MistQL: {str(e)}",
                 "condition": condition,
                 "exception": type(e).__name__
-            }
+            }]
         }
 
 async def fallback(primary_func, secondary_func, context=dict()) -> Dict[str, Any]:
@@ -832,8 +877,9 @@ async def catch(try_step, catch_step,context=dict()):
     outcome = await _execute_step_internal(try_step,context)
     
     # 2. Verifica se è un oggetto errore ROP
-    if isinstance(outcome, dict) and outcome.get('ok') is False:
-        print(f"ATTENZIONE: Fallimento nello step. Esecuzione del fallback: {outcome.get('error')}")
+    # 2. Verifica se è un oggetto errore ROP
+    if isinstance(outcome, dict) and outcome.get('success') is False:
+        print(f"ATTENZIONE: Fallimento nello step. Esecuzione del fallback: {outcome.get('errors')}")
         
         # Puoi anche passare l'errore al catch_step, ma per semplicità lo eseguiamo direttamente
         # Esegue lo step di fallback
@@ -901,8 +947,8 @@ async def batch(*steps_to_run) -> Dict[str, Any]:
             
         # 2. Gestione Errori Logici (ROP: dizionari con ok=False)
         if isinstance(r, dict):
-            if r.get('ok') is False: 
-                failures.append(r.get('error', r))
+            if r.get('success') is False: 
+                failures.extend(r.get('errors', []))
             else:
                 # Se ok=True o se non c'è la chiave ok (dato raw), lo consideriamo successo
                 # Se c'è 'data', estraiamo quello, altrimenti prendiamo tutto l'oggetto
@@ -915,9 +961,9 @@ async def batch(*steps_to_run) -> Dict[str, Any]:
     is_success = len(failures) == 0
     
     return {
-        "ok": is_success,
+        "success": is_success,
         "data": successes, # Contiene i dati parziali anche in caso di errore globale? Di solito sì o no. Qui li lasciamo.
-        "error": failures if failures else None
+        "errors": failures
     }
 
 async def race(*steps_to_run) -> Any:
@@ -956,7 +1002,7 @@ async def race(*steps_to_run) -> Any:
             return winner_task.result()
         except Exception as e:
             # Se vogliamo wrappare l'errore in ROP:
-            return {"ok": False, "error": str(e), "type": "RaceWinnerError"}
+            return {"success": False, "errors": [str(e)], "type": "RaceWinnerError"}
 
     finally:
         # Cancelliamo tutti i task ancora pendenti per non lasciarli appesi
@@ -979,7 +1025,7 @@ async def retry(action_step, attempts = 3, delay = 1.0, context=dict()) -> Any:
         last_outcome = outcome
         
         # Logica di successo (non è un oggetto errore ROP)
-        if not (isinstance(outcome, dict) and outcome.get('ok') is False):
+        if not (isinstance(outcome, dict) and outcome.get('success') is False):
             print(f"Step completato al tentativo {attempt + 1}.")
             return outcome
         
@@ -1008,15 +1054,15 @@ async def timeout(action_step, max_seconds = 30.0, context=dict()) -> Any:
     except asyncio.TimeoutError:
         # Il Task è scaduto: restituisce un errore ROP
         return {
-            "ok": False,
-            "error": f"Timeout superato: lo step non è stato completato entro {max_seconds} secondi.",
+            "success": False,
+            "errors": [f"Timeout superato: lo step non è stato completato entro {max_seconds} secondi."],
             "type": "TimeoutError"
         }
     except Exception as e:
         # Gestisce altri errori generici durante l'esecuzione del task
         return {
-            "ok": False,
-            "error": f"Errore interno durante il timeout: {e}",
+            "success": False,
+            "errors": [f"Errore interno durante il timeout: {e}"],
             "type": "ExecutionError"
         }
 
