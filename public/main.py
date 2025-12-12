@@ -15,7 +15,7 @@ async def main():
 
         # Seed the DI cache with the imported module so dynamically loaded
         # modules that ask for `language` during their own import don't see None.
-        return await flow.pipe('',
+        return await flow.pipe(
             flow.step(language.resource, path="framework/service/language.py"),
             #flow.step(lambda lang: language.container.module_cache()['framework/service/language.py'] = lang),
             flow.step(flow.catch, 
@@ -25,25 +25,8 @@ async def main():
             )
         )
 
-        try:
-            lang = await language.resource(path="framework/service/language.py")
-            language.container.module_cache()['framework/service/language.py'] = lang
-            # If loading succeeded, replace cache entry with the filtered module
-        except Exception as e:
-            print(e)
-            #run = await language.resource(path="framework/service/run.py")
-            pass
-        try:
-            run = await lang.fetch(path="framework/service/run.py")
-        except Exception as e:
-            print(e)
-            #raise('ssss')
-            run = await language.resource(path="framework/service/run.py")
-            pass
-    
-    return run
 if __name__ == "__main__":
     run = asyncio.run(main())
     print(run)
-    run.application(args=sys.argv)
+    #run.application(args=sys.argv)
     

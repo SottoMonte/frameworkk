@@ -286,7 +286,6 @@ def synchronous(custom_filename: str = __file__, app_context = None,**constants)
         return wrapper
     return decorator
 
-
 def transform(data_dict, mapper, values, input, output):
 
     """ Trasforma un set di costanti in un output mappato. """
@@ -438,48 +437,35 @@ def put(data: dict, path: str, value: any, schema: dict) -> dict:
     return result
 
 def get(data, path, default=None):
-    """
-    Accesso sicuro a strutture nidificate (dict/list) tramite notazione a punti.
-    Supporta '*' per iterare su elementi di una lista.
-    """
-    if not path:
-        return data
-
+    if not path: return data
+    
     parts = path.split('.', 1)
-    key = parts[0]
+    key_str = parts[0]
     rest = parts[1] if len(parts) > 1 else None
 
-    # Converte la chiave in intero se numerica
-    if key.isnumeric():
-        key = int(key)
-    
-    # --- Gestione carattere jolly '*' ---
-    if key == '*':
-        if not isinstance(data, list):
-            return default
-        
-        # Mappa la chiamata ricorsiva su ogni elemento della lista
-        results = [get(item, rest or '', default) for item in data]
-        return results
-    
-    # --- Accesso a dict/list ---
-    try:
-        if isinstance(data, dict):
-            next_data = data.get(key)
-        elif isinstance(data, list) and isinstance(key, int):
-            next_data = data[key]
-        else:
-            return default # Tipo di dato non supportato per la chiave
-        
-    except (KeyError, IndexError, TypeError):
+    # Gestione Wildcard (Dalla get riga 440)
+    if key_str == '*':
+        if isinstance(data, list):
+            return [get(item, rest or '', default) for item in data]
         return default
 
-    # --- Ricorsione ---
+    # Accesso Sicuro (Logica migliorata stile get2)
+    next_data = default
+    try:
+        if isinstance(data, list):
+            # Solo per le liste convertiamo in int
+            if key_str.lstrip('-').isnumeric():
+                next_data = data[int(key_str)]
+        elif isinstance(data, dict):
+            # Per i dict usiamo la chiave stringa originale
+            next_data = data.get(key_str)
+        # Opzionale: Aggiungere qui getattr per oggetti se serve
+    except (IndexError, TypeError):
+        return default
+
     if rest is None:
         return next_data if next_data is not None else default
-    else:
-        # Continua la ricorsione sul resto del path
-        return get(next_data, rest, default)
+    return get(next_data, rest, default)
 
 def route(url: dict, new_part: str) -> str:
     """
@@ -579,66 +565,6 @@ def route(url: dict, new_part: str) -> str:
 
     return base_url
 
-def get2(data, domain, default=None):
-    """
-    Ottiene dati da un oggetto (dict, list, module o object) usando una 
-    stringa di accesso puntata (dotted accessor-string), restituendo 
-    'default' solo se il percorso non viene trovato.
-    """
-    
-    # 1. Controllo del tipo iniziale
-    # Rimuoviamo il TypeError iniziale per consentire moduli e altri oggetti.
-    current_data = data
-    
-    # Se il dato iniziale è None o la stringa di dominio è vuota/None, restituisci l'oggetto stesso.
-    if current_data is None or not domain:
-        return current_data
-
-    # 2. Iterazione sui "chunk" della stringa di accesso
-    for chunk in domain.split('.'):
-        
-        # Gestisce i casi in cui current_data diventa None durante l'iterazione
-        if current_data is None:
-            return default
-            
-        # A. Gestione delle liste (accesso tramite indice numerico)
-        if isinstance(current_data, list):
-            try:
-                index = int(chunk)
-                current_data = current_data[index]
-            except (IndexError, ValueError, TypeError):
-                # Indice non valido o current_data non è una lista
-                return default
-                
-        # B. Gestione dei dizionari (accesso tramite chiave)
-        elif isinstance(current_data, dict):
-            if chunk in current_data:
-                current_data = current_data[chunk]
-            else:
-                # Chiave non presente nel dizionario
-                return default
-                
-        # C. Gestione di Moduli/Oggetti (accesso tramite attributo, es. modulo.attributo)
-        # Questo cattura oggetti generici, moduli, classi e istanze.
-        elif hasattr(current_data, '__iter__'):
-            # Usa getattr() per accedere all'attributo. 
-            # Il default di getattr è un oggetto 'sentinella' per distinguere
-            # tra attributo non trovato e un attributo che è None.
-            sentinel = object() 
-            current_data = getattr(current_data, chunk, sentinel)
-            
-            if current_data is sentinel:
-                # L'attributo non è stato trovato nell'oggetto/modulo
-                return default
-        
-        # D. Caso non gestito (il dato non è più navigabile)
-        else:
-            # Se un oggetto non è navigabile (ad esempio, un int, str, float)
-            return default
-    
-    # 3. Restituisce il valore finale
-    return current_data
-
 async def _execute_step_internal(action_step,context=dict()) -> Any:
     """
     Esegue un'azione (funzione, args, kwargs) fornita da 'step', 
@@ -736,7 +662,7 @@ async def safe(func: Callable, *args, **kwargs) -> Dict[str, Any]:
             "error": {"type": type(e).__name__, "message": str(e)}
         }
 
-async def match_result(outcome: Dict[str, Any], on_success: Callable, on_failure: Callable) -> Any:
+async def branch(on_success: Callable, on_failure: Callable, context=dict()) -> Any:
     """
     Instrada il flusso basandosi sul campo 'ok' del risultato (result.json).
     
@@ -748,14 +674,14 @@ async def match_result(outcome: Dict[str, Any], on_success: Callable, on_failure
     Returns:
         Il risultato della funzione chiamata (on_success o on_failure).
     """
-    if outcome.get('ok') is True:
+    if context.get('ok') is True:
         if asyncio.iscoroutinefunction(on_success):
-            return await on_success(outcome.get('data'))
-        return on_success(outcome.get('data'))
+            return await on_success(context.get('data'))
+        return on_success(context.get('data'))
     else:
         if asyncio.iscoroutinefunction(on_failure):
-            return await on_failure(outcome.get('error'))
-        return on_failure(outcome.get('error'))
+            return await on_failure(context.get('error'))
+        return on_failure(context.get('error'))
 
 async def retry(func , max_attempts: int = 3, retryable_errors: List[str] = None, context=dict()) -> Dict[str, Any]:
     """
@@ -800,114 +726,6 @@ async def retry(func , max_attempts: int = 3, retryable_errors: List[str] = None
         # await asyncio.sleep(0.1 * (2 ** attempt)) 
         
     return last_transaction
-
-def lift_io(io_outcome: Dict[str, Any]) -> Dict[str, Any]:
-    """
-    Trasforma automaticamente un 'io.json' (Infrastructure) in un 'result.json' (Application).
-    
-    Args:
-        io_outcome: Dizionario conforme a io.json.
-        
-    Returns:
-        Dizionario conforme a result.json.
-    """
-    status_code = io_outcome.get('status_code', 500)
-    
-    if 200 <= status_code < 300:
-        return {
-            "ok": True,
-            "data": io_outcome.get('payload'),
-            "error": None
-        }
-    else:
-        return {
-            "ok": False,
-            "data": None,
-            "error": {
-                "code": status_code,
-                "message": "Errore infrastruttura",
-                "details": io_outcome.get('metadata', {})
-            }
-        }
-
-def map_data(outcome: Dict[str, Any], mapping_rules: Dict[str, str]) -> Dict[str, Any]:
-    """
-    Trasforma i dati usando un dizionario di regole dichiarative.
-    
-    Args:
-        outcome: Un result.json o io.json contenente i dati sorgente.
-        mapping_rules: Dizionario {chiave_destinazione: percorso_sorgente}.
-                       Es. {"name": "user.details.nome"}
-                       
-    Returns:
-        Un result.json con i dati mappati.
-    """
-    # Determina dove sono i dati sorgente
-    source = None
-    if 'data' in outcome:
-        source = outcome['data']
-    elif 'payload' in outcome:
-        source = outcome['payload']
-    else:
-        source = outcome # Fallback, usa l'intero oggetto
-        
-    # Se l'operazione precedente è fallita, propaga l'errore
-    if isinstance(outcome, dict) and not outcome.get('ok', True) and 'error' in outcome:
-        return outcome
-
-    new_data = {}
-    
-    for target_key, source_path in mapping_rules.items():
-        # Usa la funzione get di language.py per supportare dot notation
-        value = get(source, source_path)
-        new_data[target_key] = value
-        
-    return {"ok": True, "data": new_data, "error": None}
-
-async def gather_results(functions_list: List[Callable]) -> Dict[str, Any]:
-    """
-    Esegue N funzioni in parallelo e aggrega i risultati.
-    
-    Args:
-        functions_list: Lista di funzioni (o coroutine) da eseguire.
-        
-    Returns:
-        Un result.json aggregato. 'ok' è True solo se TUTTE hanno successo.
-    """
-    # Avvia le coroutine
-    coroutines = []
-    for f in functions_list:
-        if asyncio.iscoroutinefunction(f):
-            coroutines.append(f())
-        else:
-            # Wrap sync function in coroutine
-            async def wrapper(func=f):
-                return func()
-            coroutines.append(wrapper())
-            
-    results = await asyncio.gather(*coroutines, return_exceptions=True)
-    
-    successes = []
-    failures = []
-    
-    for r in results:
-        if isinstance(r, Exception):
-            failures.append({"type": type(r).__name__, "message": str(r)})
-            continue
-            
-        if isinstance(r, dict):
-            if r.get('ok', True): # Assume successo se non specificato diversamente
-                successes.append(r.get('data', r))
-            else:
-                failures.append(r.get('error'))
-        else:
-            successes.append(r)
-    
-    return {
-        "ok": len(failures) == 0,
-        "data": successes,
-        "error": failures if failures else None
-    }
 
 async def guard(condition: str, context=dict()) -> Optional[Dict[str, Any]]:
     """
@@ -1044,24 +862,108 @@ async def foreach(input_list, step_to_run, context=dict()) -> List[Any]:
         
     return results
 
-async def fan_out(*steps_to_run) -> List[Any]:
+async def batch(*steps_to_run) -> Dict[str, Any]:
     """
-    Esegue una lista di step o pipe in parallelo (con asyncio.gather).
+    Esegue una lista di step in parallelo (con asyncio.gather) e aggrega i risultati.
+    Ritorna un risultato aggregato con 'ok': True solo se TUTTI gli step hanno successo.
     """
+    if not steps_to_run:
+        return {"ok": True, "data": [], "error": None}
+
     tasks = []
     
     for action_step in steps_to_run:
-        if not isinstance(action_step, tuple) or not action_step:
-            raise TypeError("Gli argomenti di fan_out devono essere step validi (tuple).")
+        # Supporto sia per step tuple che per callable diretti (per retrocompatibilità/flessibilità)
+        if hasattr(action_step, '__call__') or asyncio.iscoroutinefunction(action_step):
+             # Wrap callable in a step-like structure execution or direct call
+             # Ma _execute_step_internal si aspetta una tupla (func, args, kwargs)
+             # Creiamo uno step fittizio
+             step_tuple = (action_step, (), {})
+             task = asyncio.create_task(_execute_step_internal(step_tuple))
+        elif isinstance(action_step, tuple):
+             task = asyncio.create_task(_execute_step_internal(action_step))
+        else:
+            raise TypeError(f"fan_out supporta solo step (tuple) o callable, ricevuto: {type(action_step)}")
             
-        # Creiamo un'attività asincrona per eseguire lo step
-        # Nota: Eseguiamo lo step con pipe(None, action_step) assumendo che non richieda 'input'
-        # Questo è un'assunzione, se gli step hanno bisogno di input, questa logica va adattata.
-        task = asyncio.create_task(_execute_step_internal(action_step))
         tasks.append(task)
     
-    # Attendiamo che tutti i task in parallelo completino
-    return await asyncio.gather(*tasks)
+    # Esegue in parallelo, catturando eccezioni Python
+    raw_results = await asyncio.gather(*tasks, return_exceptions=True)
+    
+    successes = []
+    failures = []
+    
+    for r in raw_results:
+        # 1. Gestione Eccezioni Python (crash della funzione)
+        if isinstance(r, Exception):
+            failures.append({"type": type(r).__name__, "message": str(r)})
+            continue
+            
+        # 2. Gestione Errori Logici (ROP: dizionari con ok=False)
+        if isinstance(r, dict):
+            if r.get('ok') is False: 
+                failures.append(r.get('error', r))
+            else:
+                # Se ok=True o se non c'è la chiave ok (dato raw), lo consideriamo successo
+                # Se c'è 'data', estraiamo quello, altrimenti prendiamo tutto l'oggetto
+                successes.append(r.get('data', r))
+        else:
+            # Dato raw non dizionario
+            successes.append(r)
+    
+    # Logica di aggregazione: Tutto OK o niente
+    is_success = len(failures) == 0
+    
+    return {
+        "ok": is_success,
+        "data": successes, # Contiene i dati parziali anche in caso di errore globale? Di solito sì o no. Qui li lasciamo.
+        "error": failures if failures else None
+    }
+
+async def race(*steps_to_run) -> Any:
+    """
+    Esegue più step in parallelo e restituisce IL RISULTATO del primo che completa.
+    Gli altri task vengono cancellati.
+    """
+    if not steps_to_run:
+        return None
+
+    tasks = []
+    
+    # Creazione dei task (uguale a batch/fan_out)
+    for action_step in steps_to_run:
+        if hasattr(action_step, '__call__') or asyncio.iscoroutinefunction(action_step):
+             step_tuple = (action_step, (), {})
+             task = asyncio.create_task(_execute_step_internal(step_tuple))
+        elif isinstance(action_step, tuple):
+             task = asyncio.create_task(_execute_step_internal(action_step))
+        else:
+            # Se uno step non è valido, lo ignoriamo o lanciamo errore?
+            # Per coerenza con batch, lanciamo errore.
+             raise TypeError(f"race supporta solo step (tuple) o callable, ricevuto: {type(action_step)}")
+        tasks.append(task)
+
+    try:
+        # returns a tuple (done, pending)
+        done, pending = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
+        
+        # Prende il risultato del vincitore
+        winner_task = done.pop()
+        
+        # Se il vincitore ha lanciato un'eccezione, la rilanciamo o la restituiamo?
+        # Qui seguiamo la logica python standard: accedendo a .result() si rilancia l'eccezione
+        try:
+            return winner_task.result()
+        except Exception as e:
+            # Se vogliamo wrappare l'errore in ROP:
+            return {"ok": False, "error": str(e), "type": "RaceWinnerError"}
+
+    finally:
+        # Cancelliamo tutti i task ancora pendenti per non lasciarli appesi
+        for task in pending:
+            task.cancel()
+            # Opzionale: attendere che la cancellazione sia effettiva
+            # await asyncio.gather(task, return_exceptions=True)
 
 async def retry(action_step, attempts = 3, delay = 1.0, context=dict()) -> Any:
     """
@@ -1117,54 +1019,6 @@ async def timeout(action_step, max_seconds = 30.0, context=dict()) -> Any:
             "error": f"Errore interno durante il timeout: {e}",
             "type": "ExecutionError"
         }
-
-async def select(source, path) -> Any:
-    """
-    Estrae un valore da una sorgente complessa (dizionario o lista) usando una 'path'
-    separata da punti (es. 'user.profile.id' o 'data.0.value').
-
-    Args:
-        source: L'oggetto dati di partenza (normalmente risolto come 'output' o 'input').
-        path: La stringa di navigazione separata da punti.
-    """
-    
-    # 1. Risolvi la sorgente
-    # ATTENZIONE: Se 'select' è usato come step nel pipe, 
-    # la risoluzione della sorgente ('output', 'input') deve avvenire 
-    # nello step precedente o in un wrapper, non qui. 
-    # Qui assumiamo che 'source' sia già l'oggetto dati di Python.
-    
-    # 2. Navigazione
-    current_data = source
-    path_segments = path.split('.')
-    
-    for segment in path_segments:
-        try:
-            if isinstance(current_data, dict):
-                current_data = current_data[segment]
-            
-            elif isinstance(current_data, list):
-                # Gestione degli indici di lista (es. 'data.0.value')
-                index = int(segment)
-                current_data = current_data[index]
-            
-            else:
-                # La navigazione è fallita perché il tipo di dato non è navigabile
-                return {
-                    "ok": False,
-                    "error": f"Impossibile navigare in '{segment}': il dato è di tipo {type(current_data).__name__}.",
-                    "path": path
-                }
-                
-        except (KeyError, IndexError, ValueError):
-            # La chiave non esiste o l'indice non è valido
-            return {
-                "ok": False,
-                "error": f"Chiave o indice non trovato: '{segment}' nel percorso '{path}'.",
-                "path": path
-            }
-        
-    return current_data
 
 async def throttle(action_step, rate_limit_ms = 1000, context=dict()) -> Any:
     """
