@@ -26,7 +26,7 @@ async def main():
             flow.step(loader_instance.resource, path="framework/service/language.py"),
             #flow.step(lambda lang: language.container.module_cache()['framework/service/language.py'] = lang),
             flow.step(flow.catch,
-                flow.step('@.outputs.-1', path="framework/service/run.py"),
+                flow.step('@.outputs.-1.resource', path="framework/service/run.py"),
                 flow.step(loader_instance.resource, path="framework/service/run.py"),
             )
         )

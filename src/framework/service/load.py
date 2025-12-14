@@ -168,7 +168,18 @@ async def _validate_and_filter_module(main_module: types.ModuleType, path: str, 
     if exports_map:
         buffered_log("DEBUG", f"🔐 exports trovato in {path}: {list(exports_map.keys())}")
     else:
-        buffered_log("WARNING", "⚠️ Nessun 'exports' dichiarato: nessun membro sarà esposto automaticamente.")
+        buffered_log("WARNING", "⚠️ Nessun 'exports' dichiarato: generazione automatica da contratto se disponibile.")
+        if external_contracts:
+            for k, v in external_contracts.items():
+                if k == '__module__':
+                    if isinstance(v, dict):
+                        for method_name in v.keys():
+                            exports_map[method_name] = method_name
+                else:
+                    exports_map[k] = k
+        
+        if not exports_map:
+             buffered_log("WARNING", "⚠️ Nessun 'exports' dichiarato e nessun contratto utilizzabile: nessun membro sarà esposto automaticamente.")
 
     # Build map of test-targeted methods: {TargetName: {method1, method2}}
     contract_methods_by_name: Dict[str, set[str]] = {

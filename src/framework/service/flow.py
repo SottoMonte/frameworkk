@@ -496,7 +496,9 @@ def get(data, path, default=None):
         elif isinstance(data, dict):
             # Per i dict usiamo la chiave stringa originale
             next_data = data.get(key_str)
-        # Opzionale: Aggiungere qui getattr per oggetti se serve
+        else:
+             # Opzionale: Aggiungere qui getattr per oggetti se serve
+             next_data = getattr(data, key_str, default)
     except (IndexError, TypeError):
         return default
 
@@ -635,6 +637,7 @@ async def _execute_step_internal(action_step,context=dict()) -> Any:
 
     if not isinstance(action_step, tuple) or len(action_step) < 2 or not callable(action_step[0]):
         raise TypeError("L'azione fornita non è un formato step valido.",fun,args,kwargs)
+        #return {'success': False, 'errors': ['("L\'azione fornita non è un formato step valido.", None, (), {\'path\': \'framework/service/run.py\'})'], 'function': fun.__name__}
 
     try:
         if asyncio.iscoroutinefunction(fun):
@@ -914,8 +917,11 @@ async def catch(try_step, catch_step,context=dict()):
     # Per semplicità, la chiameremo _execute_step
     
     # 1. Tenta di eseguire lo step principale
-    outcome = await _execute_step_internal(try_step,context)
-    
+    try:
+        outcome = await _execute_step_internal(try_step,context)
+    except Exception as e:
+        outcome = {'success': False, 'errors': [str(e)]}
+    print("CATCH---------------------",outcome)
     # 2. Verifica se è un oggetto errore ROP
     # 2. Verifica se è un oggetto errore ROP
     if isinstance(outcome, dict) and outcome.get('success') is False:
@@ -923,6 +929,7 @@ async def catch(try_step, catch_step,context=dict()):
         
         # Puoi anche passare l'errore al catch_step, ma per semplicità lo eseguiamo direttamente
         # Esegue lo step di fallback
+        
         return await _execute_step_internal(catch_step)
     
     return outcome
