@@ -16,9 +16,9 @@ async def main():
         
         loader_instance = loader.loader()
 
-        ok = await loader_instance.resource(path="framework/service/language.py")
+        '''ok = await loader_instance.resource(path="framework/service/run.py")
         print(dir(ok.get('data')))
-        print(ok.get('data').__dict__)
+        print(ok.get('data').__dict__)'''
 
         # Seed the DI cache with the imported module so dynamically loaded
         # modules that ask for `language` during their own import don't see None.
@@ -33,6 +33,6 @@ async def main():
 
 if __name__ == "__main__":
     run = asyncio.run(main())
-    print(run)
-    #run.application(args=sys.argv)
+    #print(dir(run))
+    run.application(args=sys.argv)
     

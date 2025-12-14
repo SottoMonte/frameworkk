@@ -2,7 +2,8 @@ import asyncio
 import sys
 
 imports = {
-    'loader': 'framework/service/loader.py'
+    #'loader': 'framework/manager/loader.py'
+    'loader': 'framework/service/load.py'
 }
 
 import os

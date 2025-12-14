@@ -380,6 +380,7 @@ def estrai_righe_da_codice(codice_sorgente: str, riga_inizio: int, riga_fine: in
     righe = codice_sorgente.splitlines()
     indice_inizio = max(0, riga_inizio - 1)
     indice_fine = min(len(righe), riga_fine)
+    return "\n".join(righe[indice_inizio:indice_fine])
 
 # =====================================================================
 # --- Logging Utilites ---

@@ -162,7 +162,8 @@ async def _validate_and_filter_module(main_module: types.ModuleType, path: str, 
     # contract_module = await resource(path=contract_path) # Recursion risk? 
     # resource calls _load_python_module which works.
     # But resource checks if .test.py -> returns it directly. So OK.
-    contract_module = await resource(path=contract_path)
+    contract_module_res = await resource(path=contract_path)
+    contract_module = contract_module_res.get('data') if isinstance(contract_module_res, dict) and 'data' in contract_module_res else contract_module_res
 
     exports_map = getattr(contract_module, 'exports', {}) if isinstance(getattr(contract_module, 'exports', None), dict) else {}
     if exports_map:
@@ -190,7 +191,8 @@ async def _validate_and_filter_module(main_module: types.ModuleType, path: str, 
 
     # Validate hashes (compact loop)
     contract_validated_methods = {}
-    ccc = await generate_checksum(path)
+    ccc_envelope = await generate_checksum(path)
+    ccc = ccc_envelope.get('data', {}) if isinstance(ccc_envelope, dict) else ccc_envelope
 
     if not external_contracts:
         print(f"DEBUG_LOADER: {path} - Using Auto-Trust (CCC generated)")
@@ -204,6 +206,7 @@ async def _validate_and_filter_module(main_module: types.ModuleType, path: str, 
             continue
         prod_obj = main_module if tgt == '__module__' else getattr(main_module, tgt, None)
         test_obj = getattr(contract_module, 'TestModule' if tgt == '__module__' else f'Test{tgt}', None)
+        
         if not prod_obj or not test_obj:
             # buffered_log("WARNING", f"Oggetto produzione/test mancante per contratto: {tgt}")
             continue
@@ -398,7 +401,7 @@ async def resource(**kwargs) -> Any:
         'match (regex ".py") @.path': flow.step(flow.pipe,
             flow.step(_load_python_module, 'main_module', '@.path', content),
             flow.step(flow.switch, {
-                '@ | match (regex ".test.py")': flow.step(lambda x: x, '@'),
+                '@.path | match (regex ".test.py")': flow.step(lambda x: x, '@.outputs.-1'),
                 'true': flow.step(_validate_and_filter_module, '@.outputs.-1', resource_path),
             }),
         ),
