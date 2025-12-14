@@ -31,9 +31,7 @@ logger = logging.getLogger("BOOTSTRAPPER")
 # =====================================================================
 
 @asynchronous()
-async def generate_checksum(
-    main_path: str, 
-) -> Dict[str, Dict[str, Dict[str, Dict[str, str]]]]:
+async def generate_checksum(main_path: str, ) -> Dict[str, Dict[str, Dict[str, Dict[str, str]]]]:
     """
     Genera il contratto JSON, mappando ogni metodo in un oggetto annidato
     che distingue l'hash di produzione da quello di test.
@@ -359,9 +357,9 @@ async def _load_python_module(name: str, path: str, code: str) -> types.ModuleTy
     except Exception:
         container.module_cache()[path] = module
 
-    if module.__dict__['language'] is None and path not in ['src/framework/service/contract.test.py','src/framework/service/contract.py','src/framework/service/language.test.py','src/framework/service/language.py','framework/service/language.py']:
+    '''if module.__dict__['language'] is None and path not in ['src/framework/service/contract.test.py','src/framework/service/contract.py','src/framework/service/language.test.py','src/framework/service/language.py','framework/service/language.py']:
         buffered_log("WARNING", "⚠️ Modulo di lingua non caricato prima delle dipendenze.", path)
-        raise ImportError("Modulo di lingua mancante per le dipendenze.")
+        raise ImportError("Modulo di lingua mancante per le dipendenze.")'''
     
     try:
         dependencies = analyze_module(code, path)
@@ -371,7 +369,6 @@ async def _load_python_module(name: str, path: str, code: str) -> types.ModuleTy
         
         buffered_log("INFO", f"🔍 Dipendenze trovate in {path}: {dependencies}")
         await _load_dependencies(module, dependencies.copy())
-        
         compiled_code = compile(code, module_name, 'exec')
         exec(compiled_code, module.__dict__)
         container.module_cache()[path] = module
@@ -386,16 +383,16 @@ async def resource(**kwargs) -> Any:
     resource_path = kwargs.get('path', '')
     content = await _load_resource(path=resource_path)
     return await flow.switch({
-        'match (regex ".json") @': flow.step(convert, content, dict, 'json'),
-        'match (regex ".py") @': flow.step(flow.pipe, resource_path,
-            flow.step(_load_python_module, 'main_module', 'input', content),
-            flow.step(flow.switch, 'outputs', {
+        'match (regex ".json") @.path': flow.step(convert, content, dict, 'json'),
+        'match (regex ".py") @.path': flow.step(flow.pipe,
+            flow.step(_load_python_module, 'main_module', '@.path', content),
+            flow.step(flow.switch, {
                 '@ | match (regex ".test.py")': flow.step(lambda x: x, '@'),
-                'true': flow.step(_validate_and_filter_module, '@', resource_path),
+                'true': flow.step(_validate_and_filter_module, '@.outputs.-1', resource_path),
             }),
         ),
         'true': flow.step(lambda: content),
-    })
+    }, context={'path': resource_path})
 
 async def load_di_entry(**constants: Any) -> None:
     """

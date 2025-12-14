@@ -612,11 +612,14 @@ async def _execute_step_internal(action_step,context=dict()) -> Any:
     args = action_step[1] if len(action_step) > 1 else ()
     kwargs = action_step[2] if len(action_step) > 2 else {}
     if isinstance(fun, str):
-        print("funzione##############################################à",context,fun)
+        #Funzione da stringa (context lookup)
+        #print("funzione##############################################à",context,fun)
         fun = get({'@':context}, fun)
+    
     aaa = []
     for arg in args:
-        if isinstance(arg, str) and "@" in arg:
+        # Modifica: Controllo più rigoroso per lookup su contesto
+        if isinstance(arg, str) and arg.strip().startswith("@"):
             aaa.append(get({'@':context}, arg))
         else:
             aaa.append(arg)
@@ -624,7 +627,7 @@ async def _execute_step_internal(action_step,context=dict()) -> Any:
 
     kkk = {}
     for k, v in kwargs.items():
-        if isinstance(v, str) and "@" in v:
+        if isinstance(v, str) and v.strip().startswith("@"):
             kkk[k] = get({'@':context}, v)
         else:
             kkk[k] = v
@@ -635,8 +638,16 @@ async def _execute_step_internal(action_step,context=dict()) -> Any:
 
     try:
         if asyncio.iscoroutinefunction(fun):
+            # Inspect the function to see if it accepts 'context'
+            sig = inspect.signature(fun)
+            if 'context' in sig.parameters:
+                kwargs['context'] = context
             result = await fun(*args, **kwargs)
         else:
+            # Inspect the function to see if it accepts 'context'
+            sig = inspect.signature(fun)
+            if 'context' in sig.parameters:
+                kwargs['context'] = context
             result = fun(*args, **kwargs)
 
         # Auto-wrapping in Transaction se non lo è già
@@ -665,6 +676,7 @@ async def pipe(*stages,context=dict()):
     
     for stage_tuple in stages:
         stage_index += 1
+        #print("stage_tuple",stage_tuple,"<---------------------",context)
         outcome = await _execute_step_internal(stage_tuple,context)
         print("outcome",outcome,"<---------------------")
         if isinstance(outcome, dict) and outcome.get('success') is True and 'data' in outcome:
@@ -788,9 +800,35 @@ async def guard(condition: str, context=dict()) -> Optional[Dict[str, Any]]:
     
     try:
         # Esegue la query MistQL sui dati forniti
+        safe_context = context
+        if isinstance(context, dict):
+             # Crea una copia safe per MistQL rimuovendo oggetti non serializzabili
+             # o convertendoli in stringhe.
+             # Si può fare una copia shallow e rimpiazzare le chiavi problematiche note
+             # oppure una sanitizzazione ricorsiva se necessario.
+             # Per ora sanitizziamo shallow 'outputs' se presente
+            safe_context = context.copy()
+            if 'outputs' in safe_context:
+                safe_outputs = []
+                for out in safe_context['outputs']:
+                    if isinstance(out, (dict, list, str, int, float, bool, type(None))):
+                        safe_outputs.append(out)
+                    else:
+                        safe_outputs.append(str(out))
+                safe_context['outputs'] = safe_outputs
+            
+            # Sanitizza eventuali altri oggetti non serializzabili al primo livello
+            for k, v in safe_context.items():
+                if not isinstance(v, (dict, list, str, int, float, bool, type(None))):
+                    safe_context[k] = str(v)
+
         if type(context) not in [str, int, float, bool,dict,list]:
-            context = str(context)
-        result = mistql.query(condition, context)
+            safe_context = str(context)
+            
+        wrapped_context = {'@': safe_context}
+        print("condition---------------------",condition)
+        result = mistql.query(condition, wrapped_context)
+        print("result---------------------",result,condition)
         
         # Se il risultato è truthy, la condizione è soddisfatta
         if result:
@@ -803,11 +841,12 @@ async def guard(condition: str, context=dict()) -> Optional[Dict[str, Any]]:
             # Condizione non soddisfatta
             return {
                 "success": False, 
-                "data": None, 
+                "data": context, 
                 "errors": [{
                     #"message": error_message,
                     "condition": condition,
-                    "evaluated_result": result
+                    "evaluated_result": result,
+                    "context": safe_context # Logghiamo il contesto safe per debug
                 }]
             }
     except Exception as e:
@@ -858,8 +897,9 @@ async def switch(cases, context=dict()):
     for condition, action_step in case_list:
         
         # 1. Valuta la condizione
+        #print(condition,action_step)
         guard_result = await guard(condition, context)
-        print(guard_result)
+        print("guard_result---------------------",condition,guard_result)
         success = guard_result.get("success", False)
         
         if success:
