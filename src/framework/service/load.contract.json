@@ -1,12 +1,16 @@
 {
     "__module__": {
+        "generate_checksum": {
+            "test": "0c95d2646532345ba5efdea7bcca6d6f37eb15bf70a1daae5afb0f846641778b",
+            "production": "46f68bd05e07b5473a9cc608106ff88823f0ba3d6e1e104ca138ce957ab4796b"
+        },
         "bootstrap_core": {
             "test": "d683b01a043ec54c4081835db4187e9f54206e1580563e29bb07fb977ef4b999",
-            "production": "f8cbae8bfea13110b7774808fe2081c78c34544a594f0809ed49e6490dbf7c85"
+            "production": "ad41e658954a285157a0e22356f2c2903e2e2e4ec8f28c963c3f3707831bde66"
         },
         "bootstrap": {
             "test": "038ee4e822716fb257c55af8dc60aa05a5efb4f112fcc251edb8a4110ccbcbb5",
-            "production": "7cde1edd4f4181600a679ccf4f05b358f08e41d4648ae2d4cebc111dcf2f89ca"
+            "production": "bb2ae47d4caa6e5bf2b86011482ff9c1a7bd1847c6cc87963ae8c8ed8379b895"
         }
     }
 }

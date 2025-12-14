@@ -351,7 +351,8 @@ async def _load_dependencies(module: types.ModuleType, dependencies) -> None:
                 continue
 
         buffered_log("DEBUG", f"⏳ Caricamento dipendenza '{key}' da {import_path}...")
-        value = await resource(path=import_path)
+        res = await resource(path=import_path)
+        value = res.get('data') if isinstance(res, dict) and 'data' in res else res
         setattr(module, key, value)
         container.module_cache()[import_path] = value
         buffered_log("DEBUG", f"📦 Dipendenza '{key}' caricata da {import_path}")
@@ -428,7 +429,8 @@ async def load_di_entry(**constants: Any) -> None:
         setattr(container, service_name, providers.Singleton(list))
 
     # Caricamento del Modulo/Risorsa 
-    module = await resource(**constants)
+    res = await resource(**constants)
+    module = res.get('data') if isinstance(res, dict) and 'data' in res else res
     resource_class: Callable = getattr(module, attribute_name)
 
     if dependency_keys:
@@ -599,8 +601,9 @@ async def bootstrap() -> None:
     # Dobbiamo importare language qui o usare module_cache?
     # bootstrap dipende da language per `format` e `convert`.
     import framework.service.language as language
-    
+
     text = await resource(path="pyproject.toml")
+    print(text)
     config = await language.format(text,**config_params)
     config = await convert(config, dict, 'toml')
     

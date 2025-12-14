@@ -413,6 +413,32 @@ def test():
 def application(tester=None,**constants):
     if '--update' in constants.get('args',[]):
         sync_github_repo("src", "colosso-cloud", "framework", "main")
+    if '--generate-contract' in constants.get('args', []):
+        try:
+            target_idx = constants.get('args', []).index('--generate-contract') + 1
+            if target_idx < len(constants.get('args', [])):
+                target_path = constants.get('args', [])[target_idx]
+                print(f"Generating contract for: {target_path}")
+                # loader.generate_checksum is async and returns the hashes
+                res = asyncio.run(loader.generate_checksum(target_path))
+                # Unwrap if it's an envelope
+                data = res.get('data', {}) if isinstance(res, dict) and 'data' in res else res
+                
+                if data and target_path in data:
+                    import json
+                    contract_path = target_path.replace('.py', '.contract.json')
+                    with open(contract_path, 'w') as f:
+                        json.dump(data[target_path], f, indent=4)
+                    print(f"✅ Contract written to {contract_path}")
+                else:
+                    print(f"❌ Failed to generate contract or empty result: {data}")
+            else:
+                print("Usage: --generate-contract <path>")
+        except Exception as e:
+            print(f"Error generating contract: {e}")
+            import traceback
+            traceback.print_exc()
+            
     if '--test' in constants.get('args',[]):
         test()
     else:

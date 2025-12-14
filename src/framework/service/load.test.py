@@ -9,12 +9,16 @@ imports = {
 exports = {
     'bootstrap':'bootstrap',
     'bootstrap_core':'bootstrap_core',
+    'generate_checksum': 'generate_checksum'
 }
 
 class TestModule(contract.Contract):
 
     def setUp(self):
         print("Setting up the test environment...")
+
+    async def test_generate_checksum(self):
+        pass
 
     async def test_bootstrap_core(self):
         '''"""Verifica che language.get recuperi correttamente i valori da percorsi validi."""

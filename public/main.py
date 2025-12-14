@@ -30,7 +30,26 @@ async def main():
                 flow.step(loader_instance.resource, path="framework/service/run.py"),
             )
         )
-
+'''
+async def main():
+    target = sys.argv[1] if len(sys.argv) > 1 else 'src/framework/service/load.py'
+    print(f"Generating contract for {target}...")
+    
+    # generate_checksum returns a wrapper due to @asynchronous
+    res = await generate_checksum(target)
+    
+    # Unwrap
+    data = res.get('data', {}) if isinstance(res, dict) and 'data' in res else res
+    
+    contract_path = target.replace('.py', '.contract.json')
+    if data and target in data:
+        with open(contract_path, 'w') as f:
+            json.dump(data[target], f, indent=4)
+        print(f"Written to {contract_path}")
+        print(json.dumps(data[target], indent=4))
+    else:
+        print(f"Failed to generate contract for {target}. Result: {data}")
+'''
 if __name__ == "__main__":
     run = asyncio.run(main())
     #print(dir(run))

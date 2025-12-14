@@ -5,7 +5,8 @@ imports = {
 }
 
 exports = {
-    'application': 'application'
+    'application': 'application',
+    'discover_and_run_tests': 'discover_and_run_tests'
 }
 
 class TestModule(contract.Contract):
