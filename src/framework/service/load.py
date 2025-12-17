@@ -141,202 +141,246 @@ async def generate(data, schema=None):
 # --- Funzioni di Caricamento --- CDDF (Contract-Driven Dependency Filter)
 # =====================================================================
 
-async def _validate_and_filter_module(main_module: types.ModuleType, path: str, ) -> types.ModuleType:
-    if isinstance(main_module, dict) and 'success' in main_module and not main_module['success']:
-         raise ImportError(f"Modules load failed: {main_module.get('errors')}")
+# =====================================================================
+# --- Helper per _validate_and_filter_module (CDDF) ---
+# =====================================================================
 
-    """
-    Copia le classi e le funzioni dal main_module al filtered_module, mantenendo
-    solo i membri che hanno un contratto valido e presente nel file .contract.json.
-    """
-    validated_members: List[str] = []
-    # print()
+async def _load_contract_info(main_module, path):
+    """Carica il contratto JSON e le info dal modulo di test."""
     buffered_log("DEBUG", f"🔍 Avvio validazione contratto per il modulo: {path}", dir(main_module))
+    
+    # 1. Caricamento contratto JSON
     contract_json_path = path.replace('.py', '.contract.json')
+    external_contracts = {}
     try:
         json_content = await _load_resource(path=contract_json_path)
-        external_contracts: Dict[str, Any] = await convert(json_content, dict, 'json')
+        external_contracts = await convert(json_content, dict, 'json')
         buffered_log("DEBUG", f"Contratto JSON esterno caricato da {contract_json_path}.")
     except Exception as e:
         buffered_log("WARNING", f"Nessun contratto JSON valido trovato in {contract_json_path}. Filtro hash disabilitato.", e)
-        external_contracts = {}
 
+    # 2. Caricamento modulo di test
     contract_path = path.replace('.py', '.test.py')
+    contract_module_res = await resource(path=contract_path)
+    # Estrai modulo se resource() ritorna un wrapper
+    contract_module = contract_module_res.get('data') if isinstance(contract_module_res, dict) and 'data' in contract_module_res else contract_module_res
+    
+    # Analisi statica del codice di test
     contract_code = await _load_resource(path=contract_path)
     contract_ana = analyze_module(contract_code, contract_path)
-    # contract_module = await resource(path=contract_path) # Recursion risk? 
-    # resource calls _load_python_module which works.
-    # But resource checks if .test.py -> returns it directly. So OK.
-    contract_module_res = await resource(path=contract_path)
-    contract_module = contract_module_res.get('data') if isinstance(contract_module_res, dict) and 'data' in contract_module_res else contract_module_res
 
-    exports_map = getattr(contract_module, 'exports', {}) if isinstance(getattr(contract_module, 'exports', None), dict) else {}
-    if exports_map:
-        buffered_log("DEBUG", f"🔐 exports trovato in {path}: {list(exports_map.keys())}")
-    else:
-        buffered_log("WARNING", "⚠️ Nessun 'exports' dichiarato: generazione automatica da contratto se disponibile.")
-        if external_contracts:
-            for k, v in external_contracts.items():
-                if k == '__module__':
-                    if isinstance(v, dict):
-                        for method_name in v.keys():
-                            exports_map[method_name] = method_name
-                else:
-                    exports_map[k] = k
-        
-        if not exports_map:
-             buffered_log("WARNING", "⚠️ Nessun 'exports' dichiarato e nessun contratto utilizzabile: nessun membro sarà esposto automaticamente.")
-
-    # Build map of test-targeted methods: {TargetName: {method1, method2}}
-    contract_methods_by_name: Dict[str, set[str]] = {
-        ('__module__' if mname == 'TestModule' else mname.replace('Test', '')):
-            {tn.replace('test_', '') for tn in (data.get('data', {}).get('methods', {}) or {}).keys() if tn.startswith('test_')}
-        for mname, data in contract_ana.items() if isinstance(data, dict)
+    return {
+        'external_contracts': external_contracts,
+        'contract_module': contract_module,
+        'contract_ana': contract_ana
     }
 
-    # Validate hashes (compact loop)
-    contract_validated_methods = {}
+def _resolve_exports_map(main_module, contract_info):
+    """Costruisce la mappa degli exports basata sul modulo di test o sul contratto JSON."""
+    contract_module = contract_info['contract_module']
+    external_contracts = contract_info['external_contracts']
+    
+    # Tentativo primario: exports definito in .test.py
+    exports_map = getattr(contract_module, 'exports', {}) if isinstance(getattr(contract_module, 'exports', None), dict) else {}
+    
+    if exports_map:
+        buffered_log("DEBUG", f"🔐 exports trovato: {list(exports_map.keys())}")
+        return exports_map
+        
+    # Tentativo secondario: derivazione da .contract.json
+    buffered_log("WARNING", "⚠️ Nessun 'exports' dichiarato: generazione automatica da contratto se disponibile.")
+    if external_contracts:
+        for k, v in external_contracts.items():
+            if k == '__module__' and isinstance(v, dict):
+                for method_name in v.keys():
+                    exports_map[method_name] = method_name
+            else:
+                exports_map[k] = k
+    
+    if not exports_map:
+        buffered_log("WARNING", "⚠️ Nessun 'exports' dichiarato e nessun contratto utilizzabile.")
+    
+    return exports_map
+
+async def _validate_checksums(main_module, path, contract_info):
+    """Valida gli hash dei metodi se presente un contratto esterno."""
+    external_contracts = contract_info['external_contracts']
+    contract_module = contract_info['contract_module']
+    
     ccc_envelope = await generate_checksum(path)
     ccc = ccc_envelope.get('data', {}) if isinstance(ccc_envelope, dict) else ccc_envelope
 
     if not external_contracts:
         print(f"DEBUG_LOADER: {path} - Using Auto-Trust (CCC generated)")
-        buffered_log("WARNING", "⚠️ Nessun contratto JSON esterno. Uso gli hash generati (Auto-Trust).")
-        external_contracts = ccc.get(path, {})
-    else:
-        print(f"DEBUG_LOADER: {path} - Using External Contract: {list(external_contracts.keys())}")
+        return {} # Nessuna validazione strict richiesta
 
-    for tgt, group in (external_contracts or {}).items():
-        if not isinstance(group, dict):
-            continue
+    print(f"DEBUG_LOADER: {path} - Using External Contract: {list(external_contracts.keys())}")
+    
+    contract_validated_methods = {}
+    
+    for tgt, group in external_contracts.items():
+        if not isinstance(group, dict): continue
+            
         prod_obj = main_module if tgt == '__module__' else getattr(main_module, tgt, None)
         test_obj = getattr(contract_module, 'TestModule' if tgt == '__module__' else f'Test{tgt}', None)
         
-        if not prod_obj or not test_obj:
-            # buffered_log("WARNING", f"Oggetto produzione/test mancante per contratto: {tgt}")
-            continue
+        if not prod_obj or not test_obj: continue
 
         valid = set()
         for m, hashes in group.items():
-            if not (isinstance(hashes, dict) and 'production' in hashes and 'test' in hashes):
-                continue
+            if not (isinstance(hashes, dict) and 'production' in hashes and 'test' in hashes): continue
             
-            prod_func = getattr(prod_obj, m, None)
-            test_func = getattr(test_obj, f'test_{m}', None)
-            
-            if prod_func is None or test_func is None:
+            # Verifica che esistano metodi corrispondenti
+            if getattr(prod_obj, m, None) is None or getattr(test_obj, f'test_{m}', None) is None:
                 continue
 
-            expected_prod_hash = hashes['production']
-            expected_test_hash = hashes['test']
-
-            current_prod_hash = ccc.get(path,{}).get(tgt,{}).get(m,{}).get('production','')
-            current_test_hash = ccc.get(path,{}).get(tgt,{}).get(m,{}).get('test','')
+            expected_p = hashes['production']
+            expected_t = hashes['test']
+            current_p = ccc.get(path,{}).get(tgt,{}).get(m,{}).get('production','')
+            current_t = ccc.get(path,{}).get(tgt,{}).get(m,{}).get('test','')
             
-            if current_prod_hash == expected_prod_hash and current_test_hash == expected_test_hash:
+            if current_p == expected_p and current_t == expected_t:
                 valid.add(m)
             else:
-                print(f"DEBUG_LOADER: Mismatch hash for {m}. P:{current_prod_hash} vs {expected_prod_hash}")
+                print(f"DEBUG_LOADER: Mismatch hash for {m}. P:{current_p} vs {expected_p}")
         
         if valid:
             contract_validated_methods[tgt] = valid
+            
+    return contract_validated_methods
 
-    buffered_log("DEBUG", f"🔍 Avvio filtro: membri mantenuti se presenti in {contract_json_path} e/o testati.")
-    print(f"DEBUG_LOADER: Exports Map: {exports_map}")
-    print(f"DEBUG_LOADER: Methods by Name: {contract_methods_by_name}")
-    print(f"DEBUG_LOADER: Validated Methods: {contract_validated_methods}")
-    print(f"DEBUG_LOADER: Allowed Exports (calc):")
+def _compute_allowed_exports(main_module, exports_map, contract_info, validated_methods):
+    """Calcola l'insieme finale dei membri esportabili e validati."""
+    contract_ana = contract_info['contract_ana']
+    
+    # Mappa metodi testati esplicitamente
+    # contract_ana struttura: { 'TestClasse': {'data': {'methods': {'test_metodo': ...}}} }
+    contract_methods_by_name = {
+        ('__module__' if mname == 'TestModule' else mname.replace('Test', '')):
+            {tn.replace('test_', '') for tn in (data.get('data', {}).get('methods', {}) or {}).keys() if tn.startswith('test_')}
+        for mname, data in contract_ana.items() if isinstance(data, dict)
+    }
 
-    # Compute allowed exports
     allowed_exports = {
         public 
         for public, priv in exports_map.items()
         for candidate in [public] + ([priv] if isinstance(priv, str) else [])
         if hasattr(main_module, candidate) and (
-            (inspect.isclass(getattr(main_module, candidate)) and (contract_methods_by_name.get(candidate) or contract_validated_methods.get(candidate))) or
-            (inspect.isfunction(getattr(main_module, candidate)) and (candidate in contract_methods_by_name.get('__module__', {}) and candidate in contract_validated_methods.get('__module__', {})))
+            (inspect.isclass(getattr(main_module, candidate)) and 
+                (contract_methods_by_name.get(candidate) or validated_methods.get(candidate))) 
+            or
+            (inspect.isfunction(getattr(main_module, candidate)) and 
+                (candidate in contract_methods_by_name.get('__module__', {}) and candidate in validated_methods.get('__module__', {})))
         )
     }
-    print(f"DEBUG_LOADER: Allowed Exports: {allowed_exports}")
-    allowed_exports = allowed_exports.union(set({'language'}))
+    
+    # Force include 'language'
+    allowed_exports.add('language')
     exports_map['language'] = 'language'
-    buffered_log("DEBUG", f"🔍 Avvio filtro: membri mantenuti se presenti in {allowed_exports} e/o testati.")
+    
+    return allowed_exports
+
+def _create_filtered_module(main_module, exports_map, allowed_exports, validated_methods, contract_info):
+    """Crea un nuovo oggetto modulo popolandolo solo con i membri validati."""
+    path = main_module.__file__ if hasattr(main_module, '__file__') else "unknown"
+    contract_ana = contract_info['contract_ana']
+    
+    # Ricostruiamo la mappa metodi testati che serve qui dentro
+    contract_methods_by_name = {
+        ('__module__' if mname == 'TestModule' else mname.replace('Test', '')):
+            {tn.replace('test_', '') for tn in (data.get('data', {}).get('methods', {}) or {}).keys() if tn.startswith('test_')}
+        for mname, data in contract_ana.items() if isinstance(data, dict)
+    }
     
     filtered_module = types.ModuleType(f"filtered:{main_module.__name__}")
     if hasattr(main_module, '__file__'):
         filtered_module.__file__ = main_module.__file__
 
-    if exports_map:
-        for public_name, private_spec in exports_map.items():
-            private_name = private_spec if isinstance(private_spec, str) else public_name
-            if public_name not in allowed_exports:
-                buffered_log("DEBUG", f"Export ignorato: {public_name} -> {private_name}")
-                continue
-            if not hasattr(main_module, private_name):
-                buffered_log("WARNING", f"Export dichiarato ma non trovato nel modulo: {private_name} (dichiarato come {public_name})")
-                continue
+    validated_members_log = []
 
-            member = getattr(main_module, private_name)
-            if inspect.isclass(member):
-                # shallow clone of class attributes
-                attrs = {k: v for k, v in member.__dict__.items()}
-                attrs['__module__'] = filtered_module.__name__
-                FilteredClass = type(member.__name__, member.__bases__, attrs)
-                setattr(filtered_module, public_name, FilteredClass)
-                validated_members.append(public_name)
+    if not exports_map:
+        buffered_log("WARNING", "⚠️ Nessun 'exports' dichiarato: file vuoto.")
+        return filtered_module
 
-                valid_set = contract_validated_methods.get(member.__name__, set()) or contract_methods_by_name.get(member.__name__, set())
-                for attr_name, _ in inspect.getmembers(FilteredClass, inspect.isfunction):
-                    if attr_name.startswith('__') and attr_name.endswith('__'):
-                        continue
-                    if attr_name.startswith('_'):
-                        continue
-                    if attr_name not in valid_set:
-                        try:
-                            delattr(FilteredClass, attr_name)
-                        except Exception:
-                            pass
-                    else:
-                        validated_members.append(f"{public_name}.{attr_name}")
+    for public_name, private_spec in exports_map.items():
+        private_name = private_spec if isinstance(private_spec, str) else public_name
+        
+        if public_name not in allowed_exports:
+            continue
+        if not hasattr(main_module, private_name):
+            continue
 
-            elif inspect.isfunction(member) or not inspect.isclass(member):
-                if not hasattr(member, '_is_decorated'):
-                    setattr(filtered_module, public_name, member)
-                    validated_members.append(public_name)
-                    pass
-                if inspect.iscoroutinefunction(member):
-                    try:
-                        decorator_factory = asynchronous(
-                            custom_filename=main_module.__file__ if hasattr(main_module, '__file__') else path,
-                            app_context=None 
-                        )
-                        new_member = decorator_factory(member)
-                        buffered_log("DEBUG", f"Decoratore 'asynchronous' applicato a funzione sincrona: {private_name}")
-                    except Exception as ex:
-                        buffered_log("ERROR", f"Impossibile applicare decoratore a {private_name}: {ex}")
-                        new_member = member 
+        member = getattr(main_module, private_name)
+        
+        if inspect.isclass(member):
+            # Shallow clone class
+            attrs = {k: v for k, v in member.__dict__.items()}
+            attrs['__module__'] = filtered_module.__name__
+            FilteredClass = type(member.__name__, member.__bases__, attrs)
+            
+            valid_set = validated_methods.get(member.__name__, set()) or contract_methods_by_name.get(member.__name__, set())
+            
+            # Prune methods not validated
+            for attr_name, _ in inspect.getmembers(FilteredClass, inspect.isfunction):
+                if attr_name.startswith('__') or attr_name.startswith('_'): continue
+                if attr_name not in valid_set:
+                    try: delattr(FilteredClass, attr_name)
+                    except: pass
                 else:
-                    try:
-                        decorator_factory = synchronous(
-                            custom_filename=main_module.__file__ if hasattr(main_module, '__file__') else path,
-                            app_context=None 
-                        )
-                        new_member = decorator_factory(member)
-                        buffered_log("DEBUG", f"Decoratore 'synchronous' applicato a funzione: {private_name}")
-                    except Exception as ex:
-                        buffered_log("ERROR", f"Impossibile applicare decoratore SYNC a {private_name}: {ex}")
-                        new_member = member 
-                
-                setattr(filtered_module, public_name, new_member)
-                validated_members.append(public_name)
-            elif inspect.ismodule(member):
-                setattr(filtered_module, public_name, member)
-                validated_members.append(public_name)
-    else:
-        buffered_log("WARNING", "⚠️ Nessun 'exports' dichiarato: nessun membro sarà esposto dal modulo filtrato.")
+                    validated_members_log.append(f"{public_name}.{attr_name}")
+            
+            setattr(filtered_module, public_name, FilteredClass)
+            validated_members_log.append(public_name)
 
-    buffered_log("INFO", f"✅ Validazione e filtro riusciti per {path}. Membri esposti: {validated_members}")
+        elif inspect.isfunction(member):
+            # Apply decorators logic if needed (simplified here just copying member)
+            # Re-applying logic from original:
+            new_member = member
+            if inspect.iscoroutinefunction(member):
+                try:
+                    deco = asynchronous(custom_filename=path)
+                    new_member = deco(member)
+                except Exception: pass
+            else:
+                try:
+                    deco = synchronous(custom_filename=path)
+                    new_member = deco(member)
+                except Exception: pass
+
+            setattr(filtered_module, public_name, new_member)
+            validated_members_log.append(public_name)
+            
+        elif inspect.ismodule(member):
+            setattr(filtered_module, public_name, member)
+            validated_members_log.append(public_name)
+
+    buffered_log("INFO", f"✅ Validazione riuscita per {path}. Esposti: {validated_members_log}")
     return filtered_module
+
+
+async def _validate_and_filter_module(main_module: types.ModuleType, path: str) -> types.ModuleType:
+    if isinstance(main_module, dict) and 'success' in main_module and not main_module['success']:
+         raise ImportError(f"Modules load failed: {main_module.get('errors')}")
+
+    # Esecuzione Pipeline CDDF referenced
+    # Nota: flow.pipe passa l'output di uno step come primo argomento del successivo.
+    # Qui però abbiamo bisogno di 'accumulare' info. flow.pipe base è lineare.
+    # Useremo chiamate dirette per semplicità o dovremmo adattare gli step per ritornare (main_module, context...)
+    
+    # 1. Info Contratto
+    contract_info = await _load_contract_info(main_module, path)
+    
+    # 2. Risoluzione Exports
+    exports_map = _resolve_exports_map(main_module, contract_info)
+    
+    # 3. Validazione Checksum
+    validated_methods = await _validate_checksums(main_module, path, contract_info)
+    
+    # 4. Calcolo Allowed Exports
+    allowed_exports = _compute_allowed_exports(main_module, exports_map, contract_info, validated_methods)
+    
+    # 5. Creazione Modulo Filtrato
+    return _create_filtered_module(main_module, exports_map, allowed_exports, validated_methods, contract_info)
 
 async def _load_dependencies(module: types.ModuleType, dependencies) -> None:
     """Risolve le dipendenze 'imports' definite in un modulo."""
@@ -414,44 +458,58 @@ async def resource(**kwargs) -> Any:
         'true': flow.step(lambda: content),
     }, context={'path': resource_path})
 
-async def load_di_entry(**constants: Any) -> None:
+# =====================================================================
+# --- Helper per load_di_entry (Refactoring Flow) ---
+# =====================================================================
 
-    """
-    Carica una risorsa specificata in 'constants' e la registra nel container DI globale.
-    """
-    path: str = constants.get('path', '')
-    service_name: str = constants.get('service', constants.get('name', '')) 
-    attribute_name: str = constants.get('adapter', constants.get('name', ''))
-    init_args: Dict[str, Any] = constants.get('payload', constants.get('config', {}))
-    dependency_keys = constants.get('dependency_keys', None)
-
-    log_info = f"'{path}' con service '{service_name}' e attr '{attribute_name}'"
-
-    if not path or not service_name or not attribute_name:
+def _check_di_config(**constants):
+    """Valida la configurazione di ingresso per la DI."""
+    path = constants.get('path')
+    service = constants.get('service', constants.get('name'))
+    adapter = constants.get('adapter', constants.get('name'))
+    if not path or not service or not adapter:
         buffered_log("ERROR", f"❌ Errore: Configurazioni DI insufficienti: {constants}")
-        return
-    
+        raise ValueError(f"Configurazioni DI insufficienti: {constants}")
+    return constants
+
+def _ensure_service_container(service_name):
+    """Assicura che il container abbia una lista per il servizio specificato."""
     if not hasattr(container, service_name):
         setattr(container, service_name, providers.Singleton(list))
+    return service_name
 
-    # Caricamento del Modulo/Risorsa 
-    res = await resource(**constants)
+def _extract_and_validate_module(res, constants):
+    """Estrae il modulo dalla risposta di resource() e valida l'attributo."""
+    path = constants.get('path')
+    attribute_name = constants.get('adapter', constants.get('name'))
+    
     module = res.get('data') if isinstance(res, dict) and 'data' in res else res
     
     if isinstance(module, dict):
         if 'success' in module and not module['success']:
-             print(f"CRITICAL ERROR LOADING RESOURCE {constants.get('path')}: {module.get('errors')}")
-             raise ImportError(f"Failed to load resource {constants.get('path')}: {module.get('errors')}")
-        # If it's a dict but not success=False, maybe it's valid data? But here we expect a module with attribute_name.
+             print(f"CRITICAL ERROR LOADING RESOURCE {path}: {module.get('errors')}")
+             raise ImportError(f"Failed to load resource {path}: {module.get('errors')}")
+        
         if not hasattr(module, attribute_name):
-             print(f"DEBUG_ERROR: Module {constants.get('path')} is a dict without {attribute_name}: {module}")
-             raise AttributeError(f"Module {constants.get('path')} is a dict and lacks {attribute_name}")
+             print(f"DEBUG_ERROR: Module {path} is a dict without {attribute_name}: {module}")
+             raise AttributeError(f"Module {path} is a dict and lacks {attribute_name}")
     
-    resource_class: Callable = getattr(module, attribute_name)
+    return module
+
+def _register_dependency_in_container(module, constants):
+    """Registra la classe/funzione nel container DI (come Factory o Singleton)."""
+    service_name = constants.get('service', constants.get('name'))
+    attribute_name = constants.get('adapter', constants.get('name'))
+    init_args = constants.get('payload', constants.get('config', {}))
+    dependency_keys = constants.get('dependency_keys', None)
+    path = constants.get('path')
+    log_info = f"'{path}' con service '{service_name}' e attr '{attribute_name}'"
+
+    resource_class = getattr(module, attribute_name)
 
     if dependency_keys:
         # --- CASO: MANAGER/FACTORY ---
-        dependencies: Dict[str, Any] = {}
+        dependencies = {}
         for dep_key in dependency_keys:
             if not hasattr(container, dep_key):
                 setattr(container, dep_key, providers.Singleton(list))
@@ -466,9 +524,25 @@ async def load_di_entry(**constants: Any) -> None:
         
         service_list = getattr(container, service_name)()
         service_list.append(resource_class(config=init_args))
-        
         buffered_log("INFO", f"✅✅✅✅ Aggiunto Provider a lista: '{service_name}' ({log_info})")
-        return { "success": True, "results": [] }
+    
+    return {"success": True, "results": []}
+
+async def load_di_entry(**constants: Any) -> None:
+    """
+    Carica una risorsa specificata in 'constants' e la registra nel container DI globale usando flow.pipe.
+    """
+    try:
+        await flow.pipe(
+            flow.step(_check_di_config, **constants),
+            flow.step(_ensure_service_container, '@.service'),
+            flow.step(resource, **constants),
+            flow.step(_extract_and_validate_module, '@.outputs.-1', constants),
+            flow.step(_register_dependency_in_container, '@.outputs.-1', constants)
+        , context=constants)
+    except Exception as e:
+        buffered_log("ERROR", f"Errore critico in load_di_entry per {constants.get('path')}: {e}")
+        raise e
 
 # Alias per compatibilità o preferenza di nome
 register = load_di_entry
