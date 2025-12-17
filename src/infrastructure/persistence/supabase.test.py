@@ -1,14 +1,25 @@
+imports = {
+    'contract': 'framework/service/contract.py',
+}
+
+exports = {
+    'adapter': 'adapter',
+}
+
 import unittest
 
-import framework.port.persistence as persistence
-import framework.service.flow as flow
-import framework.service.language as language
-from infrastructure.presentation.starlette import adapter
+class Testadapter(unittest.TestCase):
+    def test_read(self):
+        pass
 
-from unittest import IsolatedAsyncioTestCase
+    def test_create(self):
+        pass
 
-class AdapterTest(IsolatedAsyncioTestCase):
-    def __init__(self, *args,**kwargs):
-        super(AdapterTest, self).__init__(*args, **kwargs)  # Chiamata al costruttore di unittest.TestCase
-        #config = {}
-        #self.test = adapter(config=config)  # Inizializza il tuo adapter qui
+    def test_update(self):
+        pass
+
+    def test_delete(self):
+        pass
+
+    def test_set_token(self):
+        pass

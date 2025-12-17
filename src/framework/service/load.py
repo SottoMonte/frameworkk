@@ -19,6 +19,8 @@ from framework.service.inspector import (
     _load_resource
 )
 
+from dependency_injector import providers
+
 # 1. Configurazione del Logging
 logging.basicConfig(
     level=logging.INFO, 
@@ -140,6 +142,9 @@ async def generate(data, schema=None):
 # =====================================================================
 
 async def _validate_and_filter_module(main_module: types.ModuleType, path: str, ) -> types.ModuleType:
+    if isinstance(main_module, dict) and 'success' in main_module and not main_module['success']:
+         raise ImportError(f"Modules load failed: {main_module.get('errors')}")
+
     """
     Copia le classi e le funzioni dal main_module al filtered_module, mantenendo
     solo i membri che hanno un contratto valido e presente nel file .contract.json.
@@ -410,6 +415,7 @@ async def resource(**kwargs) -> Any:
     }, context={'path': resource_path})
 
 async def load_di_entry(**constants: Any) -> None:
+
     """
     Carica una risorsa specificata in 'constants' e la registra nel container DI globale.
     """
@@ -431,6 +437,16 @@ async def load_di_entry(**constants: Any) -> None:
     # Caricamento del Modulo/Risorsa 
     res = await resource(**constants)
     module = res.get('data') if isinstance(res, dict) and 'data' in res else res
+    
+    if isinstance(module, dict):
+        if 'success' in module and not module['success']:
+             print(f"CRITICAL ERROR LOADING RESOURCE {constants.get('path')}: {module.get('errors')}")
+             raise ImportError(f"Failed to load resource {constants.get('path')}: {module.get('errors')}")
+        # If it's a dict but not success=False, maybe it's valid data? But here we expect a module with attribute_name.
+        if not hasattr(module, attribute_name):
+             print(f"DEBUG_ERROR: Module {constants.get('path')} is a dict without {attribute_name}: {module}")
+             raise AttributeError(f"Module {constants.get('path')} is a dict and lacks {attribute_name}")
+    
     resource_class: Callable = getattr(module, attribute_name)
 
     if dependency_keys:
@@ -600,15 +616,21 @@ async def bootstrap() -> None:
     # language.format e language.convert sono ancora in language.py.
     # Dobbiamo importare language qui o usare module_cache?
     # bootstrap dipende da language per `format` e `convert`.
-    import framework.service.language as language
 
-    text = await resource(path="pyproject.toml")
-    print(text)
-    config = await language.format(text,**config_params)
-    config = await convert(config, dict, 'toml')
-    
+    # Utilizziamo flow.pipe che gestisce automaticamente l'unwrapping dei dati
+    # da {'success': True, 'data': ...} ritornati da resource()
+    config = await flow.pipe(
+        flow.step(resource, path="pyproject.toml"),
+        flow.step(flow.format,'@.outputs.-1', **config_params),
+        flow.step(flow.convert,'@.outputs.-1', dict, 'toml')
+    )
+
+    print("BOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOM##",config)
+    print("BOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOM##111")
     await bootstrap_core(config)
     
+    print("BOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOM##222")
+
     dependency_executor = container.executor()
     dependency_messenger = container.messenger()
 

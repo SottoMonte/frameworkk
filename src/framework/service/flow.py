@@ -271,13 +271,16 @@ def asynchronous(custom_filename: str = __file__, app_context = None,**constants
                 else:
                     buffered_log("ERROR", e, emoji="❌")
 
-                return {
+                ok = {
                     "success": False, 
                     "errors": [error_details],
                     "data": None,
                     "action": wrapper.__name__,
                     "identifier": current_tx_id
                 }
+
+                print(ok)
+                return ok
 
             finally:
                 _requirements.reset(req_token)
@@ -681,7 +684,7 @@ async def pipe(*stages,context=dict()):
         stage_index += 1
         #print("stage_tuple",stage_tuple,"<---------------------",context)
         outcome = await _execute_step_internal(stage_tuple,context)
-        print("outcome",outcome,"<---------------------")
+        #print("outcome",outcome,"<---------------------")
         if isinstance(outcome, dict) and outcome.get('success') is True and 'data' in outcome:
             data_to_pass = outcome['data']
         else:

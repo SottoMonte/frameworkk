@@ -24,9 +24,10 @@ else:
         create_client = None
 
 # Aggiusta il percorso del modulo se necessario, come nel tuo codice originale
-resources = {
+imports = {
     'flow': 'framework/service/flow.py',
 }
+
 
 class adapter:
     def __init__(self, **config):
@@ -64,7 +65,15 @@ class adapter:
         if self.is_frontend and self.js_client:
             self.js_client.auth.setSession({"access_token": token,'refresh_token':''})
         elif self.client:
-            self.client.auth.set_session('eyJhbGciOiJIUzI1NiIsImtpZCI6Inl0WDVVZXhsVHNmS2RPVEsiLCJ0eXAiOiJKV1QifQ.eyJpc3MiOiJodHRwczovL2xqZW93cHFtb3ZhYXZ4Z2hwc25lLnN1cGFiYXNlLmNvL2F1dGgvdjEiLCJzdWIiOiI5OTkzOGQ3YS1lYzIwLTRhZDItYjMxOS02MGIzODMzYmUxNjAiLCJhdWQiOiJhdXRoZW50aWNhdGVkIiwiZXhwIjoxNzQ5MTU0MjkyLCJpYXQiOjE3NDkxNTA2OTIsImVtYWlsIjoibWFyaW80MjM0MzRAZ21haWwuY29tIiwicGhvbmUiOiIiLCJhcHBfbWV0YWRhdGEiOnsicHJvdmlkZXIiOiJlbWFpbCIsInByb3ZpZGVycyI6WyJlbWFpbCJdfSwidXNlcl9tZXRhZGF0YSI6eyJlbWFpbCI6Im1hcmlvNDIzNDM0QGdtYWlsLmNvbSIsImVtYWlsX3ZlcmlmaWVkIjp0cnVlLCJwaG9uZV92ZXJpZmllZCI6ZmFsc2UsInN1YiI6Ijk5OTM4ZDdhLWVjMjAtNGFkMi1iMzE5LTYwYjM4MzNiZTE2MCJ9LCJyb2xlIjoiYXV0aGVudGljYXRlZCIsImFhbCI6ImFhbDEiLCJhbXIiOlt7Im1ldGhvZCI6InBhc3N3b3JkIiwidGltZXN0YW1wIjoxNzQ4NjIxMzE1fV0sInNlc3Npb25faWQiOiI3MTI5ZGRiYi05NDYzLTQ1MGMtYWFkMi1hNDM2MWU5ZWQ3NWYiLCJpc19hbm9ueW1vdXMiOmZhbHNlfQ.lROpEk57HnTNxiE2ifJAQ1sfuNAbnneZlP2_r55tQkE','ersbjkxqruoo')
+            try:
+                if token and token2:
+                    self.client.auth.set_session(token, token2)
+                else: 
+                    # If we don't have tokens, maybe we don't set session?
+                    # The hardcoded one was likely for testing.
+                    pass 
+            except Exception as e:
+                print(f"Warning: Failed to set Supabase session: {e}")
 
     def _apply_filters_to_query(self, query, filters):
         """Applica dinamicamente i filtri alla query."""
