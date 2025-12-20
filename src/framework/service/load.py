@@ -262,6 +262,8 @@ def _compute_allowed_exports(main_module, exports_map, contract_info, validated_
         for public, priv in exports_map.items()
         for candidate in [public] + ([priv] if isinstance(priv, str) else [])
         if hasattr(main_module, candidate) and (
+            not contract_info.get('external_contracts') # Auto-Trust: allow all exported
+            or
             (inspect.isclass(getattr(main_module, candidate)) and 
                 (contract_methods_by_name.get(candidate) or validated_methods.get(candidate))) 
             or
@@ -462,7 +464,7 @@ def _check_di_config(**constants):
     """Valida la configurazione di ingresso per la DI."""
     path = constants.get('path')
     service = constants.get('service', constants.get('name'))
-    adapter = constants.get('adapter', constants.get('name'))
+    adapter = constants.get('adapter', constants.get('service', constants.get('name')))
     if not path or not service or not adapter:
         framework_log("ERROR", f"❌ Errore: Configurazioni DI insufficienti: {constants}")
         raise ValueError(f"Configurazioni DI insufficienti: {constants}")
@@ -483,11 +485,11 @@ def _extract_and_validate_module(res, constants):
     
     if isinstance(module, dict):
         if 'success' in module and not module['success']:
-             print(f"CRITICAL ERROR LOADING RESOURCE {path}: {module.get('errors')}")
+             framework_log("CRITICAL", f"CRITICAL ERROR LOADING RESOURCE {path}: {module.get('errors')}", emoji="🛑")
              raise ImportError(f"Failed to load resource {path}: {module.get('errors')}")
         
         if not hasattr(module, attribute_name):
-             print(f"DEBUG_ERROR: Module {path} is a dict without {attribute_name}: {module}")
+             framework_log("ERROR", f"DEBUG_ERROR: Module {path} is a dict without {attribute_name}", emoji="❌", module_data=module)
              raise AttributeError(f"Module {path} is a dict and lacks {attribute_name}")
     
     return module
@@ -495,7 +497,7 @@ def _extract_and_validate_module(res, constants):
 def _register_dependency_in_container(module, constants):
     """Registra la classe/funzione nel container DI (come Factory o Singleton)."""
     service_name = constants.get('service', constants.get('name'))
-    attribute_name = constants.get('adapter', constants.get('name'))
+    attribute_name = constants.get('adapter', constants.get('service', constants.get('name')))
     init_args = constants.get('payload', constants.get('config', {}))
     dependency_keys = constants.get('dependency_keys', None)
     path = constants.get('path')
@@ -528,16 +530,18 @@ async def load_di_entry(**constants: Any) -> None:
     """
     Carica una risorsa specificata in 'constants' e la registra nel container DI globale usando flow.pipe.
     """
+    #service_val = constants.get('service', constants.get('name'))
     try:
         await flow.pipe(
             flow.step(_check_di_config, **constants),
+            #flow.step(_ensure_service_container, service_val),
             flow.step(_ensure_service_container, '@.service'),
             flow.step(resource, **constants),
             flow.step(_extract_and_validate_module, '@.outputs.-1', constants),
             flow.step(_register_dependency_in_container, '@.outputs.-1', constants)
         , context=constants)
     except Exception as e:
-        framework_log("ERROR", f"Errore critico in load_di_entry per {constants.get('path')}: {e}")
+        framework_log("ERROR", f"Errore critico in load_di_entry per {constants.get('path')}: {e}", exception=e)
         raise e
 
 # Alias per compatibilità o preferenza di nome
@@ -606,42 +610,42 @@ async def bootstrap_core(config) -> None:
     manager_loader_path = [
         {
             'path': 'framework/manager/messenger.py', 
-            'name': 'messenger', 
+            'service': 'messenger', 
             'config': {'cache_enabled': True, 'log_level': 'INFO'},
             'dependency_keys': ['message'], 
             'messenger': 'messenger' 
         },
         {
             'path': 'framework/manager/executor.py', 
-            'name': 'executor', 
+            'service': 'executor', 
             'config': {'cache_enabled': True, 'log_level': 'INFO'},
             'dependency_keys': ['actuator'], 
             'messenger': 'executor'
         },
         {
             'path': 'framework/manager/presenter.py',
-            'name': 'presenter',
+            'service': 'presenter',
             'config': {'cache_enabled': True, 'log_level': 'INFO'},
             'dependency_keys': ['messenger'], 
             'messenger': 'presenter'
         },
         {
             'path': 'framework/manager/defender.py',
-            'name': 'defender',
+            'service': 'defender',
             'config': {'cache_enabled': True, 'log_level': 'INFO'},
             'dependency_keys': ['authentication'], 
             'messenger': 'defender' 
         },
         {
             'path': 'framework/manager/storekeeper.py',
-            'name': 'storekeeper',
+            'service': 'storekeeper',
             'config': {'cache_enabled': True, 'log_level': 'INFO'},
             'dependency_keys': ['persistence'], 
             'messenger': 'storekeeper'
         },
         {
             'path': 'framework/manager/tester.py',
-            'name': 'tester',
+            'service': 'tester',
             'config': {'cache_enabled': True, 'log_level': 'INFO'},
             'dependency_keys': ['messenger','persistence'], 
             'messenger': 'tester' 

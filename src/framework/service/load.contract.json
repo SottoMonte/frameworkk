@@ -2,7 +2,7 @@
     "__module__": {
         "generate_checksum": {
             "test": "0c95d2646532345ba5efdea7bcca6d6f37eb15bf70a1daae5afb0f846641778b",
-            "production": "46f68bd05e07b5473a9cc608106ff88823f0ba3d6e1e104ca138ce957ab4796b"
+            "production": "0991be066c4cec9cf724cf9d7b39c10aada2c17995083e0077be4b0121e30ba0"
         },
         "bootstrap_core": {
             "test": "d683b01a043ec54c4081835db4187e9f54206e1580563e29bb07fb977ef4b999",
@@ -10,7 +10,7 @@
         },
         "bootstrap": {
             "test": "038ee4e822716fb257c55af8dc60aa05a5efb4f112fcc251edb8a4110ccbcbb5",
-            "production": "d7c1e5a5fef384bc9ada4157ed7b1030272cb99c414bfbc27cd137b61ce96c3d"
+            "production": "d3c004330cf339725795d3c2fc8522989e4734de36114cea178dea6e154210a5"
         }
     }
 }

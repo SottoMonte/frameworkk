@@ -2,11 +2,11 @@
     "__module__": {
         "application": {
             "test": "582a4ee986a7b5874cb1f78fe9c5b03a1bb2e3e03bf8b2e3f6539921376c3e85",
-            "production": "de169a2839360190e42e434adf3a91ad4a8c692666ffd768f31a7825e59e9a46"
+            "production": "430d70586776e1c040e19427ba5a895e33d415634fd55daaeeab83a6763b917c"
         },
         "discover_and_run_tests": {
             "test": "976127eee273eb5b71f2455388bfa4713c4a918b54ecd2f6381448c63480a7ea",
-            "production": "625e8e015e5f2de1db9462b875531e3b2374f6fe2846a683152f13c8ef5e732d"
+            "production": "f8e6b23e11c462db24992624d5a4723e770b09e6decd6dc77f425be9c7699b1b"
         }
     }
 }

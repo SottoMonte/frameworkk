@@ -2,6 +2,7 @@ import asyncio
 from typing import List, Dict, Any, Callable
 import re
 import traceback
+from framework.service.inspector import framework_log
 
 imports = {}
 
@@ -123,9 +124,8 @@ class executor:
 
             for operation in finished:
                 transaction = operation.result()
-                print(transaction,'<------------------')
                 if transaction:
-                    print(f"Transazione completata: {type(transaction)}")
+                    framework_log("DEBUG", f"Transazione completata: {type(transaction)}", emoji="💼")
                     if 'success' in constants:
                         transaction = await constants['success'](transaction=transaction,profile=operation.get_name())
                     await messenger.post(domain='debug',message=f"✅ Transazione completata: {str(transaction)}")

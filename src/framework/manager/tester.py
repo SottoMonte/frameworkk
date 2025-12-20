@@ -5,6 +5,7 @@ import sys
 import io
 import asyncio
 import inspect
+from framework.service.inspector import framework_log
 
 class tester():
 
@@ -31,7 +32,7 @@ class tester():
                         # Aggiungi i test dal modulo
                         test_suite.addTest(unittest.defaultTestLoader.loadTestsFromModule(module))
                     except ImportError as e:
-                        print(f"Errore nell'importazione del modulo: {module_path}, {e}")
+                        framework_log("ERROR", f"Errore nell'importazione del modulo: {module_path}, {e}", emoji="❌")
         return test_suite
     
     async def unittest2(self, code: str, **constants):
@@ -78,15 +79,11 @@ class tester():
                 print(case())
             #print(await test())
 
-        if results.errors:
-            print("Errori:")
-            for test, err in results.errors:
-                print(f"{test}: {err}")
-        
-        # Stampa i risultati
-        print(f"Numero di test eseguiti: {results.testsRun}")
-        print(f"Errori: {len(results.errors)}")
-        print(f"Fallimenti: {len(results.failures)}")
+        # Risultati
+        framework_log("INFO", "Risultati Test Unittest2", emoji="🧪", 
+                      total=results.testsRun, 
+                      errors=len(results.errors), 
+                      failures=len(results.failures))
 
         # Rimuove il modulo temporaneo
         del sys.modules[module_name]
@@ -175,7 +172,7 @@ class tester():
 
 
     def run(self,**constants):
-        print("run test")
+        framework_log("INFO", "Avvio esecuzione suite di test...", emoji="🧪")
         suite = self.discover_tests()
         runner = unittest.TextTestRunner()
         runner.run(suite)

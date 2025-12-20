@@ -219,7 +219,7 @@ async def discover_and_run_tests():
 
     #di['module_cache']['framework/service/language.py'] = language
     text = await language.resource(path="pyproject.toml")
-    print(text,'ok')
+    framework_log("DEBUG", "pyproject.toml loaded successfully", emoji="📜")
     #config = await language.format(text,**{})
     config = await language.convert(text, dict, 'toml')
 
@@ -262,8 +262,8 @@ async def discover_and_run_tests():
                     test_suite.addTest(unittest.defaultTestLoader.loadTestsFromModule(module))
                 except Exception as e:
                     import traceback
-                    print(f"Errore nell'importazione/filtro del modulo: {main_path_rel}, {e}")
-                    traceback.print_exc()
+                    framework_log("ERROR", f"Errore nell'importazione/filtro del modulo: {main_path_rel}, {e}", emoji="❌")
+                    # traceback.print_exc() # Still keep for very deep debug if needed, but framework_log might handle it
     
     checking = estrai_test_da_suite(test_suite)
     def filtra_contratti_test_compattato(
@@ -415,7 +415,7 @@ def application(tester=None,**constants):
             target_idx = constants.get('args', []).index('--generate-contract') + 1
             if target_idx < len(constants.get('args', [])):
                 target_path = constants.get('args', [])[target_idx]
-                print(f"Generating contract for: {target_path}")
+                framework_log("INFO", f"Generating contract for: {target_path}", emoji="⚙️")
                 # loader.generate_checksum is async and returns the hashes
                 res = asyncio.run(loader.generate_checksum(target_path))
                 # Unwrap if it's an envelope
@@ -426,15 +426,15 @@ def application(tester=None,**constants):
                     contract_path = target_path.replace('.py', '.contract.json')
                     with open(contract_path, 'w') as f:
                         json.dump(data[target_path], f, indent=4)
-                    print(f"✅ Contract written to {contract_path}")
+                    framework_log("INFO", f"✅ Contract written to {contract_path}")
                 else:
-                    print(f"❌ Failed to generate contract or empty result: {data}")
+                    framework_log("ERROR", f"❌ Failed to generate contract or empty result: {data}")
             else:
-                print("Usage: --generate-contract <path>")
+                framework_log("WARNING", "Usage: --generate-contract <path>")
         except Exception as e:
-            print(f"Error generating contract: {e}")
+            framework_log("ERROR", f"Error generating contract: {e}", emoji="❌")
             import traceback
-            traceback.print_exc()
+            # traceback.print_exc()
             
     if '--test' in constants.get('args',[]):
         test()

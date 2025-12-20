@@ -12,6 +12,8 @@ import socket
 import psutil
 import traceback
 import asyncio
+import time
+from contextlib import contextmanager
 from datetime import datetime, timezone
 from typing import Dict, Any, List, Optional, Set
 from framework.service.context import container
@@ -400,6 +402,16 @@ COLORS = {
     "CRITICAL": "\033[95m", # Magenta
 }
 
+@contextmanager
+def timed_block(message: str, level: str = "INFO", emoji: str = "⏱️", **kwargs):
+    """Context manager per loggare la durata di un blocco di codice."""
+    start_time = time.perf_counter()
+    try:
+        yield
+    finally:
+        duration = time.perf_counter() - start_time
+        framework_log(level, message, emoji=emoji, duration=duration, depth=3, **kwargs)
+
 def framework_log(level: str, message: str, emoji: str = "", depth: int = 1, **kwargs):
     """
     Logger standardizzato per il framework.
@@ -428,21 +440,70 @@ def framework_log(level: str, message: str, emoji: str = "", depth: int = 1, **k
     
     tx_short = tx_id[:8] if tx_id != "system" else "system"
     
-    # Formattazione base
-    header = f"[{timestamp}] [{color}{level_pad}{COLOR_RESET}] [{tx_short}]"
+    # --- Helper Interni per la visualizzazione ---
+    def sanitize(k, v):
+        sensitive = ("password", "secret", "token", "key", "auth", "credential")
+        k_str = str(k).lower()
+        if any(s in k_str for s in sensitive):
+            return "******** [MASKED]"
+        return v
+
+    def print_tree_recursive(obj, current_prefix="    ", current_depth=0, max_depth=3):
+        if current_depth > max_depth:
+            print(f"{current_prefix}... [too deep]")
+            return
+
+        if isinstance(obj, dict):
+            items = list(obj.items())
+            for idx, (k, v) in enumerate(items):
+                v_sanitized = sanitize(k, v)
+                is_last_item = (idx == len(items) - 1)
+                next_prefix = "    " if is_last_item else "│   "
+                connector = "└─" if is_last_item else "├─"
+                
+                if isinstance(v_sanitized, dict) and current_depth < max_depth:
+                    print(f"{current_prefix}{connector} {k}:")
+                    print_tree_recursive(v_sanitized, current_prefix + next_prefix, current_depth + 1, max_depth)
+                elif isinstance(v_sanitized, list) and current_depth < max_depth:
+                    print(f"{current_prefix}{connector} {k}:")
+                    print_tree_recursive(v_sanitized, current_prefix + next_prefix, current_depth + 1, max_depth)
+                else:
+                    val_str = truncate_value(str(k), v_sanitized, max_str_len=150)
+                    print(f"{current_prefix}{connector} {k}: {val_str}")
+        elif isinstance(obj, list):
+            for idx, item in enumerate(obj[:10]):
+                is_last_item = (idx == len(obj[:10]) - 1)
+                connector = "└─" if is_last_item else "├─"
+                if isinstance(item, (dict, list)) and current_depth < max_depth:
+                    print(f"{current_prefix}{connector} [{idx}]:")
+                    print_tree_recursive(item, current_prefix + "    " if is_last_item else current_prefix + "│   ", current_depth + 1, max_depth)
+                else:
+                    print(f"{current_prefix}{connector} [{idx}]: {truncate_value('', item, max_str_len=150)}")
+            if len(obj) > 10:
+                print(f"{current_prefix}└─ ... and {len(obj)-10} more items")
+
+    # --- Inizio Log ---
+    lb = container.log_buffer()
     source = f"{filename}:{lineno}"
     
-    main_line = f"{header} {emoji} {source:<20} - {message}"
-    print(main_line)
+    # Aggiungi durata se presente
+    duration = kwargs.pop('duration', None)
+    duration_str = f" [{duration:.3f}s]" if duration is not None else ""
+    
+    log_entry = {"timestamp": timestamp, "level": level, "message": message, "source": source, "tx_id": tx_id, "duration": duration}
+    lb.append(log_entry)
+    
+    header = f"[{timestamp}] [{color}{level_pad}{COLOR_RESET}] [{tx_short}]{duration_str}"
+    print(f"{header} {emoji} {source:<20} - {message}")
 
-    # Gestione Metadata e Eccezioni
+    # --- Gestione Metadata e Eccezioni ---
     items = list(kwargs.items())
     for i, (key, value) in enumerate(items):
         is_last = (i == len(items) - 1)
         prefix = "    └─" if is_last else "    ├─"
         
         if key == "exception" and isinstance(value, Exception):
-            # 1. Analisi Profonda dell'eccezione
+            # 1. Analisi Profonda
             module_source = ""
             try:
                 if os.path.exists(frame_info.filename):
@@ -451,55 +512,78 @@ def framework_log(level: str, message: str, emoji: str = "", depth: int = 1, **k
             except Exception:
                 pass
             
-            # Recupera exc_info se disponibile, altrimenti usa sys.exc_info()
             exc_info_tuple = (type(value), value, value.__traceback__)
             report = analyze_exception(module_source, filename, exc_info=exc_info_tuple)
             
-            # 2. Stampa Traceback standard (colorato)
+            # 2. Generazione Crash Dump (se ERROR)
+            if level == "ERROR":
+                try:
+                    dump_dir = ".gemini/crash_dumps"
+                    os.makedirs(dump_dir, exist_ok=True)
+                    dump_file = os.path.join(dump_dir, f"crash_{tx_short}_{datetime.now().strftime('%H%M%S')}.json")
+                    with open(dump_file, 'w') as f:
+                        json.dump(report, f, cls=LogReportEncoder, indent=2)
+                    print(f"{color}    📝 Crash dump salvato: {dump_file}{COLOR_RESET}")
+                except Exception as de:
+                    print(f"    ⚠️ Errore salvataggio dump: {de}")
+
+            # 2.5 Log Breadcrumbs (Eventi precedenti della stessa transazione)
+            breadcrumbs = lb.get_history(tx_id=tx_id, limit=6)
+            # Rimuoviamo l'ultimo se è il log corrente
+            if breadcrumbs and breadcrumbs[-1].get('message') == message:
+                breadcrumbs = breadcrumbs[:-1]
+            if breadcrumbs:
+                print(f"{color}    Log Breadcrumbs (Last 5 events in TX {tx_short}):{COLOR_RESET}")
+                for b_log in breadcrumbs[-5:]:
+                    b_time = b_log.get('timestamp', '').split(' ')[-1]
+                    b_msg = truncate_value('', b_log.get('message', ''), max_str_len=80)
+                    print(f"    │   • [{b_time}] {b_msg}")
+
+            # 3. Traceback
             tb = "".join(traceback.format_exception(*exc_info_tuple))
             connector = "    │ "
-            indented_tb = "\n".join(f"{connector}{line}" for line in tb.splitlines())
-            print(f"{color}    Traceback:{COLOR_RESET}\n{indented_tb}")
+            print(f"{color}    Traceback:{COLOR_RESET}\n" + "\n".join(f"{connector}{line}" for line in tb.splitlines()))
             
-            # 3. Context Diagnostico (Source Line & Locals)
+            # 4. Context Diagnostico
             if "EXCEPTION_DETAILS" in report:
                 details = report["EXCEPTION_DETAILS"]
                 loc = details.get("error_location", {})
-                
-                # Mostra la riga di codice incriminata
                 code_line = loc.get("source_code_line")
                 if code_line and code_line != "SORGENTE NON RECUPERATA":
-                    print(f"{color}    Source Origin ({filename}:{loc.get('line_number')}):{COLOR_RESET}")
-                    print(f"    │   > {code_line.strip()}")
+                    print(f"{color}    Source Snippet ({filename}:{loc.get('line_number')}):{COLOR_RESET}")
+                    if module_source:
+                        line_num = loc.get('line_number')
+                        start_l = max(1, line_num - 2)
+                        end_l = line_num + 2
+                        snippet_lines = estrai_righe_da_codice(module_source, start_l, end_l).splitlines()
+                        for idx, s_line in enumerate(snippet_lines):
+                            curr_line = start_l + idx
+                            marker = ">" if curr_line == line_num else " "
+                            print(f"    │   {marker} {curr_line:3} | {s_line}")
+                    else:
+                        print(f"    │   > {code_line.strip()}")
 
                 locs = details.get("LOCAL_VARIABLES_STATE_FINAL_FRAME", {})
                 if locs:
                     print(f"{color}    Local Variables (Final Frame):{COLOR_RESET}")
-                    for vname, vval in locs.items():
-                        print(f"    │   ├─ {vname}: {vval}")
+                    print_tree_recursive(locs, "    │   ", current_depth=0)
                 
-            # 4. Analisi Strutturale Modulo
+            # 5. Struttura Modulo
             if module_source:
                 mod_report = analyze_module(module_source, filename)
                 classes = [k for k, v in mod_report.items() if isinstance(v, dict) and v.get('type') == 'class']
                 funcs = [k for k, v in mod_report.items() if isinstance(v, dict) and v.get('type') == 'function']
-                
                 if classes or funcs or mod_report.get("module_docstring"):
                     print(f"{color}    Module Structure ({filename}):{COLOR_RESET}")
-                    if mod_report.get("module_docstring"):
-                        doc = truncate_value('', mod_report['module_docstring'], max_str_len=100)
-                        print(f"    │   ├─ Doc: {doc}")
-                    
-                    summary = []
-                    if classes: summary.append(f"{len(classes)} classes")
-                    if funcs: summary.append(f"{len(funcs)} functions")
-                    print(f"    │   └─ Summary: {', '.join(summary)}")
+                    doc = mod_report.get("module_docstring")
+                    if doc: print(f"    │   ├─ Doc: {truncate_value('', doc, max_str_len=80)}")
+                    print(f"    │   └─ Summary: {len(classes)} classes, {len(funcs)} functions")
             
-            # 5. Environment Snapshot
+            # 6. Environment
             env = report.get("ENVIRONMENT_CONTEXT", {})
             if env:
                 print(f"{color}    Environment Snapshot:{COLOR_RESET}")
-                print(f"    │   └─ Host: {env.get('hostname')} | OS: {platform.system()} | Process: {env.get('process_id')}")
+                print(f"    │   └─ Host: {env.get('hostname')} | OS: {platform.system()} | PID: {env.get('process_id')}")
 
         elif key in ("module", "analysis") and isinstance(value, (types.ModuleType, dict)):
             # Visualizzazione speciale per moduli o analisi pre-calcolate
@@ -509,10 +593,8 @@ def framework_log(level: str, message: str, emoji: str = "", depth: int = 1, **k
                 try:
                     m_source = inspect.getsource(value)
                 except Exception:
-                    # Fallback on __file__ or provided path
                     m_file = kwargs.get('module_path') or kwargs.get('path') or getattr(value, '__file__', None)
                     if m_file:
-                        # Prova percorsi comuni
                         candidates = [m_file, os.path.join("src", m_file), os.path.join(os.getcwd(), "src", m_file)]
                         for cand in candidates:
                             if os.path.exists(cand) and os.path.isfile(cand):
@@ -520,8 +602,7 @@ def framework_log(level: str, message: str, emoji: str = "", depth: int = 1, **k
                                     with open(cand, 'r') as f:
                                         m_source = f.read()
                                     break
-                                except Exception:
-                                    pass
+                                except Exception: pass
                 
                 if m_source:
                     m_report = analyze_module(m_source, getattr(value, '__name__', 'unknown'))
@@ -530,40 +611,23 @@ def framework_log(level: str, message: str, emoji: str = "", depth: int = 1, **k
             else:
                 m_report = value
             
-            print(f"{prefix} {key} structure ({getattr(value, '__name__', 'unknown')}):")
-            classes = [k for k, v in m_report.items() if isinstance(v, dict) and v.get('type') == 'class']
-            funcs = [k for k, v in m_report.items() if isinstance(v, dict) and v.get('type') == 'function']
-            
-            if m_report.get("error"):
-                print(f"    │   └─ Analysis Error: {m_report['error']}")
-            else:
-                if classes: print(f"    │   ├─ Classes: {classes}")
-                if funcs: print(f"    │   ├─ Functions: {funcs}")
-                doc = m_report.get("module_docstring")
-                if doc: print(f"    │   └─ Doc: {truncate_value('', doc, max_str_len=50)}")
-                elif not classes and not funcs:
-                    print(f"    │   └─ (empty or no source code available)")
+            print(f"{prefix} {key} introspection ({getattr(value, '__name__', 'unknown')}):")
+            child_prefix = "    │   " if not is_last else "        "
+            print_tree_recursive(m_report, child_prefix, max_depth=1)
 
         else:
-            # Stampa metadata generici
-            val_str = truncate_value(key, value, max_str_len=200)
-            print(f"{prefix} {key}: {val_str}")
+            # Metadata generici con TREE RECURSIVE
+            val = sanitize(key, value)
+            if isinstance(val, (dict, list)):
+                print(f"{prefix} {key}:")
+                # Indenta correttamente in base a prefix
+                child_prefix = "    │   " if not is_last else "        "
+                print_tree_recursive(val, child_prefix, max_depth=2)
+            else:
+                val_str = truncate_value(key, val, max_str_len=200)
+                print(f"{prefix} {key}: {val_str}")
 
-    # Bufferizzazione
-    if hasattr(container, 'log_buffer'):
-        try:
-            container.log_buffer().append({
-                'level': level_upper,
-                'message': message,
-                'emoji': emoji,
-                'timestamp': now.isoformat(),
-                'tx_id': tx_id,
-                'file': filename,
-                'line': lineno,
-                **kwargs
-            })
-        except Exception:
-            pass 
+    return True
 
 # Alias per compatibilità retroattiva
 buffered_log = framework_log
@@ -653,7 +717,7 @@ if sys.platform != 'emscripten':
         except FileNotFoundError:
             raise FileNotFoundError(f"File non trovato: {path}")
         except Exception as e:
-            print(f"Errore caricamento file {path}: {e}",kwargs)
+            framework_log("ERROR", f"Errore caricamento file {path}: {e}", emoji="📁", metadata=kwargs)
             raise e
 else:
     async def _load_resource(**kwargs) -> str:

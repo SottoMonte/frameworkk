@@ -144,7 +144,7 @@ async def normalize(value,schema, mode='full'):
     if not v.validate(processed_value):
         # La validazione fallisce, Cerberus fornisce i messaggi di errore
         #errors_str = "; ".join([f"{k}: {', '.join(v)}" for k, v in v.errors.items()])
-        print(f"⚠️ Errore di validazione: {v.errors}  | data:{processed_value}")
+        framework_log("WARNING", f"Errore di validazione: {v.errors}", emoji="⚠️", data=processed_value)
         raise ValueError(f"⚠️ Errore di validazione: {v.errors} | data:{processed_value}")
 
     final_output = v.document
@@ -1081,7 +1081,7 @@ async def retry(action_step, attempts = 3, delay = 1.0, context=dict()) -> Any:
     last_outcome = None
     
     for attempt in range(attempts):
-        print(f"Tentativo {attempt + 1}/{attempts} per lo step...")
+        framework_log("DEBUG", f"Tentativo {attempt + 1}/{attempts} per lo step...", emoji="🔄")
         
         # Esegue lo step usando l'helper interno
         outcome = await _execute_step_internal(action_step,context)
@@ -1089,17 +1089,17 @@ async def retry(action_step, attempts = 3, delay = 1.0, context=dict()) -> Any:
         
         # Logica di successo (non è un oggetto errore ROP)
         if not (isinstance(outcome, dict) and outcome.get('success') is False):
-            print(f"Step completato al tentativo {attempt + 1}.")
+            framework_log("DEBUG", f"Step completato al tentativo {attempt + 1}.", emoji="✅")
             return outcome
         
         # Se siamo all'ultimo tentativo, non aspettare e restituisci l'errore
         if attempt < attempts - 1:
-            print(f"Fallimento. Attesa di {delay} secondi prima di riprovare.")
+            framework_log("WARNING", f"Fallimento. Attesa di {delay} secondi prima di riprovare.", emoji="⏳")
             await asyncio.sleep(delay)
             # Logica per l'aumento del delay (ritardo esponenziale)
             # delay *= 2 # Esempio di ritardo esponenziale
 
-    print(f"Fallimento definitivo dopo {attempts} tentativi.")
+    framework_log("ERROR", f"Fallimento definitivo dopo {attempts} tentativi.", emoji="❌")
     return last_outcome
 
 async def timeout(action_step, max_seconds = 30.0, context=dict()) -> Any:

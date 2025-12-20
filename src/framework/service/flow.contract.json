@@ -18,7 +18,7 @@
         },
         "asynchronous": {
             "test": "04852c350ccbc650ed6163dae362594037c43129b6147cd879e12ff0fb94aee3",
-            "production": "dec4dca4ce9bf1cdc33cdb343375a7fc993460b0fb692089effebe96c4527f63"
+            "production": "7f80e4af0d8126363047614e1aed2da2047325400bfc650f95621c1fc1baa829"
         },
         "synchronous": {
             "test": "fce4373a51afc6fe6396a125b184f4892c6ff02b6e4588023b5f3b2ded5e58dc",
@@ -34,7 +34,7 @@
         },
         "normalize": {
             "test": "88926acbb1b3ed6e19c5267e181ebe3ec52dc7717e3f3599a99fcbf64213b7e7",
-            "production": "b72fcf43f3e33901cc42483cbd9aa583766aedad79618c2ae17263f7a8309394"
+            "production": "300554fac0bdee3d565e0e1caaa14ca9d181d5b1ff88986e2889b68d67715490"
         }
     }
 }
