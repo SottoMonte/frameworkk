@@ -1,5 +1,7 @@
 import asyncio
 import sys
+import os
+from framework.service.inspector import framework_log
 
 imports = {
     #'loader': 'framework/manager/loader.py'
@@ -40,14 +42,14 @@ def sync_directory_recursive(api_url, local_dir):
             local_sha = get_local_file_sha(file_path)
 
             if local_sha != remote_sha:
-                print(f"[Updating] {file_path}")
+                framework_log("INFO", f"Updating {file_path}", emoji="🔄")
                 os.makedirs(local_dir, exist_ok=True)
                 with open(file_path, 'wb') as f:
                     f.write(remote_content)
             else:
-                print(f"[OK] {file_path} is up to date.")
+                framework_log("DEBUG", f"{file_path} is up to date.", emoji="✅")
         else:
-            print(f"[Skipping] {item['type']}: {item['path']}")
+            framework_log("DEBUG", f"Skipping {item['type']}: {item['path']}", emoji="⏩")
 
 def sync_github_repo(local_base_dir, github_user, repo, branch='main'):
     api_url = f"https://api.github.com/repos/{github_user}/{repo}/contents/src?ref={branch}"
@@ -231,7 +233,7 @@ async def discover_and_run_tests():
                 main_path_rel = module_path_rel.replace('.test.py','.py')
                 json_path = main_path_rel.replace('.py', '.contract.json')
                 
-                print(f"\n🔍 Generazione contratto per: {module_path_rel}")
+                framework_log("DEBUG", f"Generazione contratto per: {module_path_rel}", emoji="🔍")
                 try:
                     
                     #hashes = await language.generate_and_validate_contract_json(main_path_rel)
@@ -242,10 +244,10 @@ async def discover_and_run_tests():
                     json_content = json.dumps(hashes, indent=4)
                     # Simula il salvataggio del file .contract.json
                     # await language.backend(path=json_path, content=json_content, mode='w')
-                    print(f"✅ Contratto JSON salvato (Simulato) in: {json_path}")
+                    framework_log("INFO", f"Contratto JSON salvato (Simulato) in: {json_path}", emoji="✅")
                     
                 except Exception as e:
-                    print(f"❌ Errore critico nella generazione del contratto: {e}")
+                    framework_log("ERROR", f"Errore critico nella generazione del contratto: {e}", emoji="❌")
 
                     continue
                     
@@ -386,27 +388,22 @@ def test():
     # Esegui la fase di scoperta, generazione del contratto ed esecuzione
     suite = suite_test
     runner = unittest.TextTestRunner()
-    print("\n=====================================")
-    print("        INIZIO ESECUZIONE TEST       ")
-    print("=====================================")
+    framework_log("INFO", "INIZIO ESECUZIONE TEST", emoji="🧪")
     result = runner.run(suite)
     fail = map_failed_tests(result)
-    print("\n❌ TEST FALLITI O ERRORE NEI TEST:",fail)
+    framework_log("ERROR", f"TEST FALLITI O ERRORE NEI TEST: {fail}", emoji="❌")
     for f in fail:
         try:
             del all_contract_hashes[f[0].replace('.test.py','.py')]['__module__'if 'TestModule' in f[1] else f[1].replace('Test','')][f[2].replace('test_','')]
         except KeyError:
         # Ignora l'errore se la chiave non è presente
             pass
-    print("\n✅ TEST SUPERATI. CONTRATTI AGGIORNATI:")
-    print(all_contract_hashes)
+    framework_log("INFO", f"TEST SUPERATI. CONTRATTI AGGIORNATI: {all_contract_hashes}", emoji="✅")
     for file_path, groups in all_contract_hashes.items():
         with open(file_path.replace('.py','.contract.json'), "w") as f:
             converted = asyncio.run(language.convert(groups,str,'json'))
             f.write(converted)
-    print("\n=====================================")
-    print("        FINE ESECUZIONE TEST         ")
-    print("=====================================")
+    framework_log("INFO", "FINE ESECUZIONE TEST", emoji="🏁")
 
 #@flow.asynchronous(managers=('tester',))
 #@language.synchronous(custom_filename=__file__,app_context=APP_CONTEXT)

@@ -19,7 +19,7 @@ class storekeeper():
             repository_module = await language.fetch(path=f"application/repository/{repository_name}.py")
             repository = repository_module.repository()
         except Exception as e:
-            print(f"Errore durante il caricamento del modulo repository '{repository_name}': {e}")
+            language.framework_log("ERROR", f"Errore durante il caricamento del modulo repository '{repository_name}': {e}", emoji="📦")
             return None, []
         
         
@@ -49,38 +49,35 @@ class storekeeper():
             # Se l'utente chiede 'low latency' e nessuno lo ha, forse non vuole 'high latency'.
             # Manteniamo vuoto se non trovato, ma logghiamo.
             if not selected_providers:
-                 print(f"Nessun provider soddisfa i requisiti: {requirements}")
+                 language.framework_log("WARNING", f"Nessun provider soddisfa i requisiti: {requirements}", emoji="🚫")
         
         for provider in selected_providers:
-            print(self.providers,provider)
             try:
                 profile = provider.config.get('profile', '').upper()
-                print(self.providers,provider,profile)
                 if not profile:
-                    print(f"Provider {provider} non ha un profilo configurato.")
+                    language.framework_log("WARNING", f"Provider {provider} non ha un profilo configurato.", emoji="⚠️")
                     continue
 
                 if profile in repository.location:
                     try:
                         task_args = await repository.parameters(operation, profile, **constants)
                     except Exception as e:
-                        print(f"Errore durante l'ottenimento dei parametri per {profile}: {e}")
+                        language.framework_log("ERROR", f"Errore durante l'ottenimento dei parametri per {profile}: {e}", emoji="❌")
                         continue
 
                     # Controllo che il metodo esista nel provider
                     method = getattr(provider, operation, None)
                     if not callable(method):
-                        print(f"Il metodo '{operation}' non è disponibile per il provider {profile}.")
+                        language.framework_log("WARNING", f"Il metodo '{operation}' non è disponibile per il provider {profile}.", emoji="🚫")
                         continue
 
                     task = asyncio.create_task(method(**task_args), name=profile)
                     task.parameters = task_args
                     operations.append(task)
                 else:
-                    print(f"Provider {provider} non ha un profilo trovato.")
+                    language.framework_log("DEBUG", f"Provider {provider} non ha un profilo trovato.", emoji="🔍")
             except Exception as e:
-                print(f"Errore imprevisto durante la preparazione per il provider {provider}: {e}")
-        print(repository,operations)
+                language.framework_log("ERROR", f"Errore imprevisto durante la preparazione per il provider {provider}: {e}", emoji="🤯")
         return repository, operations
     
     # overview/view/get

@@ -35,7 +35,8 @@ from framework.service.flow import (
     format,   # Re-exported
     transform as translation, # Aliased for backward compatibility/tests
     route,
-    normalize
+    normalize,
+    framework_log
 )
 import framework.service.flow as flow
 
@@ -247,7 +248,7 @@ class DSLVisitor:
                     try:
                         result = self.functions_map[func_name](result)
                     except Exception as e:
-                        print(f"[{func_name}] Errore esecuzione Python: {e}")
+                        framework_log("ERROR", f"[{func_name}] Errore esecuzione Python: {e}", emoji="🐍")
                 
                 # 2. Cerca nelle funzioni definite nel DSL (root_data)
                 elif func_name in self.root_data:
@@ -260,12 +261,12 @@ class DSLVisitor:
                             #print(f"[{func_name}] Esecuzione funzione DSL...")
                             result = self.execute_dsl_function(dsl_def, result)
                         except Exception as e:
-                            print(f"[{func_name}] Errore esecuzione DSL: {e}")
+                            framework_log("ERROR", f"[{func_name}] Errore esecuzione DSL: {e}", emoji="📜")
                     else:
-                         print(f"[{func_name}] Trovato nel DSL ma formato non valido per funzione: {type(dsl_def)}")
+                         framework_log("WARNING", f"[{func_name}] Trovato nel DSL ma formato non valido per funzione: {type(dsl_def)}", emoji="⚠️")
                 
                 else:
-                    print(f"[{func_name}] Funzione NON trovata (Python o DSL).")
+                    framework_log("WARNING", f"[{func_name}] Funzione NON trovata (Python o DSL).", emoji="🤷")
                     
         return result
 
@@ -315,10 +316,10 @@ class DSLVisitor:
         else:
             # Più parametri: input_args deve essere iterabile (tupla/lista)
             if not isinstance(input_args, (list, tuple)):
-                 print(f"Errore: Attesi {len(input_params)} argomenti, ricevuto singolo scalare: {input_args}")
+                 framework_log("ERROR", f"Mismatch argomenti: Attesi {len(input_params)}, ricevuto singolo scalare: {input_args}", emoji="❌")
                  return None
             if len(input_args) != len(input_params):
-                 print(f"Errore: Mismatch argomenti. Attesi {len(input_params)}, ricevuti {len(input_args)}")
+                 framework_log("ERROR", f"Mismatch argomenti. Attesi {len(input_params)}, ricevuti {len(input_args)}", emoji="❌")
                  return None
             
             for name, val in zip(input_params, input_args):

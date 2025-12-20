@@ -1,7 +1,7 @@
 import asyncio
 import functools
 from typing import Any, Callable, Dict, List, Optional, Union
-from framework.service.inspector import LogReportEncoder, buffered_log, _load_resource, analyze_exception, _get_system_info
+from framework.service.inspector import LogReportEncoder, framework_log, buffered_log, _load_resource, analyze_exception, _get_system_info
 from framework.service.context import container
 import uuid
 import contextvars
@@ -255,14 +255,15 @@ def _handle_wrapper_error(e, function, custom_filename, current_tx_id):
     """Gestisce le eccezioni e genera il report di errore."""
     error_details = str(e)
     try:
-        report = analyze_exception(inspect.getsource(function) if hasattr(function, '__code__') else "", custom_filename)
+        source = inspect.getsource(function) if hasattr(function, '__code__') else ""
+        report = analyze_exception(source, custom_filename)
         if report and 'EXCEPTION_DETAILS' in report:
             error_details = report['EXCEPTION_DETAILS']
     except Exception:
         pass 
 
     if not hasattr(container, 'messenger'):
-        buffered_log("ERROR", e, emoji="❌")
+        framework_log("ERROR", f"Eccezione in {function.__name__}: {e}", emoji="❌", exception=e)
 
     return {
         "success": False, 
@@ -297,9 +298,7 @@ def asynchronous(custom_filename: str = __file__, app_context = None, **constant
 
             except Exception as e:
                 # 4. Error Handling
-                ok = _handle_wrapper_error(e, function, custom_filename, current_tx_id)
-                print(ok)
-                return ok
+                return _handle_wrapper_error(e, function, custom_filename, current_tx_id)
 
             finally:
                 # Cleanup
@@ -660,29 +659,25 @@ async def _execute_step_internal(action_step,context=dict()) -> Any:
         raise TypeError("L'azione fornita non è un formato step valido.",fun,args,kwargs)
         #return {'success': False, 'errors': ['("L\'azione fornita non è un formato step valido.", None, (), {\'path\': \'framework/service/run.py\'})'], 'function': fun.__name__}
 
-    try:
-        if asyncio.iscoroutinefunction(fun):
-            # Inspect the function to see if it accepts 'context'
-            sig = inspect.signature(fun)
-            if 'context' in sig.parameters:
-                kwargs['context'] = context
-            result = await fun(*args, **kwargs)
-        else:
-            # Inspect the function to see if it accepts 'context'
-            sig = inspect.signature(fun)
-            if 'context' in sig.parameters:
-                kwargs['context'] = context
-            result = fun(*args, **kwargs)
+    if asyncio.iscoroutinefunction(fun):
+        # Inspect the function to see if it accepts 'context'
+        sig = inspect.signature(fun)
+        if 'context' in sig.parameters:
+            kwargs['context'] = context
+        result = await fun(*args, **kwargs)
+    else:
+        # Inspect the function to see if it accepts 'context'
+        sig = inspect.signature(fun)
+        if 'context' in sig.parameters:
+            kwargs['context'] = context
+        result = fun(*args, **kwargs)
 
-        # Auto-wrapping in Transaction se non lo è già
-        if isinstance(result, dict) and 'success' in result and ('data' in result or 'errors' in result):
-            return result
+    # Auto-wrapping in Transaction se non lo è già
+    if isinstance(result, dict) and 'success' in result and ('data' in result or 'errors' in result):
+        return result
+    
+    return {"success": True, "data": result, "errors": []}
         
-        return {"success": True, "data": result, "errors": []}
-
-    except Exception as e:
-        # Implementazione minimale ROP per gli errori (Transaction)
-        return {"success": False, "errors": [str(e)], "function": fun.__name__}
 
 def step(func, *args, **kwargs):
     return (func, args, kwargs)
@@ -942,11 +937,11 @@ async def catch(try_step, catch_step,context=dict()):
         outcome = await _execute_step_internal(try_step,context)
     except Exception as e:
         outcome = {'success': False, 'errors': [str(e)]}
-    print("CATCH---------------------",outcome)
+    framework_log("WARNING", f"Eccezione catturata da catch: {outcome}", emoji="🪝")
     # 2. Verifica se è un oggetto errore ROP
     # 2. Verifica se è un oggetto errore ROP
     if isinstance(outcome, dict) and outcome.get('success') is False:
-        print(f"ATTENZIONE: Fallimento nello step. Esecuzione del fallback: {outcome.get('errors')}")
+        framework_log("WARNING", f"Fallimento nello step. Esecuzione del fallback: {outcome.get('errors')}", emoji="⚠️")
         
         # Puoi anche passare l'errore al catch_step, ma per semplicità lo eseguiamo direttamente
         # Esegue lo step di fallback

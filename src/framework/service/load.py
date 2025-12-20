@@ -15,18 +15,14 @@ from framework.service.inspector import (
     analyze_module,
     calculate_hash_of_function,
     estrai_righe_da_codice,
+    framework_log,
     buffered_log,
     _load_resource
 )
 
 from dependency_injector import providers
 
-# 1. Configurazione del Logging
-logging.basicConfig(
-    level=logging.INFO, 
-    format='%(asctime)s - %(levelname)s - [%(name)s.%(funcName)s] - %(message)s'
-)
-logger = logging.getLogger("BOOTSTRAPPER")
+# Logging is now handled via framework_log from inspector.py
 
 # =====================================================================
 # --- Funzioni di Generazione (Spostate da language.py) ---
@@ -44,7 +40,7 @@ async def generate_checksum(main_path: str, ) -> Dict[str, Dict[str, Dict[str, D
     contract_code = await _load_resource(path=contract_path)
     
     if not main_code or not contract_code:
-        buffered_log("INFO", f"Impossibile caricare i file sorgente o di test ({main_path} / {contract_path}).")
+        framework_log("INFO", f"Impossibile caricare i file sorgente o di test ({main_path} / {contract_path}).")
         return {}
 
     main_module = analyze_module(main_code, main_path)
@@ -122,7 +118,7 @@ async def generate_checksum(main_path: str, ) -> Dict[str, Dict[str, Dict[str, D
     # json_content = json.dumps(contract_hashes, indent=4)
     # await backend(path=json_path, content=json_content, mode='w') 
 
-    buffered_log("INFO", f"✅ Generato e scritto il contratto JSON in {json_path}")
+    framework_log("INFO", f"✅ Generato e scritto il contratto JSON in {json_path}")
     
     return {main_path: contract_hashes}
 
@@ -147,7 +143,7 @@ async def generate(data, schema=None):
 
 async def _load_contract_info(main_module, path):
     """Carica il contratto JSON e le info dal modulo di test."""
-    buffered_log("DEBUG", f"🔍 Avvio validazione contratto per il modulo: {path}", dir(main_module))
+    framework_log("DEBUG", f"Caricamento e validazione contratto per {path}", emoji="📜", module=main_module)
     
     # 1. Caricamento contratto JSON
     contract_json_path = path.replace('.py', '.contract.json')
@@ -155,9 +151,9 @@ async def _load_contract_info(main_module, path):
     try:
         json_content = await _load_resource(path=contract_json_path)
         external_contracts = await convert(json_content, dict, 'json')
-        buffered_log("DEBUG", f"Contratto JSON esterno caricato da {contract_json_path}.")
+        framework_log("DEBUG", f"Contratto JSON esterno caricato da {contract_json_path}.")
     except Exception as e:
-        buffered_log("WARNING", f"Nessun contratto JSON valido trovato in {contract_json_path}. Filtro hash disabilitato.", e)
+        framework_log("WARNING", f"Nessun contratto JSON valido trovato in {contract_json_path}. Filtro hash disabilitato.", e)
 
     # 2. Caricamento modulo di test
     contract_path = path.replace('.py', '.test.py')
@@ -184,11 +180,11 @@ def _resolve_exports_map(main_module, contract_info):
     exports_map = getattr(contract_module, 'exports', {}) if isinstance(getattr(contract_module, 'exports', None), dict) else {}
     
     if exports_map:
-        buffered_log("DEBUG", f"🔐 exports trovato: {list(exports_map.keys())}")
+        framework_log("DEBUG", f"🔐 exports trovato: {list(exports_map.keys())}")
         return exports_map
         
     # Tentativo secondario: derivazione da .contract.json
-    buffered_log("WARNING", "⚠️ Nessun 'exports' dichiarato: generazione automatica da contratto se disponibile.")
+    framework_log("WARNING", "⚠️ Nessun 'exports' dichiarato: generazione automatica da contratto se disponibile.")
     if external_contracts:
         for k, v in external_contracts.items():
             if k == '__module__' and isinstance(v, dict):
@@ -198,7 +194,7 @@ def _resolve_exports_map(main_module, contract_info):
                 exports_map[k] = k
     
     if not exports_map:
-        buffered_log("WARNING", "⚠️ Nessun 'exports' dichiarato e nessun contratto utilizzabile.")
+        framework_log("WARNING", "⚠️ Nessun 'exports' dichiarato e nessun contratto utilizzabile.")
     
     return exports_map
 
@@ -211,10 +207,10 @@ async def _validate_checksums(main_module, path, contract_info):
     ccc = ccc_envelope.get('data', {}) if isinstance(ccc_envelope, dict) else ccc_envelope
 
     if not external_contracts:
-        print(f"DEBUG_LOADER: {path} - Using Auto-Trust (CCC generated)")
+        framework_log("DEBUG", f"Using Auto-Trust (CCC generated) for {path}", emoji="🛡️")
         return {} # Nessuna validazione strict richiesta
 
-    print(f"DEBUG_LOADER: {path} - Using External Contract: {list(external_contracts.keys())}")
+    framework_log("DEBUG", f"Using External Contract for {path}: {list(external_contracts.keys())}", emoji="📜")
     
     contract_validated_methods = {}
     
@@ -242,7 +238,7 @@ async def _validate_checksums(main_module, path, contract_info):
             if current_p == expected_p and current_t == expected_t:
                 valid.add(m)
             else:
-                print(f"DEBUG_LOADER: Mismatch hash for {m}. P:{current_p} vs {expected_p}")
+                framework_log("DEBUG", f"Mismatch hash for {m}. P:{current_p} vs {expected_p}", emoji="🚫")
         
         if valid:
             contract_validated_methods[tgt] = valid
@@ -299,7 +295,7 @@ def _create_filtered_module(main_module, exports_map, allowed_exports, validated
     validated_members_log = []
 
     if not exports_map:
-        buffered_log("WARNING", "⚠️ Nessun 'exports' dichiarato: file vuoto.")
+        framework_log("WARNING", "⚠️ Nessun 'exports' dichiarato: file vuoto.")
         return filtered_module
 
     for public_name, private_spec in exports_map.items():
@@ -354,7 +350,7 @@ def _create_filtered_module(main_module, exports_map, allowed_exports, validated
             setattr(filtered_module, public_name, member)
             validated_members_log.append(public_name)
 
-    buffered_log("INFO", f"✅ Validazione riuscita per {path}. Esposti: {validated_members_log}")
+    framework_log("INFO", f"✅ Validazione riuscita per {path}. Esposti: {validated_members_log}")
     return filtered_module
 
 
@@ -399,12 +395,12 @@ async def _load_dependencies(module: types.ModuleType, dependencies) -> None:
                 setattr(module, key, value)
                 continue
 
-        buffered_log("DEBUG", f"⏳ Caricamento dipendenza '{key}' da {import_path}...")
+        framework_log("DEBUG", f"⏳ Caricamento dipendenza '{key}' da {import_path}...")
         res = await resource(path=import_path)
         value = res.get('data') if isinstance(res, dict) and 'data' in res else res
         setattr(module, key, value)
         container.module_cache()[import_path] = value
-        buffered_log("DEBUG", f"📦 Dipendenza '{key}' caricata da {import_path}")
+        framework_log("DEBUG", f"📦 Dipendenza '{key}' caricata da {import_path}")
 
 async def _load_python_module(name: str, path: str, code: str) -> types.ModuleType:
     """Crea ed esegue dinamicamente un modulo Python con le variabili globali necessarie."""
@@ -417,12 +413,12 @@ async def _load_python_module(name: str, path: str, code: str) -> types.ModuleTy
     try:
         async with container.module_cache_lock():
             container.module_cache()[path] = module
-            buffered_log("DEBUG", f"♻️ Placeholder module inserito nella cache per {path} (pre-caricamento)")
+            framework_log("DEBUG", f"♻️ Placeholder module inserito nella cache per {path} (pre-caricamento)")
     except Exception:
         container.module_cache()[path] = module
 
     '''if module.__dict__['language'] is None and path not in ['src/framework/service/contract.test.py','src/framework/service/contract.py','src/framework/service/language.test.py','src/framework/service/language.py','framework/service/language.py']:
-        buffered_log("WARNING", "⚠️ Modulo di lingua non caricato prima delle dipendenze.", path)
+        framework_log("WARNING", "⚠️ Modulo di lingua non caricato prima delle dipendenze.", path)
         raise ImportError("Modulo di lingua mancante per le dipendenze.")'''
     
     try:
@@ -431,7 +427,7 @@ async def _load_python_module(name: str, path: str, code: str) -> types.ModuleTy
         if path.replace('.test.py','.py',) in dependencies:
             del dependencies[path.replace('.test.py','.py')]
         
-        buffered_log("INFO", f"🔍 Dipendenze trovate in {path}: {dependencies}")
+        framework_log("INFO", f"🔍 Dipendenze trovate in {path}: {dependencies}")
         await _load_dependencies(module, dependencies.copy())
         compiled_code = compile(code, module_name, 'exec')
         exec(compiled_code, module.__dict__)
@@ -468,7 +464,7 @@ def _check_di_config(**constants):
     service = constants.get('service', constants.get('name'))
     adapter = constants.get('adapter', constants.get('name'))
     if not path or not service or not adapter:
-        buffered_log("ERROR", f"❌ Errore: Configurazioni DI insufficienti: {constants}")
+        framework_log("ERROR", f"❌ Errore: Configurazioni DI insufficienti: {constants}")
         raise ValueError(f"Configurazioni DI insufficienti: {constants}")
     return constants
 
@@ -516,7 +512,7 @@ def _register_dependency_in_container(module, constants):
             dependencies[dep_key] = getattr(container, dep_key)()
         
         setattr(container, service_name, providers.Factory(resource_class, **init_args, providers=dependencies))
-        buffered_log("INFO", f"✅✅✅✅ Registrato Factory: '{service_name}' ({log_info})")
+        framework_log("INFO", f"✅✅✅✅ Registrato Factory: '{service_name}' ({log_info})")
     else:
         # --- CASO: PROVIDER/SINGLETON ---
         if not hasattr(container, service_name):
@@ -524,7 +520,7 @@ def _register_dependency_in_container(module, constants):
         
         service_list = getattr(container, service_name)()
         service_list.append(resource_class(config=init_args))
-        buffered_log("INFO", f"✅✅✅✅ Aggiunto Provider a lista: '{service_name}' ({log_info})")
+        framework_log("INFO", f"✅✅✅✅ Aggiunto Provider a lista: '{service_name}' ({log_info})")
     
     return {"success": True, "results": []}
 
@@ -541,7 +537,7 @@ async def load_di_entry(**constants: Any) -> None:
             flow.step(_register_dependency_in_container, '@.outputs.-1', constants)
         , context=constants)
     except Exception as e:
-        buffered_log("ERROR", f"Errore critico in load_di_entry per {constants.get('path')}: {e}")
+        framework_log("ERROR", f"Errore critico in load_di_entry per {constants.get('path')}: {e}")
         raise e
 
 # Alias per compatibilità o preferenza di nome
@@ -554,7 +550,7 @@ register = load_di_entry
 def parse_browser_cookies(cookie_string: str) -> Dict[str, str]:
     if not cookie_string:
         return {}
-    logger.debug("Parsing dei cookie in ambiente browser...")
+    framework_log("DEBUG", "Parsing dei cookie in ambiente browser...")
     cookies_dict = {}
     try:
         for cookie_pair in cookie_string.split(';'):
@@ -562,7 +558,7 @@ def parse_browser_cookies(cookie_string: str) -> Dict[str, str]:
                 key, value = cookie_pair.split('=', 1)
                 cookies_dict[key.strip()] = value
     except Exception as e:
-        logger.error(f"Errore critico durante il parsing dei cookie: {e}")
+        framework_log("ERROR", f"Errore critico durante il parsing dei cookie: {e}")
         return cookies_dict
     return cookies_dict
 
@@ -572,12 +568,12 @@ def tenta_recupero_sessione(session_value: str) -> Dict[str, Any]:
         return session_data
     for i in range(2):
         try:
-            logger.debug(f"Tentativo di eval() su sessione (Passo {i+1}): {session_value}")
+            framework_log("DEBUG", f"Tentativo di eval() su sessione (Passo {i+1}): {session_value}")
             session_value = eval(session_value)
             if not isinstance(session_value, str) and i == 0:
                  break
         except Exception as e:
-            logger.warning(f"Errore durante l'eval() della sessione al passo {i+1}. Dettaglio: {e}")
+            framework_log("WARNING", f"Errore durante l'eval() della sessione al passo {i+1}. Dettaglio: {e}")
             return {} 
     
     if isinstance(session_value, dict):
@@ -587,14 +583,14 @@ def tenta_recupero_sessione(session_value: str) -> Dict[str, Any]:
 async def installa_dipendenze_browser() -> None:
     if sys.platform != "emscripten":
         return
-    logger.info("Rilevato ambiente Pyodide. Avvio installazione dipendenze.")
+    framework_log("INFO", "Rilevato ambiente Pyodide. Avvio installazione dipendenze.")
     try:
         import micropip 
         packages_to_install = ["kink", "tomli", "jinja2", "untangle", "bs4", "lxml"]
         await micropip.install(packages_to_install)
-        logger.info(f"Installazione di {len(packages_to_install)} pacchetti completata.")
+        framework_log("INFO", f"Installazione di {len(packages_to_install)} pacchetti completata.")
     except ImportError:
-        logger.critical("Dipendenze Pyodide (micropip) non disponibili, ma sys.platform è 'emscripten'.")
+        framework_log("CRITICAL", "Dipendenze Pyodide (micropip) non disponibili, ma sys.platform è 'emscripten'.")
         raise RuntimeError("Impossibile caricare micropip per l'installazione dipendenze.")
 
 # =====================================================================
@@ -699,11 +695,9 @@ async def bootstrap() -> None:
         flow.step(flow.convert,'@.outputs.-1', dict, 'toml')
     )
 
-    print("BOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOM##",config)
-    print("BOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOM##111")
+    framework_log("DEBUG", f"Configurazione caricata: {config}", emoji="⚙️")
     await bootstrap_core(config)
-    
-    print("BOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOM##222")
+    framework_log("INFO", "Bootstrap core completato.", emoji="🚀")
 
     dependency_executor = container.executor()
     dependency_messenger = container.messenger()

@@ -109,7 +109,7 @@ def analyze_traceback(tb: Optional[types.TracebackType]) -> List[Dict[str, Any]]
         
         line_content = None
         try:
-            frame_summary = traceback.FrameSummary(filename, frame.f_lineno, frame.f_code.co_name, lookup_line=True)
+            frame_summary = traceback.FrameSummary(filename, current_tb.tb_lineno, frame.f_code.co_name, lookup_line=True)
             if frame_summary.line:
                 line_content = frame_summary.line.strip()
         except Exception:
@@ -123,7 +123,7 @@ def analyze_traceback(tb: Optional[types.TracebackType]) -> List[Dict[str, Any]]
         
         structured_tb.append({
             "step_filename": filename,
-            "step_lineno": frame.f_lineno,
+            "step_lineno": current_tb.tb_lineno,
             "step_function": frame.f_code.co_name,
             "step_code_line": line_content, 
             "local_variables_state": local_vars_state
@@ -132,9 +132,13 @@ def analyze_traceback(tb: Optional[types.TracebackType]) -> List[Dict[str, Any]]
     
     return structured_tb
 
-def analyze_exception(source_code: str, custom_filename: str = "<code_in_memory>", app_context: Dict[str, Any] = None) -> Dict[str, Any]:
-    """Genera un report dettagliato sull'eccezione corrente."""
-    exc_type, exc_value, exc_traceback = sys.exc_info()
+def analyze_exception(source_code: str, custom_filename: str = "<code_in_memory>", app_context: Dict[str, Any] = None, 
+                      exc_info: tuple = None) -> Dict[str, Any]:
+    """Genera un report dettagliato sull'eccezione corrente o fornita."""
+    if exc_info:
+        exc_type, exc_value, exc_traceback = exc_info
+    else:
+        exc_type, exc_value, exc_traceback = sys.exc_info()
     
     if exc_type is None or exc_traceback is None:
         return {"status": "Nessuna eccezione attiva trovata."}
@@ -386,17 +390,183 @@ def estrai_righe_da_codice(codice_sorgente: str, riga_inizio: int, riga_fine: in
 # --- Logging Utilites ---
 # =====================================================================
 
-def buffered_log(level: str, message: str, emoji: str = ""):
-    """Logger rudimentale che bufferizza i messaggi iniziali"""
-    formatted = f"{emoji} {message}"
+# --- Colori ANSI per il terminale ---
+COLOR_RESET = "\033[0m"
+COLORS = {
+    "DEBUG": "\033[90m",    # Grigio
+    "INFO": "\033[96m",     # Cyan
+    "WARNING": "\033[93m",  # Giallo
+    "ERROR": "\033[91m",    # Rosso
+    "CRITICAL": "\033[95m", # Magenta
+}
+
+def framework_log(level: str, message: str, emoji: str = "", depth: int = 1, **kwargs):
+    """
+    Logger standardizzato per il framework.
+    Include timestamp, livello colorato, transaction ID, origine e metadata.
+    """
+    from framework.service.flow import get_transaction_id
+    tx_id = get_transaction_id() or "system"
+    
+    # Recupera info sul chiamante con offset variabile
+    try:
+        frames = inspect.stack()
+        # Se depth > len(frames) usiamo l'ultimo frame disponibile
+        idx = min(depth, len(frames) - 1)
+        frame_info = frames[idx]
+        filename = os.path.basename(frame_info.filename)
+        lineno = frame_info.lineno
+    except Exception:
+        filename, lineno = "unknown", 0
+
+    now = datetime.now()
+    timestamp = now.strftime("%H:%M:%S")
+    
+    level_upper = level.upper()
+    color = COLORS.get(level_upper, "")
+    level_pad = f"{level_upper:8}"
+    
+    tx_short = tx_id[:8] if tx_id != "system" else "system"
+    
+    # Formattazione base
+    header = f"[{timestamp}] [{color}{level_pad}{COLOR_RESET}] [{tx_short}]"
+    source = f"{filename}:{lineno}"
+    
+    main_line = f"{header} {emoji} {source:<20} - {message}"
+    print(main_line)
+
+    # Gestione Metadata e Eccezioni
+    items = list(kwargs.items())
+    for i, (key, value) in enumerate(items):
+        is_last = (i == len(items) - 1)
+        prefix = "    └─" if is_last else "    ├─"
+        
+        if key == "exception" and isinstance(value, Exception):
+            # 1. Analisi Profonda dell'eccezione
+            module_source = ""
+            try:
+                if os.path.exists(frame_info.filename):
+                    with open(frame_info.filename, 'r') as f:
+                        module_source = f.read()
+            except Exception:
+                pass
+            
+            # Recupera exc_info se disponibile, altrimenti usa sys.exc_info()
+            exc_info_tuple = (type(value), value, value.__traceback__)
+            report = analyze_exception(module_source, filename, exc_info=exc_info_tuple)
+            
+            # 2. Stampa Traceback standard (colorato)
+            tb = "".join(traceback.format_exception(*exc_info_tuple))
+            connector = "    │ "
+            indented_tb = "\n".join(f"{connector}{line}" for line in tb.splitlines())
+            print(f"{color}    Traceback:{COLOR_RESET}\n{indented_tb}")
+            
+            # 3. Context Diagnostico (Source Line & Locals)
+            if "EXCEPTION_DETAILS" in report:
+                details = report["EXCEPTION_DETAILS"]
+                loc = details.get("error_location", {})
+                
+                # Mostra la riga di codice incriminata
+                code_line = loc.get("source_code_line")
+                if code_line and code_line != "SORGENTE NON RECUPERATA":
+                    print(f"{color}    Source Origin ({filename}:{loc.get('line_number')}):{COLOR_RESET}")
+                    print(f"    │   > {code_line.strip()}")
+
+                locs = details.get("LOCAL_VARIABLES_STATE_FINAL_FRAME", {})
+                if locs:
+                    print(f"{color}    Local Variables (Final Frame):{COLOR_RESET}")
+                    for vname, vval in locs.items():
+                        print(f"    │   ├─ {vname}: {vval}")
+                
+            # 4. Analisi Strutturale Modulo
+            if module_source:
+                mod_report = analyze_module(module_source, filename)
+                classes = [k for k, v in mod_report.items() if isinstance(v, dict) and v.get('type') == 'class']
+                funcs = [k for k, v in mod_report.items() if isinstance(v, dict) and v.get('type') == 'function']
+                
+                if classes or funcs or mod_report.get("module_docstring"):
+                    print(f"{color}    Module Structure ({filename}):{COLOR_RESET}")
+                    if mod_report.get("module_docstring"):
+                        doc = truncate_value('', mod_report['module_docstring'], max_str_len=100)
+                        print(f"    │   ├─ Doc: {doc}")
+                    
+                    summary = []
+                    if classes: summary.append(f"{len(classes)} classes")
+                    if funcs: summary.append(f"{len(funcs)} functions")
+                    print(f"    │   └─ Summary: {', '.join(summary)}")
+            
+            # 5. Environment Snapshot
+            env = report.get("ENVIRONMENT_CONTEXT", {})
+            if env:
+                print(f"{color}    Environment Snapshot:{COLOR_RESET}")
+                print(f"    │   └─ Host: {env.get('hostname')} | OS: {platform.system()} | Process: {env.get('process_id')}")
+
+        elif key in ("module", "analysis") and isinstance(value, (types.ModuleType, dict)):
+            # Visualizzazione speciale per moduli o analisi pre-calcolate
+            if isinstance(value, types.ModuleType):
+                m_report = {}
+                m_source = ""
+                try:
+                    m_source = inspect.getsource(value)
+                except Exception:
+                    # Fallback on __file__ or provided path
+                    m_file = kwargs.get('module_path') or kwargs.get('path') or getattr(value, '__file__', None)
+                    if m_file:
+                        # Prova percorsi comuni
+                        candidates = [m_file, os.path.join("src", m_file), os.path.join(os.getcwd(), "src", m_file)]
+                        for cand in candidates:
+                            if os.path.exists(cand) and os.path.isfile(cand):
+                                try:
+                                    with open(cand, 'r') as f:
+                                        m_source = f.read()
+                                    break
+                                except Exception:
+                                    pass
+                
+                if m_source:
+                    m_report = analyze_module(m_source, getattr(value, '__name__', 'unknown'))
+                else:
+                    m_report = {"error": "cannot retrieve module source"}
+            else:
+                m_report = value
+            
+            print(f"{prefix} {key} structure ({getattr(value, '__name__', 'unknown')}):")
+            classes = [k for k, v in m_report.items() if isinstance(v, dict) and v.get('type') == 'class']
+            funcs = [k for k, v in m_report.items() if isinstance(v, dict) and v.get('type') == 'function']
+            
+            if m_report.get("error"):
+                print(f"    │   └─ Analysis Error: {m_report['error']}")
+            else:
+                if classes: print(f"    │   ├─ Classes: {classes}")
+                if funcs: print(f"    │   ├─ Functions: {funcs}")
+                doc = m_report.get("module_docstring")
+                if doc: print(f"    │   └─ Doc: {truncate_value('', doc, max_str_len=50)}")
+                elif not classes and not funcs:
+                    print(f"    │   └─ (empty or no source code available)")
+
+        else:
+            # Stampa metadata generici
+            val_str = truncate_value(key, value, max_str_len=200)
+            print(f"{prefix} {key}: {val_str}")
+
+    # Bufferizzazione
     if hasattr(container, 'log_buffer'):
-        container.log_buffer().append({
-            'level': level,
-            'message': message,
-            'emoji': emoji,
-            'timestamp': datetime.now(timezone.utc).isoformat(),
-        })
-    print(formatted)
+        try:
+            container.log_buffer().append({
+                'level': level_upper,
+                'message': message,
+                'emoji': emoji,
+                'timestamp': now.isoformat(),
+                'tx_id': tx_id,
+                'file': filename,
+                'line': lineno,
+                **kwargs
+            })
+        except Exception:
+            pass 
+
+# Alias per compatibilità retroattiva
+buffered_log = framework_log
 
 # =====================================================================
 # --- Resource Loading Utilites ---
