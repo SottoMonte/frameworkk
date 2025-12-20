@@ -1,7 +1,7 @@
 import asyncio
 import functools
 from typing import Any, Callable, Dict, List, Optional, Union
-from framework.service.inspector import LogReportEncoder, framework_log, buffered_log, _load_resource, analyze_exception, _get_system_info
+from framework.service.inspector import LogReportEncoder, framework_log, buffered_log, _load_resource, analyze_exception, _get_system_info, log_block
 from framework.service.context import container
 import uuid
 import contextvars
@@ -689,24 +689,22 @@ async def pipe(*stages,context=dict()):
     Le sorgenti supportate sono: 'input', 'output' o valori letterali.
     """
     context |= {'outputs': []}
-    #context = {'@': context}
     stage_index = 0
     final_output = None
     
-    for stage_tuple in stages:
-        stage_index += 1
-        #print("stage_tuple",stage_tuple,"<---------------------",context)
-        outcome = await _execute_step_internal(stage_tuple,context)
-        #print("outcome",outcome,"<---------------------")
-        if isinstance(outcome, dict) and outcome.get('success') is True and 'data' in outcome:
-            data_to_pass = outcome['data']
-        else:
-            data_to_pass = outcome
-        
-        # Aggiorna il contesto e l'output per i prossimi stage
-        final_output = data_to_pass
-        context['outputs'].append(data_to_pass)
-        
+    with log_block(f"Pipe with {len(stages)} stages", level="TRACE", emoji="🚀"):
+        for stage_tuple in stages:
+            stage_index += 1
+            outcome = await _execute_step_internal(stage_tuple,context)
+            
+            if isinstance(outcome, dict) and outcome.get('success') is True and 'data' in outcome:
+                data_to_pass = outcome['data']
+            else:
+                data_to_pass = outcome
+            
+            final_output = data_to_pass
+            context['outputs'].append(data_to_pass)
+            
     return final_output
 
 async def safe(func: Callable, *args, **kwargs) -> Dict[str, Any]:
@@ -738,7 +736,7 @@ async def safe(func: Callable, *args, **kwargs) -> Dict[str, Any]:
             "errors": [{"type": type(e).__name__, "message": str(e)}]
         }
 
-async def branch(on_success: Callable, on_failure: Callable, context=dict()) -> Any:
+async def branch(on_success: Callable, on_failure: Callable, context=dict()):
     """
     Instrada il flusso basandosi sul campo 'ok' del risultato (result.json).
     
@@ -750,14 +748,13 @@ async def branch(on_success: Callable, on_failure: Callable, context=dict()) -> 
     Returns:
         Il risultato della funzione chiamata (on_success o on_failure).
     """
-    if context.get('success') is True:
-        if asyncio.iscoroutinefunction(on_success):
-            return await on_success(context.get('data'))
-        return on_success(context.get('data'))
-    else:
-        if asyncio.iscoroutinefunction(on_failure):
-            return await on_failure(context.get('errors'))
-        return on_failure(context.get('errors'))
+    outcome = context.get('outputs', [None])[-1]
+    
+    with log_block("Branching", level="TRACE", emoji="📂"):
+        if isinstance(outcome, dict) and outcome.get('success') is True:
+            return await _execute_step_internal(on_success, context)
+        else:
+            return await _execute_step_internal(on_failure, context)
 
 async def retry(func , max_attempts: int = 3, retryable_errors: List[str] = None, context=dict()) -> Dict[str, Any]:
     """
@@ -977,27 +974,24 @@ async def batch(*steps_to_run) -> Dict[str, Any]:
     Ritorna un risultato aggregato con 'ok': True solo se TUTTI gli step hanno successo.
     """
     if not steps_to_run:
-        return {"ok": True, "data": [], "error": None}
+        return {"success": True, "data": [], "errors": None}
 
     tasks = []
     
-    for action_step in steps_to_run:
-        # Supporto sia per step tuple che per callable diretti (per retrocompatibilità/flessibilità)
-        if hasattr(action_step, '__call__') or asyncio.iscoroutinefunction(action_step):
-             # Wrap callable in a step-like structure execution or direct call
-             # Ma _execute_step_internal si aspetta una tupla (func, args, kwargs)
-             # Creiamo uno step fittizio
-             step_tuple = (action_step, (), {})
-             task = asyncio.create_task(_execute_step_internal(step_tuple))
-        elif isinstance(action_step, tuple):
-             task = asyncio.create_task(_execute_step_internal(action_step))
-        else:
-            raise TypeError(f"fan_out supporta solo step (tuple) o callable, ricevuto: {type(action_step)}")
+    with log_block(f"Batch with {len(steps_to_run)} steps", level="TRACE", emoji="🧬"):
+        for action_step in steps_to_run:
+            if hasattr(action_step, '__call__') or asyncio.iscoroutinefunction(action_step):
+                 step_tuple = (action_step, (), {})
+                 task = asyncio.create_task(_execute_step_internal(step_tuple))
+            elif isinstance(action_step, tuple):
+                 task = asyncio.create_task(_execute_step_internal(action_step))
+            else:
+                raise TypeError(f"batch supporta solo step (tuple) o callable, ricevuto: {type(action_step)}")
             
-        tasks.append(task)
-    
-    # Esegue in parallelo, catturando eccezioni Python
-    raw_results = await asyncio.gather(*tasks, return_exceptions=True)
+            tasks.append(task)
+        
+        # Esegue in parallelo, catturando eccezioni Python
+        raw_results = await asyncio.gather(*tasks, return_exceptions=True)
     
     successes = []
     failures = []
@@ -1025,7 +1019,7 @@ async def batch(*steps_to_run) -> Dict[str, Any]:
     
     return {
         "success": is_success,
-        "data": successes, # Contiene i dati parziali anche in caso di errore globale? Di solito sì o no. Qui li lasciamo.
+        "data": successes,
         "errors": failures
     }
 

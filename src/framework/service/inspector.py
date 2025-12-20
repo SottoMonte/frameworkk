@@ -13,6 +13,7 @@ import psutil
 import traceback
 import asyncio
 import time
+import contextvars
 from contextlib import contextmanager
 from datetime import datetime, timezone
 from typing import Dict, Any, List, Optional, Set
@@ -184,14 +185,30 @@ def analyze_exception(source_code: str, custom_filename: str = "<code_in_memory>
         "LOCAL_VARIABLES_STATE_FINAL_FRAME": final_local_vars,
     }
     
+    # Snapshot del container DI
+    container_snapshot = {}
+    try:
+        from framework.service.context import container
+        for attr in dir(container):
+            if attr.startswith('_'): continue
+            p = getattr(container, attr)
+            # dependency_injector providers hanno l'attributo 'provider' o sono essi stessi callable
+            if hasattr(p, '__class__') and 'dependency_injector.providers' in str(p.__class__):
+                container_snapshot[attr] = str(p)
+    except:
+        pass
+
     debug_report = {
         "ENVIRONMENT_CONTEXT": {
             "timestamp": datetime.now().isoformat(),
             "python_version": platform.python_version(),
+            "sys_path": sys.path[:5], # Primi 5 per brevità
+            "loaded_modules_count": len(sys.modules),
             **_get_system_info()
         },
         "APPLICATION_CONTEXT": app_context or {"VERSION": "N/A", "USER_ID": "anonymous"},
         "EXCEPTION_DETAILS": exception_details,
+        "DI_CONTAINER_SNAPSHOT": container_snapshot,
         "STRUCTURED_TRACEBACK": structured_tb[1:-1], 
     }
     
@@ -395,22 +412,38 @@ def estrai_righe_da_codice(codice_sorgente: str, riga_inizio: int, riga_fine: in
 # --- Colori ANSI per il terminale ---
 COLOR_RESET = "\033[0m"
 COLORS = {
-    "DEBUG": "\033[90m",    # Grigio
+    "TRACE": "\033[90m",    # Grigio scuro
+    "DEBUG": "\033[37m",    # Bianco/Grigio chiaro
     "INFO": "\033[96m",     # Cyan
     "WARNING": "\033[93m",  # Giallo
     "ERROR": "\033[91m",    # Rosso
     "CRITICAL": "\033[95m", # Magenta
 }
 
+_log_indent: contextvars.ContextVar[int] = contextvars.ContextVar("log_indent", default=0)
+
 @contextmanager
-def timed_block(message: str, level: str = "INFO", emoji: str = "⏱️", **kwargs):
-    """Context manager per loggare la durata di un blocco di codice."""
+def log_block(title: str, level: str = "DEBUG", emoji: str = "📦", timing: bool = True):
+    """
+    Context manager per creare un blocco di log indentato.
+    Aumenta l'indentazione globale per la durata del blocco.
+    """
+    indent = _log_indent.get()
+    framework_log(level, f"{title} (Starting...)", emoji=emoji, depth=4)
+    token = _log_indent.set(indent + 1)
     start_time = time.perf_counter()
     try:
         yield
     finally:
-        duration = time.perf_counter() - start_time
-        framework_log(level, message, emoji=emoji, duration=duration, depth=3, **kwargs)
+        duration = time.perf_counter() - start_time if timing else None
+        _log_indent.reset(token)
+        framework_log(level, f"{title} (Completed)", emoji=emoji, duration=duration, depth=4)
+
+@contextmanager
+def timed_block(message: str, level: str = "INFO", emoji: str = "⏱️", **kwargs):
+    """Context manager per loggare la durata di un blocco di codice (usa log_block internamente)."""
+    with log_block(message, level=level, emoji=emoji, timing=True):
+        yield
 
 def framework_log(level: str, message: str, emoji: str = "", depth: int = 1, **kwargs):
     """
@@ -439,6 +472,12 @@ def framework_log(level: str, message: str, emoji: str = "", depth: int = 1, **k
     level_pad = f"{level_upper:8}"
     
     tx_short = tx_id[:8] if tx_id != "system" else "system"
+    
+    # Indentazione
+    indent = _log_indent.get()
+    indent_str = "│   " * indent if indent > 0 else ""
+    if indent_str and not message.startswith('(Completed)'):
+        indent_str = indent_str[:-4] + "├── "
     
     # --- Helper Interni per la visualizzazione ---
     def sanitize(k, v):
@@ -493,8 +532,11 @@ def framework_log(level: str, message: str, emoji: str = "", depth: int = 1, **k
     log_entry = {"timestamp": timestamp, "level": level, "message": message, "source": source, "tx_id": tx_id, "duration": duration}
     lb.append(log_entry)
     
-    header = f"[{timestamp}] [{color}{level_pad}{COLOR_RESET}] [{tx_short}]{duration_str}"
-    print(f"{header} {emoji} {source:<20} - {message}")
+    module_info = f"{filename}:{lineno}"
+    module_info_pad = f"{module_info:20}"
+    
+    log_line = f"{color}[{timestamp}] [{level_pad}] [{tx_short}] {indent_str}{module_info_pad} - {emoji} {message}{COLOR_RESET}"
+    print(log_line)
 
     # --- Gestione Metadata e Eccezioni ---
     items = list(kwargs.items())

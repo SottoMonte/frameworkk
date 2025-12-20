@@ -17,7 +17,8 @@ from framework.service.inspector import (
     estrai_righe_da_codice,
     framework_log,
     buffered_log,
-    _load_resource
+    _load_resource,
+    log_block
 )
 
 from dependency_injector import providers
@@ -143,7 +144,7 @@ async def generate(data, schema=None):
 
 async def _load_contract_info(main_module, path):
     """Carica il contratto JSON e le info dal modulo di test."""
-    framework_log("DEBUG", f"Caricamento e validazione contratto per {path}", emoji="📜", module=main_module)
+    framework_log("TRACE", f"Caricamento e validazione contratto per {path}", emoji="📜", module=main_module)
     
     # 1. Caricamento contratto JSON
     contract_json_path = path.replace('.py', '.contract.json')
@@ -151,7 +152,7 @@ async def _load_contract_info(main_module, path):
     try:
         json_content = await _load_resource(path=contract_json_path)
         external_contracts = await convert(json_content, dict, 'json')
-        framework_log("DEBUG", f"Contratto JSON esterno caricato da {contract_json_path}.")
+        framework_log("TRACE", f"Contratto JSON esterno caricato da {contract_json_path}.")
     except Exception as e:
         framework_log("WARNING", f"Nessun contratto JSON valido trovato in {contract_json_path}. Filtro hash disabilitato.", e)
 
@@ -180,7 +181,7 @@ def _resolve_exports_map(main_module, contract_info):
     exports_map = getattr(contract_module, 'exports', {}) if isinstance(getattr(contract_module, 'exports', None), dict) else {}
     
     if exports_map:
-        framework_log("DEBUG", f"🔐 exports trovato: {list(exports_map.keys())}")
+        framework_log("TRACE", f"🔐 exports trovato: {list(exports_map.keys())}")
         return exports_map
         
     # Tentativo secondario: derivazione da .contract.json
@@ -207,10 +208,10 @@ async def _validate_checksums(main_module, path, contract_info):
     ccc = ccc_envelope.get('data', {}) if isinstance(ccc_envelope, dict) else ccc_envelope
 
     if not external_contracts:
-        framework_log("DEBUG", f"Using Auto-Trust (CCC generated) for {path}", emoji="🛡️")
+        framework_log("TRACE", f"Using Auto-Trust (CCC generated) for {path}", emoji="🛡️")
         return {} # Nessuna validazione strict richiesta
 
-    framework_log("DEBUG", f"Using External Contract for {path}: {list(external_contracts.keys())}", emoji="📜")
+    framework_log("TRACE", f"Using External Contract for {path}: {list(external_contracts.keys())}", emoji="📜")
     
     contract_validated_methods = {}
     
@@ -397,12 +398,12 @@ async def _load_dependencies(module: types.ModuleType, dependencies) -> None:
                 setattr(module, key, value)
                 continue
 
-        framework_log("DEBUG", f"⏳ Caricamento dipendenza '{key}' da {import_path}...")
+        framework_log("TRACE", f"⏳ Caricamento dipendenza '{key}' da {import_path}...")
         res = await resource(path=import_path)
         value = res.get('data') if isinstance(res, dict) and 'data' in res else res
         setattr(module, key, value)
         container.module_cache()[import_path] = value
-        framework_log("DEBUG", f"📦 Dipendenza '{key}' caricata da {import_path}")
+        framework_log("TRACE", f"📦 Dipendenza '{key}' caricata da {import_path}")
 
 async def _load_python_module(name: str, path: str, code: str) -> types.ModuleType:
     """Crea ed esegue dinamicamente un modulo Python con le variabili globali necessarie."""
@@ -415,7 +416,7 @@ async def _load_python_module(name: str, path: str, code: str) -> types.ModuleTy
     try:
         async with container.module_cache_lock():
             container.module_cache()[path] = module
-            framework_log("DEBUG", f"♻️ Placeholder module inserito nella cache per {path} (pre-caricamento)")
+            framework_log("TRACE", f"♻️ Placeholder module inserito nella cache per {path} (pre-caricamento)")
     except Exception:
         container.module_cache()[path] = module
 
@@ -429,7 +430,7 @@ async def _load_python_module(name: str, path: str, code: str) -> types.ModuleTy
         if path.replace('.test.py','.py',) in dependencies:
             del dependencies[path.replace('.test.py','.py')]
         
-        framework_log("INFO", f"🔍 Dipendenze trovate in {path}: {dependencies}")
+        framework_log("TRACE", f"🔍 Dipendenze trovate in {path}: {dependencies}")
         await _load_dependencies(module, dependencies.copy())
         compiled_code = compile(code, module_name, 'exec')
         exec(compiled_code, module.__dict__)
@@ -602,70 +603,68 @@ async def installa_dipendenze_browser() -> None:
 # =====================================================================
 
 async def bootstrap_core(config) -> None:
-    # Nota: Usiamo language.register qui? No, usiamo la nostra register locale ora, 
-    # ma language.py deve essere ancora disponibile.
-    # Il codice originale chiamava `await language.register`. Ora `register` è qui.
-    # Dobbiamo aggiornare le chiamate interne.
-    
-    manager_loader_path = [
-        {
-            'path': 'framework/manager/messenger.py', 
-            'service': 'messenger', 
-            'config': {'cache_enabled': True, 'log_level': 'INFO'},
-            'dependency_keys': ['message'], 
-            'messenger': 'messenger' 
-        },
-        {
-            'path': 'framework/manager/executor.py', 
-            'service': 'executor', 
-            'config': {'cache_enabled': True, 'log_level': 'INFO'},
-            'dependency_keys': ['actuator'], 
-            'messenger': 'executor'
-        },
-        {
-            'path': 'framework/manager/presenter.py',
-            'service': 'presenter',
-            'config': {'cache_enabled': True, 'log_level': 'INFO'},
-            'dependency_keys': ['messenger'], 
-            'messenger': 'presenter'
-        },
-        {
-            'path': 'framework/manager/defender.py',
-            'service': 'defender',
-            'config': {'cache_enabled': True, 'log_level': 'INFO'},
-            'dependency_keys': ['authentication'], 
-            'messenger': 'defender' 
-        },
-        {
-            'path': 'framework/manager/storekeeper.py',
-            'service': 'storekeeper',
-            'config': {'cache_enabled': True, 'log_level': 'INFO'},
-            'dependency_keys': ['persistence'], 
-            'messenger': 'storekeeper'
-        },
-        {
-            'path': 'framework/manager/tester.py',
-            'service': 'tester',
-            'config': {'cache_enabled': True, 'log_level': 'INFO'},
-            'dependency_keys': ['messenger','persistence'], 
-            'messenger': 'tester' 
-        }
-    ]
-    
-    await register(**{
-        'path': 'infrastructure/message/console.py', 
-        'service': 'message', 
-        'adapter': 'adapter', 
-        'payload': config
-    })
+    with log_block("Bootstrap Core Phases", level="INFO", emoji="🏗️"):
+        manager_loader_path = [
+            {
+                'path': 'framework/manager/messenger.py', 
+                'service': 'messenger', 
+                'config': {'cache_enabled': True, 'log_level': 'INFO'},
+                'dependency_keys': ['message'], 
+                'messenger': 'messenger' 
+            },
+            {
+                'path': 'framework/manager/executor.py', 
+                'service': 'executor', 
+                'config': {'cache_enabled': True, 'log_level': 'INFO'},
+                'dependency_keys': ['actuator'], 
+                'messenger': 'executor'
+            },
+            {
+                'path': 'framework/manager/presenter.py',
+                'service': 'presenter',
+                'config': {'cache_enabled': True, 'log_level': 'INFO'},
+                'dependency_keys': ['messenger'], 
+                'messenger': 'presenter'
+            },
+            {
+                'path': 'framework/manager/defender.py',
+                'service': 'defender',
+                'config': {'cache_enabled': True, 'log_level': 'INFO'},
+                'dependency_keys': ['authentication'], 
+                'messenger': 'defender' 
+            },
+            {
+                'path': 'framework/manager/storekeeper.py',
+                'service': 'storekeeper',
+                'config': {'cache_enabled': True, 'log_level': 'INFO'},
+                'dependency_keys': ['persistence'], 
+                'messenger': 'storekeeper'
+            },
+            {
+                'path': 'framework/manager/tester.py',
+                'service': 'tester',
+                'config': {'cache_enabled': True, 'log_level': 'INFO'},
+                'dependency_keys': ['messenger','persistence'], 
+                'messenger': 'tester' 
+            }
+        ]
+        
+        with log_block("Infrastructure Initialization", level="DEBUG", emoji="🛠️"):
+            await register(**{
+                'path': 'infrastructure/message/console.py', 
+                'service': 'message', 
+                'adapter': 'adapter', 
+                'payload': config
+            })
 
-    for mgr in manager_loader_path:
-        await register(**mgr)
+        with log_block("Manager Registration", level="DEBUG", emoji="🧩"):
+            for mgr in manager_loader_path:
+                await register(**mgr)
 
-    if hasattr(container, 'messenger'):
-        dependency_messenger = container.messenger()
-        for log in container.log_buffer():
-            await dependency_messenger.post(domain=log.get('level','DEBUG').lower(), message=log.get('message'))
+        if hasattr(container, 'messenger'):
+            dependency_messenger = container.messenger()
+            for log in container.log_buffer():
+                await dependency_messenger.post(domain=log.get('level','DEBUG').lower(), message=log.get('message'))
 
 async def bootstrap() -> None:
     env_config: Dict[str, Any] = dict(os.environ)
