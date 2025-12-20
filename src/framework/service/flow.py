@@ -181,114 +181,132 @@ def get_requirements() -> Dict[str, Any]:
     return _requirements.get()
 
 # =====================================================================
+# =====================================================================
 # --- Decorators ---
 # =====================================================================
 
-def asynchronous(custom_filename: str = __file__, app_context = None,**constants):
-    requirements = constants.get('requirements', {})
+def _prepare_async_context(custom_filename, **constants):
+    """Prepara requirements, inject e schema path per il decoratore."""
     known_params = {'managers', 'outputs', 'inputs'}
     requirements = {k: v for k, v in constants.items() if k not in known_params}
     
     inject = [getattr(container, manager)() for manager in constants.get('managers', []) if hasattr(container, manager)]
-    # input = constants.get('inputs', []) # Unused variable
     
-    # Standardizza su transaction.json
     output_schema_path = 'framework/scheme/transaction.json'
     if 'outputs' in constants and constants['outputs']:
          output_schema_path = constants['outputs']
+         
+    return requirements, inject, output_schema_path
+
+def _setup_transaction_context():
+    """Gestisce l'inizializzazione del Transaction ID."""
+    current_tx_id = get_transaction_id()
+    tx_token = None
+    if not current_tx_id:
+        current_tx_id = str(uuid.uuid4())
+        tx_token = set_transaction_id(current_tx_id)
+    return current_tx_id, tx_token
+
+async def _execute_wrapper(function, args, kwargs, inject, current_tx_id):
+    """Esegue la funzione wrappata e arricchisce il risultato."""
+    args_inject = list(args) + inject
+    step_tuple = (function, tuple(args_inject), kwargs)
+    
+    transaction = await _execute_step_internal(step_tuple)
+    # print("INNNNNNNNN ASTNC---------------------", transaction) # Debug rimosso per pulizia, ripristinabile se necessario
+    
+    transaction['identifier'] = current_tx_id
+    try:
+        sys_info = _get_system_info()
+        transaction['worker'] = f"{sys_info.get('hostname', 'unknown')}:{sys_info.get('process_id', '?')}"
+    except Exception:
+        pass
+        
+    return transaction
+
+async def _normalize_wrapper(transaction, output_schema_path, wrapper_func, kwargs, current_tx_id):
+    """Gestisce il caricamento dello schema e la normalizzazione."""
+    target_schema = output_schema_path
+    
+    if isinstance(target_schema, str):
+        try:
+            schema_content = await _load_resource(path=target_schema)
+            target_schema = json.loads(schema_content)
+        except Exception as e:
+            buffered_log("ERROR", f"Errore caricamento schema da {output_schema_path}: {e}")
+            target_schema = None
+
+    if target_schema and isinstance(target_schema, dict):
+        try:
+            meta = {
+                "action": wrapper_func.__name__,
+                "parameters": kwargs,
+                "identifier": current_tx_id,
+                "worker": transaction.get('worker', 'unknown')
+            }
+            return await normalize(meta | transaction, target_schema)
+        except Exception as e:
+            buffered_log("ERROR", f"Errore normalizzazione output in {wrapper_func.__name__}: {e}")
+            return transaction
+    
+    return transaction
+
+def _handle_wrapper_error(e, function, custom_filename, current_tx_id):
+    """Gestisce le eccezioni e genera il report di errore."""
+    error_details = str(e)
+    try:
+        report = analyze_exception(inspect.getsource(function) if hasattr(function, '__code__') else "", custom_filename)
+        if report and 'EXCEPTION_DETAILS' in report:
+            error_details = report['EXCEPTION_DETAILS']
+    except Exception:
+        pass 
+
+    if not hasattr(container, 'messenger'):
+        buffered_log("ERROR", e, emoji="❌")
+
+    return {
+        "success": False, 
+        "errors": [error_details],
+        "data": None,
+        "action": function.__name__,
+        "identifier": current_tx_id
+    }
+
+def asynchronous(custom_filename: str = __file__, app_context = None, **constants):
+    requirements, inject, output_schema_path = _prepare_async_context(custom_filename, **constants)
 
     def decorator(function):
         @functools.wraps(function)
         async def wrapper(*args, **kwargs):
             wrapper._is_decorated = True
             
-            # 1. Gestione Transaction ID
-            current_tx_id = get_transaction_id()
-            tx_token = None # Token per il reset del contesto
-            
-            if not current_tx_id:
-                current_tx_id = str(uuid.uuid4())
-                tx_token = set_transaction_id(current_tx_id)
-            
-            # Imposta i requirements nel contesto
+            # 1. Setup Context
+            current_tx_id, tx_token = _setup_transaction_context()
             req_token = _requirements.set(requirements)
             
             try:
-                args_inject = list(args) + inject
+                '''return await pipe(
+                    step(_execute_wrapper(function, args, kwargs, inject, current_tx_id)),
+                    step(_normalize_wrapper('@.outputs.-1', output_schema_path, wrapper, kwargs, current_tx_id))
+                )'''
+                # 2. Execute & Enrich
+                transaction = await _execute_wrapper(function, args, kwargs, inject, current_tx_id)
                 
-                # 2. Esecuzione tramite _execute_step_internal
-                step_tuple = (function, tuple(args_inject), kwargs)
-                outcome = await _execute_step_internal(step_tuple)
-                
-                # Arricchimento Transaction
-                outcome['identifier'] = current_tx_id
-                
-                # Aggiunge info sul worker se inspector è disponibile
-                try:
-                    sys_info = _get_system_info()
-                    outcome['worker'] = f"{sys_info.get('hostname', 'unknown')}:{sys_info.get('process_id', '?')}"
-                except Exception:
-                    pass
-
-                # 3. Normalizzazione / Validazione Schema
-                target_schema = output_schema_path
-                
-                if isinstance(target_schema, str):
-                    try:
-                        schema_content = await _load_resource(path=target_schema)
-                        target_schema = json.loads(schema_content)
-                    except Exception as e:
-                        buffered_log("ERROR", f"Errore caricamento schema da {output_schema_path}: {e}")
-                        target_schema = None
-
-                if target_schema and isinstance(target_schema, dict):
-                    try:
-                        meta = {
-                            "action": wrapper.__name__,
-                            "parameters": kwargs,
-                            "identifier": current_tx_id,
-                            "worker": outcome.get('worker', 'unknown')
-                        }
-                        return await normalize(meta | outcome, target_schema)
-                    except Exception as e:
-                        buffered_log("ERROR", f"Errore normalizzazione output in {function.__name__}: {e}")
-                        return outcome
-                else:
-                    return outcome
+                # 3. Normalize
+                return await _normalize_wrapper(transaction, output_schema_path, wrapper, kwargs, current_tx_id)
 
             except Exception as e:
-                # 4. Gestione Errori Avanzata con Introspection
-                error_details = str(e)
-                try:
-                    report = analyze_exception(inspect.getsource(function) if hasattr(function, '__code__') else "", custom_filename)
-                    if report and 'EXCEPTION_DETAILS' in report:
-                        error_details = report['EXCEPTION_DETAILS']
-                except Exception:
-                    pass 
-
-                if hasattr(container, 'messenger'):
-                    pass
-                else:
-                    buffered_log("ERROR", e, emoji="❌")
-
-                ok = {
-                    "success": False, 
-                    "errors": [error_details],
-                    "data": None,
-                    "action": wrapper.__name__,
-                    "identifier": current_tx_id
-                }
-
+                # 4. Error Handling
+                ok = _handle_wrapper_error(e, function, custom_filename, current_tx_id)
                 print(ok)
                 return ok
 
             finally:
+                # Cleanup
                 _requirements.reset(req_token)
-                
-                # Reset Transaction ID se l'abbiamo impostato noi
                 if tx_token:
                     _transaction_id.reset(tx_token)
-                pass
+
         return wrapper
     return decorator
 
@@ -832,9 +850,9 @@ async def guard(condition: str, context=dict()) -> Optional[Dict[str, Any]]:
             safe_context = str(context)
             
         wrapped_context = {'@': safe_context}
-        print("condition---------------------",condition)
+        #print("condition---------------------",condition)
         result = mistql.query(condition, wrapped_context)
-        print("result---------------------",result,condition)
+        #print("result---------------------",result,condition)
         
         # Se il risultato è truthy, la condizione è soddisfatta
         if result:
@@ -905,7 +923,7 @@ async def switch(cases, context=dict()):
         # 1. Valuta la condizione
         #print(condition,action_step)
         guard_result = await guard(condition, context)
-        print("guard_result---------------------",condition,guard_result)
+        #print("guard_result---------------------",condition,guard_result)
         success = guard_result.get("success", False)
         
         if success:
