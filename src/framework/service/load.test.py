@@ -9,7 +9,8 @@ imports = {
 exports = {
     'bootstrap':'bootstrap',
     'bootstrap_core':'bootstrap_core',
-    'generate_checksum': 'generate_checksum'
+    'generate_checksum': 'generate_checksum',
+    'resource': 'resource',
 }
 
 class TestModule(contract.Contract):
@@ -18,6 +19,9 @@ class TestModule(contract.Contract):
         print("Setting up the test environment...")
 
     async def test_generate_checksum(self):
+        pass
+
+    async def test_resource(self):
         pass
 
     async def test_bootstrap_core(self):

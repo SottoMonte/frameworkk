@@ -2,7 +2,7 @@
     "__module__": {
         "application": {
             "test": "582a4ee986a7b5874cb1f78fe9c5b03a1bb2e3e03bf8b2e3f6539921376c3e85",
-            "production": "430d70586776e1c040e19427ba5a895e33d415634fd55daaeeab83a6763b917c"
+            "production": "383c778c54ea1ac4f80c174aa0b911744b24929a807b98716fe7887a512c3f1d"
         },
         "discover_and_run_tests": {
             "test": "976127eee273eb5b71f2455388bfa4713c4a918b54ecd2f6381448c63480a7ea",

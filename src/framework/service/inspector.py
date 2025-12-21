@@ -535,7 +535,7 @@ def framework_log(level: str, message: str, emoji: str = "", depth: int = 1, **k
     module_info = f"{filename}:{lineno}"
     module_info_pad = f"{module_info:20}"
     
-    log_line = f"{color}[{timestamp}] [{level_pad}] [{tx_short}] {indent_str}{module_info_pad} - {emoji} {message}{COLOR_RESET}"
+    log_line = f"{color}[{timestamp}] [{level_pad}] [{tx_short:10}] {indent_str}{module_info_pad} - {emoji} {message}{COLOR_RESET}"
     print(log_line)
 
     # --- Gestione Metadata e Eccezioni ---

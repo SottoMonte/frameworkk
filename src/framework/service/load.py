@@ -29,7 +29,6 @@ from dependency_injector import providers
 # --- Funzioni di Generazione (Spostate da language.py) ---
 # =====================================================================
 
-@asynchronous()
 async def generate_checksum(main_path: str, ) -> Dict[str, Dict[str, Dict[str, Dict[str, str]]]]:
     """
     Genera il contratto JSON, mappando ogni metodo in un oggetto annidato
@@ -121,7 +120,7 @@ async def generate_checksum(main_path: str, ) -> Dict[str, Dict[str, Dict[str, D
 
     framework_log("INFO", f"✅ Generato e scritto il contratto JSON in {json_path}")
     
-    return {main_path: contract_hashes}
+    return {'data': {main_path: contract_hashes}, 'success': True}
 
 genera = {
     'module': generate_checksum,

@@ -4,9 +4,13 @@
             "test": "0c95d2646532345ba5efdea7bcca6d6f37eb15bf70a1daae5afb0f846641778b",
             "production": "0991be066c4cec9cf724cf9d7b39c10aada2c17995083e0077be4b0121e30ba0"
         },
+        "resource": {
+            "test": "338142eb703e766a25b3c2dac96bc58fc147359c7c44626d673231ee90b815af",
+            "production": "ba593b5b0036720532be90b1ef54c3938a4ed081434d6dd893858a8d56d304e2"
+        },
         "bootstrap_core": {
             "test": "d683b01a043ec54c4081835db4187e9f54206e1580563e29bb07fb977ef4b999",
-            "production": "ad41e658954a285157a0e22356f2c2903e2e2e4ec8f28c963c3f3707831bde66"
+            "production": "47edf890185ede80daad2974e62aefcf2bd89008a80b56d0bc29f21c9b0ad078"
         },
         "bootstrap": {
             "test": "038ee4e822716fb257c55af8dc60aa05a5efb4f112fcc251edb8a4110ccbcbb5",
