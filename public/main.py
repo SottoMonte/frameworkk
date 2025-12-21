@@ -54,7 +54,13 @@ async def main():
         print(f"Failed to generate contract for {target}. Result: {data}")
 '''
 if __name__ == "__main__":
-    run = asyncio.run(main())
-    #print(dir(run))
-    run.application(args=sys.argv)
+    # Load the run module
+    result = asyncio.run(main())
+    run_module = result.get('data') if isinstance(result, dict) and 'data' in result else result
+    
+    # Now call application which will start its own event loop for bootstrap
+    if hasattr(run_module, 'application'):
+        run_module.application(args=sys.argv)
+    else:
+        print(f"Error: run module doesn't have 'application'. Available: {dir(run_module)}")
     

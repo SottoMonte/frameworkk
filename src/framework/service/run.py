@@ -442,6 +442,19 @@ def application(tester=None,**constants):
     else:
         event_loop = asyncio.new_event_loop()
         asyncio.set_event_loop(event_loop)
-        event_loop.create_task(flow.work(flow.step(loader.bootstrap)))
-        #event_loop.create_task(loader.bootstrap())
-        event_loop.run_forever()
+        
+        try:
+            # Usiamo run_until_complete per il bootstrap. 
+            # flow.work restituisce una coroutine, che run_until_complete eseguirà.
+            event_loop.run_until_complete(
+                flow.work(flow.step(loader.bootstrap), context={'system': True})
+            )
+            
+            event_loop.run_forever()
+            
+        except Exception as e:
+            print(f"❌ Errore fatale durante l'avvio: {e}")
+            import traceback
+            traceback.print_exc()
+        finally:
+            event_loop.close()

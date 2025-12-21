@@ -966,32 +966,30 @@ async def work(workflow, context=dict()):
 
         else:
             # Defender non attivo: Bypass di Sistema (Bootstrap)
-            # Consenti solo se flaggato come sistema
+            # Consenti se flaggato come sistema o se è il bootstrap stesso
             is_system = context.get('system', False) or context.get('user') == 'system'
+            wf_name = getattr(workflow, '__name__', str(workflow))
             
-            if is_system:
+            if is_system or 'bootstrap' in wf_name:
                 authorized = True
-                framework_log("DEBUG", "Defender offline: Accesso System concesso.", emoji="🛡️")
+                framework_log("DEBUG", f"Defender offline: Accesso System concesso per {wf_name}.", emoji="🛡️")
             else:
                 authorized = False
-                framework_log("ERROR", "Defender offline: Accesso User negato.", emoji="⛔")
+                framework_log("ERROR", f"Defender offline: Accesso User negato per {wf_name}.", emoji="⛔")
 
         if not authorized:
              # Genera un errore esplicito
              raise PermissionError("Accesso negato: Permessi insufficienti o Defender non disponibile.")
-        transaction = asyncio.create_task(_execute_step_internal(workflow, context))
-
-        return transaction
+        
+        # Esegue il workflow direttamente
+        return await _execute_step_internal(workflow, context)
 
     except Exception as e:
         framework_log("ERROR", f"Errore avvio workflow: {e}", emoji="❌")
-        # Restituisce un task che fallisce immediatamente
-        async def fail_task(): raise e
-        return asyncio.create_task(fail_task())
+        raise
 
     finally:
-        # Pulisce il contextvar per non inquinare il chiamante,
-        # il task creato eredita la copia corretta con l'ID impostato.
+        # Pulisce il contextvar per non inquinare il chiamante
         if tx_token:
             _transaction_id.reset(tx_token)
 

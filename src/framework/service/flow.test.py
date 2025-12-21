@@ -15,7 +15,11 @@ exports = {
     'route':'route',
     'normalize':'normalize',
     'put':'put',
-    'get':'get'
+    'get':'get',
+    'work':'work',
+    'step':'step',
+    'pipe':'pipe',
+    'catch':'catch'
 }
 
 class TestModule(contract.Contract):
@@ -110,6 +114,18 @@ class TestModule(contract.Contract):
         pass
     
     async def test_load_di_entry(self):
+        pass
+
+    async def test_work(self):
+        pass
+
+    async def test_step(self):
+        pass
+
+    async def test_pipe(self):
+        pass
+
+    async def test_catch(self):
         pass
 
     async def test_format(self):
