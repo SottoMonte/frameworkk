@@ -348,7 +348,7 @@ def analyze_module(source_code: str, module_name: str) -> Dict[str, Any]:
                             # Tentativo safe di valutazione
                             var_value = ast.literal_eval(node.value)
                         except (ValueError, TypeError):
-                            var_value = "Evaluation Error"
+                            var_value = "<Non-Literal Value>"
                         
                         info = {
                             "type": type(node.value).__name__,

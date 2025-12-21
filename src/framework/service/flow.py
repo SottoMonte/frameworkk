@@ -656,8 +656,9 @@ async def _execute_step_internal(action_step,context=dict()) -> Any:
     kwargs = kkk
 
     if not isinstance(action_step, tuple) or len(action_step) < 2 or not callable(action_step[0]):
-        raise TypeError("L'azione fornita non è un formato step valido.",fun,args,kwargs)
-        #return {'success': False, 'errors': ['("L\'azione fornita non è un formato step valido.", None, (), {\'path\': \'framework/service/run.py\'})'], 'function': fun.__name__}
+        # Miglioramento context errore
+        step_repr = str(action_step)[:100]
+        raise TypeError(f"L'azione fornita non è un formato step valido. Action: {step_repr}", fun, args, kwargs)
 
     if asyncio.iscoroutinefunction(fun):
         # Inspect the function to see if it accepts 'context'
@@ -695,7 +696,11 @@ async def pipe(*stages,context=dict()):
     with log_block(f"Pipe with {len(stages)} stages", level="TRACE", emoji="🚀"):
         for stage_tuple in stages:
             stage_index += 1
-            outcome = await _execute_step_internal(stage_tuple,context)
+            step_name = getattr(stage_tuple[0], '__name__', str(stage_tuple[0]))
+            
+            # Utilizza timed_block o log_block per ogni stage per tracciare i tempi
+            with log_block(f"Step {stage_index}: {step_name}", level="TRACE", emoji="👣"):
+                outcome = await _execute_step_internal(stage_tuple, context)
             
             if isinstance(outcome, dict) and outcome.get('success') is True and 'data' in outcome:
                 data_to_pass = outcome['data']
@@ -703,6 +708,7 @@ async def pipe(*stages,context=dict()):
                 data_to_pass = outcome
             
             final_output = data_to_pass
+            # Tronca l'output per evitare log giganti se necessario (opzionale, qui manteniamo raw)
             context['outputs'].append(data_to_pass)
             
     return final_output
