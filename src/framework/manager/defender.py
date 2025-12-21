@@ -147,22 +147,40 @@ class defender:
         """
         pass
 
-    def has_role(self, **constants) -> None:
+    async def check_permission(self, **constants) -> bool:
         """
-        Placeholder per rimuovere sessioni scadute o non più valide.
-
-        Questo metodo potrebbe essere implementato con controlli di scadenza basati su timestamp.
-
-        :param constants: Parametri opzionali per la pulizia.
+        Verifica se il contesto corrente ha i permessi per eseguire l'azione richiesta.
+        
+        :param constants: Il contesto dell'esecuzione (deve contenere informazioni scure sull'utente/token/task).
+        :return: True se permesso, False altrimenti.
         """
-        pass
+        # Logica di base: se non ci sono regole restrittive, permetti.
+        # Qui potresti integrare controlli su ruoli, liste di controllo accessi (ACL), ecc.
+        
+        # Esempio: Controlla se l'utente è autenticato (se richiesto)
+        # if not await self.authenticated(**constants):
+        #    return False
+        
+        # Esempio: Implementazione minima che ritorna True per ora, 
+        # ma predisposta per estensioni future.
+        return True
 
-    def has_permission(self, **constants) -> None:
+    def has_role(self, **constants) -> bool:
         """
-        Placeholder per rimuovere sessioni scadute o non più valide.
-
-        Questo metodo potrebbe essere implementato con controlli di scadenza basati su timestamp.
-
-        :param constants: Parametri opzionali per la pulizia.
+        Verifica se l'utente ha uno specifico ruolo.
         """
-        pass
+        user_roles = constants.get('roles', [])
+        required_role = constants.get('required_role')
+        if required_role and required_role not in user_roles:
+            return False
+        return True
+
+    def has_permission(self, **constants) -> bool:
+        """
+        Verifica se l'utente ha uno specifico permesso.
+        """
+        user_permissions = constants.get('permissions', [])
+        required_permission = constants.get('required_permission')
+        if required_permission and required_permission not in user_permissions:
+            return False
+        return True

@@ -5,7 +5,8 @@ from framework.service.inspector import framework_log
 
 imports = {
     #'loader': 'framework/manager/loader.py'
-    'loader': 'framework/service/load.py'
+    'loader': 'framework/service/load.py',
+    'flow': 'framework/service/flow.py'
 }
 
 import os
@@ -441,5 +442,6 @@ def application(tester=None,**constants):
     else:
         event_loop = asyncio.new_event_loop()
         asyncio.set_event_loop(event_loop)
-        event_loop.create_task(loader.bootstrap())
+        event_loop.create_task(flow.work(flow.step(loader.bootstrap)))
+        #event_loop.create_task(loader.bootstrap())
         event_loop.run_forever()

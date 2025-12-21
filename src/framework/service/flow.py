@@ -921,6 +921,74 @@ async def switch(cases, context=dict()):
         if success:
             return await _execute_step_internal(action_step,context)
 
+async def work(workflow, context=dict()):
+    """
+    Esegue un workflow come una transazione radice, verificando i permessi tramite Defender.
+    Se Defender non è disponibile (es. bootstrap), consente l'esecuzione solo per task di sistema.
+    """
+    # 1. Setup Root Transaction
+    current_tx_id, tx_token = _setup_transaction_context()
+    
+    if context is None:
+        context = {}
+    
+    # Assicura che 'identifier' nel contesto corrisponda al Transaction ID
+    if 'identifier' not in context:
+        context['identifier'] = current_tx_id
+
+    try:
+        # 2. Permission Check (Defender Guard)
+        authorized = False
+        defender_service = None
+        
+        # Tenta di recuperare il servizio Defender dal container
+        if hasattr(container, 'defender'):
+            try:
+                defender_service = container.defender()
+            except Exception:
+                defender_service = None
+        
+        if defender_service:
+            # Defender è attivo: Verifica Permessi
+            wf_name = getattr(workflow, '__name__', str(workflow))
+            check_ctx = context | {'workflow_name': wf_name, 'transaction_id': current_tx_id}
+            
+            # Delega la verifica al Defender
+            authorized = await defender_service.check_permission(**check_ctx)
+            if not authorized:
+                framework_log("WARNING", f"Accesso negato da Defender per {wf_name}", emoji="⛔", data=check_ctx)
+
+        else:
+            # Defender non attivo: Bypass di Sistema (Bootstrap)
+            # Consenti solo se flaggato come sistema
+            is_system = context.get('system', False) or context.get('user') == 'system'
+            
+            if is_system:
+                authorized = True
+                framework_log("DEBUG", "Defender offline: Accesso System concesso.", emoji="🛡️")
+            else:
+                authorized = False
+                framework_log("ERROR", "Defender offline: Accesso User negato.", emoji="⛔")
+
+        if not authorized:
+             # Genera un errore esplicito
+             raise PermissionError("Accesso negato: Permessi insufficienti o Defender non disponibile.")
+        transaction = asyncio.create_task(_execute_step_internal(workflow, context))
+
+        return transaction
+
+    except Exception as e:
+        framework_log("ERROR", f"Errore avvio workflow: {e}", emoji="❌")
+        # Restituisce un task che fallisce immediatamente
+        async def fail_task(): raise e
+        return asyncio.create_task(fail_task())
+
+    finally:
+        # Pulisce il contextvar per non inquinare il chiamante,
+        # il task creato eredita la copia corretta con l'ID impostato.
+        if tx_token:
+            _transaction_id.reset(tx_token)
+
 async def catch(try_step, catch_step,context=dict()):
     """
     Esegue il primo step. Se il risultato è un oggetto errore (dizionario con 'ok': False), 
