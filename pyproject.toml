@@ -11,11 +11,11 @@ mode = "development"                     # Modalita applicazione development/pro
 presentation = "web.toml"
 persistence = "redis.toml"
 message = "log.toml"
-telemetry = "otel.toml"
+#telemetry = "otel.toml"
 
-[telemetry]
-enabled = true
-exporter = "console"
+#[telemetry]
+#enabled = true
+#exporter = "console"
 
 
 # Configurazione della messaggistica

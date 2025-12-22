@@ -10,7 +10,7 @@
         },
         "bootstrap_core": {
             "test": "d683b01a043ec54c4081835db4187e9f54206e1580563e29bb07fb977ef4b999",
-            "production": "b08f24c47c1dcc66a230ede277ef0f951a3b1ff50b848c0575deef9cca000f62"
+            "production": "a40b18f024f854c36879f29bd270e90e7381f08ec681c843d712daab764aaa01"
         },
         "bootstrap": {
             "test": "038ee4e822716fb257c55af8dc60aa05a5efb4f112fcc251edb8a4110ccbcbb5",
