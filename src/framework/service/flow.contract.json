@@ -18,7 +18,7 @@
         },
         "asynchronous": {
             "test": "04852c350ccbc650ed6163dae362594037c43129b6147cd879e12ff0fb94aee3",
-            "production": "7f80e4af0d8126363047614e1aed2da2047325400bfc650f95621c1fc1baa829"
+            "production": "44a028eaea71826cfeb904d0299ad4e9c57f16af6e195f738214b4181646512a"
         },
         "synchronous": {
             "test": "fce4373a51afc6fe6396a125b184f4892c6ff02b6e4588023b5f3b2ded5e58dc",
@@ -34,7 +34,7 @@
         },
         "pipe": {
             "test": "f2471be2477581ba9693a4a2fcd145166e07bc46355edc2800648db37b84f8cc",
-            "production": "9dadfbdeac4e9f9959961165af74d23480cf48fae4e3cf00c327f13412ad83ba"
+            "production": "2623ba96d9bec6caa838c1e478476192bcb9a26d4bb5cb2ff507e716f2e0a72e"
         },
         "catch": {
             "test": "b71786e8c64c7b614765edf6c59e970b4da30a8c5b387f6d8666aa42976f84f4",

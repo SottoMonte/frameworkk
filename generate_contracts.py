@@ -20,7 +20,8 @@ FILES_TO_GENERATE = [
     "src/framework/service/language.py",
     "src/framework/service/factory.py",
     "src/framework/manager/executor.py",
-    "src/framework/manager/tester.py"
+    "src/framework/manager/tester.py",
+    "src/infrastructure/message/otel.py"
 ]
 
 async def generate(path):

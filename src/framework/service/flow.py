@@ -286,15 +286,16 @@ def asynchronous(custom_filename: str = __file__, app_context = None, **constant
             req_token = _requirements.set(requirements)
             
             try:
-                '''return await pipe(
-                    step(_execute_wrapper(function, args, kwargs, inject, current_tx_id)),
-                    step(_normalize_wrapper('@.outputs.-1', output_schema_path, wrapper, kwargs, current_tx_id))
-                )'''
-                # 2. Execute & Enrich
-                transaction = await _execute_wrapper(function, args, kwargs, inject, current_tx_id)
+                # --- OpenTelemetry Hook ---
+                telemetry_list = getattr(container, 'telemetry', lambda: [])()
+                span_name = f"async:{function.__name__}"
                 
-                # 3. Normalize
-                return await _normalize_wrapper(transaction, output_schema_path, wrapper, kwargs, current_tx_id)
+                with MultiSpanContext(telemetry_list, span_name):
+                    # 2. Execute & Enrich
+                    transaction = await _execute_wrapper(function, args, kwargs, inject, current_tx_id)
+                    
+                    # 3. Normalize
+                    return await _normalize_wrapper(transaction, output_schema_path, wrapper, kwargs, current_tx_id)
 
             except Exception as e:
                 # 4. Error Handling
@@ -694,24 +695,54 @@ async def pipe(*stages,context=dict()):
     final_output = None
     
     with log_block(f"Pipe with {len(stages)} stages", level="TRACE", emoji="🚀"):
-        for stage_tuple in stages:
-            stage_index += 1
-            step_name = getattr(stage_tuple[0], '__name__', str(stage_tuple[0]))
-            
-            # Utilizza timed_block o log_block per ogni stage per tracciare i tempi
-            with log_block(f"Step {stage_index}: {step_name}", level="TRACE", emoji="👣"):
-                outcome = await _execute_step_internal(stage_tuple, context)
-            
-            if isinstance(outcome, dict) and outcome.get('success') is True and 'data' in outcome:
-                data_to_pass = outcome['data']
-            else:
-                data_to_pass = outcome
-            
-            final_output = data_to_pass
-            # Tronca l'output per evitare log giganti se necessario (opzionale, qui manteniamo raw)
-            context['outputs'].append(data_to_pass)
+        # --- OpenTelemetry Hook ---
+        telemetry_list = getattr(container, 'telemetry', lambda: [])()
+        
+        with MultiSpanContext(telemetry_list, "pipe_execution"):
+            for stage_tuple in stages:
+                stage_index += 1
+                step_name = getattr(stage_tuple[0], '__name__', str(stage_tuple[0]))
+                
+                # Utilizza timed_block o log_block per ogni stage per tracciare i tempi
+                with log_block(f"Step {stage_index}: {step_name}", level="TRACE", emoji="👣"):
+                    outcome = await _execute_step_internal(stage_tuple, context)
+                
+                if isinstance(outcome, dict) and outcome.get('success') is True and 'data' in outcome:
+                    data_to_pass = outcome['data']
+                else:
+                    data_to_pass = outcome
+                
+                final_output = data_to_pass
+                # Tronca l'output per evitare log giganti se necessario (opzionale, qui manteniamo raw)
+                context['outputs'].append(data_to_pass)
             
     return final_output
+
+class MockSpanContext:
+    def __enter__(self): return self
+    def __exit__(self, *args): pass
+
+class MultiSpanContext:
+    """Gestisce l'apertura di più span per una lista di provider di telemetria."""
+    def __init__(self, telemetry_list, span_name, attributes=None):
+        self.telemetry_list = telemetry_list or []
+        self.span_name = span_name
+        self.attributes = attributes
+        self.spans = []
+
+    def __enter__(self):
+        for tel in self.telemetry_list:
+            if hasattr(tel, 'start_span'):
+                span = tel.start_span(self.span_name, attributes=self.attributes)
+                if hasattr(span, '__enter__'):
+                    span.__enter__()
+                self.spans.append(span)
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        for span in reversed(self.spans):
+            if hasattr(span, '__exit__'):
+                span.__exit__(exc_type, exc_val, exc_tb)
 
 async def safe(func: Callable, *args, **kwargs) -> Dict[str, Any]:
     """

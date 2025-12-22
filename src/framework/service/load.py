@@ -603,6 +603,16 @@ async def installa_dipendenze_browser() -> None:
 
 async def bootstrap_core(config) -> None:
     with log_block("Bootstrap Core Phases", level="INFO", emoji="🏗️"):
+        # --- Telemetry Initialization ---
+        with log_block("Telemetry Initialization", level="DEBUG", emoji="📡"):
+            tel_config = config.get('telemetry', {})
+            await register(**{
+                'path': 'infrastructure/message/otel.py',
+                'service': 'telemetry',
+                'adapter': 'adapter',
+                'payload': tel_config | {'project': config.get('project', {}).get('name', 'sottomonte-app')}
+            })
+
         manager_loader_path = [
             {
                 'path': 'framework/manager/messenger.py', 
