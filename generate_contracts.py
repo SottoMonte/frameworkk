@@ -12,17 +12,19 @@ sys.path.insert(1, cwd + '/src')
 import framework.service.load as load
 import framework.service.flow as flow
 
-# Lista dei file per cui generare i contratti
-FILES_TO_GENERATE = [
-    "src/framework/service/run.py",
-    "src/framework/service/flow.py",
-    "src/framework/service/load.py",
-    "src/framework/service/language.py",
-    "src/framework/service/factory.py",
-    "src/framework/manager/executor.py",
-    "src/framework/manager/tester.py",
-    "src/infrastructure/message/otel.py"
-]
+# Funzione per scoprire tutti i contratti da generare
+def discover_files_to_generate(start_dir="src"):
+    files = []
+    for root, _, filenames in os.walk(start_dir):
+        for filename in filenames:
+            if filename.endswith(".test.py"):
+                # Percorso del file di test
+                test_path = os.path.join(root, filename)
+                # Percorso del file principale corrispondente
+                main_path = test_path.replace(".test.py", ".py")
+                if os.path.exists(main_path):
+                    files.append(main_path)
+    return files
 
 async def generate(path):
     print(f"Generating contract for {path}...")
@@ -40,11 +42,7 @@ async def generate(path):
         data = result.get('data') if isinstance(result, dict) and 'data' in result else result
         
         if not data or rel_path not in data:
-            # A volte generate_checksum potrebbe ritornare direttamente il contenuto o usare chiavi diverse
-            # Controlliamo cosa torna
-            # Se generate_checksum fallisce internamente, potrebbe tornare un dict vuoto o errore
             print(f"❌ Failed or Empty data for {path}. Result keys: {data.keys() if isinstance(data, dict) else type(data)}")
-            # Fallback: a volte il path chiave nel dict risultato potrebbe variare leggermente
             return
 
         contract_content = data[rel_path]
@@ -62,17 +60,17 @@ async def generate(path):
         
     except Exception as e:
         print(f"❌ CRITICAL Error generating {path}: {e}")
-        import traceback
-        traceback.print_exc()
+        # import traceback
+        # traceback.print_exc()
 
 async def main():
-    print("🚀 Starting Contract Generation...")
-    for f in FILES_TO_GENERATE:
-        # Verifica se il file esiste prima
-        if os.path.exists(f):
-            await generate(f)
-        else:
-            print(f"⚠️ File not found, skipping: {f}")
+    print("🚀 Starting Contract Generation (Auto-Discovery)...")
+    files_to_generate = discover_files_to_generate()
+    print(f"🔍 Found {len(files_to_generate)} modules with tests.")
+    
+    for f in files_to_generate:
+        await generate(f)
+        
     print("🏁 Done.")
 
 if __name__ == "__main__":

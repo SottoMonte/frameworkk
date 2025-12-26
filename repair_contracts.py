@@ -8,16 +8,23 @@ sys.path.append(os.path.join(os.getcwd(), 'src'))
 # Import load.py normally (not via the dynamic loader)
 from framework.service import load
 
+# Funzione per scoprire tutti i contratti da riparare
+def discover_files_to_repair(start_dir="src"):
+    files = []
+    for root, _, filenames in os.walk(start_dir):
+        for filename in filenames:
+            if filename.endswith(".test.py"):
+                # Percorso del file di test
+                test_path = os.path.join(root, filename)
+                # Percorso del file principale corrispondente
+                main_path = test_path.replace(".test.py", ".py")
+                if os.path.exists(main_path):
+                    files.append(main_path)
+    return files
+
 async def repair():
-    services = [
-        "src/framework/service/run.py",
-        "src/framework/service/load.py",
-        "src/framework/service/language.py",
-        "src/framework/service/factory.py",
-        "src/framework/service/flow.py",
-        "src/framework/manager/executor.py",
-        "src/framework/manager/tester.py"
-    ]
+    services = discover_files_to_repair()
+    print(f"Repairing {len(services)} contracts (Auto-Discovery)...")
     
     for service_path in services:
         print(f"Repairing contract for {service_path}...")

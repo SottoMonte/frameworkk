@@ -706,10 +706,9 @@ class adapter(presentation.port):
             #Middleware(AuthorizationMiddleware, manager=defender)
         ]
 
-        loop = asyncio.get_event_loop()
-
-        @language.asynchronous()
-        async def main():
+        async def starter():
+            print("Starlette: Inizializzazione in corso...")
+            exit(1000)
             await self.parse_route()
             self.mount_route(routes) # 'routes' deve essere accessibile qui
 
@@ -722,7 +721,7 @@ class adapter(presentation.port):
                 "host": self.config.get('host', '127.0.0.1'),
                 "port": int(self.config.get('port', 8000)),
                 "use_colors": True,
-                "reload": True, # `reload=True` solo per sviluppo
+                "reload": False, # `reload=True` non è compatibile con create_task in questo modo
                 "loop": loop,
                 #'log_level':"trace"
                 #'log_config':None
@@ -748,12 +747,15 @@ class adapter(presentation.port):
                 # Crea e avvia il server Uvicorn come task asyncio
                 config = Config(**uvicorn_config_params)
                 server = Server(config)
-                loop.create_task(server.serve())
+                await server.serve()
                 await messenger.post(domain='debug', message=f"Server avviato su {uvicorn_config_params['host']}:{uvicorn_config_params['port']}")
             except Exception as e:
                 # Logga errori critici all'avvio del server
                 await messenger.post(domain='error', message=f"Errore critico durante l'avvio del server Uvicorn: {e}")
-        loop.create_task(main())
+        self.starter = starter
+
+    def loader(self, loop):
+        loop.create_task(self.starter())
     
     async def mount_css(self,constants):
         pass
