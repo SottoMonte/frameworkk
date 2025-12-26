@@ -34,7 +34,7 @@
         },
         "loader": {
             "test": "8a5fb87c6af0419d89afd124376101aa19590f1de018511340be5ccdb2849cae",
-            "production": "062bcf4652f781df23735f9fff4163b9ba1a186d5d7eb93ae731a664816437df"
+            "production": "bd418e100f9f1b8098c396ba0e38adb27b93b9a33be3366896489622da8152e3"
         },
         "mount_view": {
             "test": "3b4f2222bcad68f18894c6787c38c289d86e0839f836ff52dea65ede7bbeed71",

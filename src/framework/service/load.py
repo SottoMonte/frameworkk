@@ -240,6 +240,7 @@ async def _validate_checksums(main_module, path, contract_info):
             else:
                 framework_log("ERROR", f"Hash mismatch per '{m}' in {path}: il codice è stato modificato rispetto al contratto (P:{current_p[:8]}... vs E:{expected_p[:8]}...).", emoji="🚫") 
                 framework_log("DEBUG", f"Integrità: L'attributo '{m}' in {path} è stato rimosso dal modulo per violazione del contratto.", emoji="🛡️")
+                #raise Exception(f"Hash mismatch per '{m}' in {path}: il codice è stato modificato rispetto al contratto (P:{current_p[:8]}... vs E:{expected_p[:8]}...).")
         if valid:
             contract_validated_methods[tgt] = valid
             
@@ -718,6 +719,7 @@ async def bootstrap() -> None:
     await dependency_messenger.post(domain='debug', message="✅ Manager di base (Messenger, Executor) caricati e pronti.")
     await dependency_messenger.post(domain='debug', message=f"Configurazione caricata con successo (Ambiente: {platform_type}).")
     
+    print("Configurazione caricata con successo (Ambiente: {platform_type}).")
     # --- FASE DI CARICAMENTO PROVIDER ---
     provider_tasks: List[asyncio.Task] = []
     MODULI_PRINCIPALI = ["presentation", "persistence", "message", "authentication", "actuator","authorization"]

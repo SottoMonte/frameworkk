@@ -1,4 +1,3 @@
-# Import
 import sys
 import os
 import asyncio
@@ -33,34 +32,10 @@ async def main():
                 flow.step(load_filtered.resource, path="framework/service/run.py"),
             )
         )
-'''
-async def main():
-    target = sys.argv[1] if len(sys.argv) > 1 else 'src/framework/service/load.py'
-    print(f"Generating contract for {target}...")
-    
-    # generate_checksum returns a wrapper due to @asynchronous
-    res = await generate_checksum(target)
-    
-    # Unwrap
-    data = res.get('data', {}) if isinstance(res, dict) and 'data' in res else res
-    
-    contract_path = target.replace('.py', '.contract.json')
-    if data and target in data:
-        with open(contract_path, 'w') as f:
-            json.dump(data[target], f, indent=4)
-        print(f"Written to {contract_path}")
-        print(json.dumps(data[target], indent=4))
-    else:
-        print(f"Failed to generate contract for {target}. Result: {data}")
-'''
+
 if __name__ == "__main__":
     # Load the run module
     result = asyncio.run(main())
     run_module = result.get('data') if isinstance(result, dict) and 'data' in result else result
     
-    # Now call application which will start its own event loop for bootstrap
-    if hasattr(run_module, 'application'):
-        run_module.application(args=sys.argv)
-    else:
-        print(f"Error: run module doesn't have 'application'. Available: {dir(run_module)}")
-    
+    run_module.application(args=sys.argv)

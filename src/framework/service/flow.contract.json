@@ -18,11 +18,11 @@
         },
         "asynchronous": {
             "test": "04852c350ccbc650ed6163dae362594037c43129b6147cd879e12ff0fb94aee3",
-            "production": "44a028eaea71826cfeb904d0299ad4e9c57f16af6e195f738214b4181646512a"
+            "production": "8d0a0d85b80776f559c1f2372b877a6600f06959a1b48b4d87f6dc002325eddc"
         },
         "synchronous": {
             "test": "fce4373a51afc6fe6396a125b184f4892c6ff02b6e4588023b5f3b2ded5e58dc",
-            "production": "9d1935228edb8d634d3965b21d78e887e2bc0e6a982a5544117eeea43090bb01"
+            "production": "9b7efc908cd1f0f9adff8ad15deedc5c47fc4d3236e0e8f18a70cf29e7815b51"
         },
         "work": {
             "test": "b763b22557c92d29e16682d100ac4e7d543553327920fb5a54b395dcae9c5055",
